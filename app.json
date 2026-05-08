@@ -15,6 +15,9 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.siftly.app",
       "buildNumber": "1",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      },
       "privacyManifests": {
         "NSPrivacyAccessedAPITypes": [
           {
