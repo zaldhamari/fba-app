@@ -7,10 +7,14 @@ import * as Sentry from '@sentry/react-native';
 import RootNavigator from './src/navigation/RootNavigator';
 import { CurrencyProvider } from './src/context/CurrencyContext';
 import { initRevenueCat } from './src/lib/revenuecat';
+import { validateConfig } from './src/lib/validateConfig';
 
+validateConfig();
+
+const SENTRY_DSN = process.env.EXPO_PUBLIC_SENTRY_DSN ?? '';
 Sentry.init({
-  dsn: process.env.EXPO_PUBLIC_SENTRY_DSN ?? '',
-  enabled: !__DEV__,
+  dsn: SENTRY_DSN.startsWith('REPLACE_WITH') ? '' : SENTRY_DSN,
+  enabled: !__DEV__ && !SENTRY_DSN.startsWith('REPLACE_WITH'),
 });
 
 // Initialize RC as early as possible — before any render
