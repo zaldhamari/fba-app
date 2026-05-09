@@ -3,9 +3,6 @@
     "name": "Siftly",
     "slug": "siftly",
     "version": "1.0.0",
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
     "icon": "./assets/icon.png",
     "newArchEnabled": false,
     "orientation": "portrait",
