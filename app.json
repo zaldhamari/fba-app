@@ -6,9 +6,12 @@
     "runtimeVersion": {
       "policy": "appVersion"
     },
+    "icon": "./assets/icon.png",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
       "backgroundColor": "#0A1628"
     },
     "ios": {
