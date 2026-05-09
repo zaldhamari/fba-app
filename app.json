@@ -7,6 +7,7 @@
       "policy": "appVersion"
     },
     "icon": "./assets/icon.png",
+    "newArchEnabled": false,
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "splash": {
