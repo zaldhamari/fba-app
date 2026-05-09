@@ -90,6 +90,10 @@ export const PLAN_FEATURES: Record<Tier, string[]> = {
   ],
 };
 
+// ─── Dev bypass (preview builds only — stripped from production) ───────────────
+
+const DEV_BYPASS = process.env.EXPO_PUBLIC_DEV_BYPASS === 'true';
+
 // ─── Keys ──────────────────────────────────────────────────────────────────────
 
 const KEYS = {
@@ -121,6 +125,11 @@ export function useSubscription() {
   const [loaded, setLoaded]                       = useState(false);
 
   useEffect(() => {
+    if (DEV_BYPASS) {
+      setTier('operator');
+      setLoaded(true);
+      return;
+    }
     loadState();
     checkRCEntitlements();
   }, []);
