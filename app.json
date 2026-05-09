@@ -43,8 +43,7 @@
       "package": "com.siftly.app"
     },
     "plugins": [
-      "expo-secure-store",
-      "@sentry/react-native"
+      "expo-secure-store"
     ],
     "extra": {
       "eas": {
