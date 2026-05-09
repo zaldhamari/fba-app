@@ -18,6 +18,9 @@ export function initRevenueCat(): void {
     if (__DEV__) console.warn('[RC] EXPO_PUBLIC_RC_KEY not set — RevenueCat disabled');
     return;
   }
+  if (!__DEV__ && apiKey.startsWith('test_')) {
+    console.error('[RC] Test key used in production build — replace with live key before App Store submission');
+  }
   if (__DEV__) Purchases.setLogLevel(LOG_LEVEL.DEBUG);
   Purchases.configure({ apiKey });
 }
@@ -30,15 +33,14 @@ export function tierFromCustomerInfo(info: CustomerInfo): Tier {
   return 'explorer';
 }
 
-// Fetch the package matching tier + billing period.
-// RC dashboard package identifiers: builder_monthly, builder_annual,
-// operator_monthly, operator_annual
+// Fetch the package matching the billing period from the current offering.
+// RC dashboard default offering uses standard identifiers: $rc_monthly, $rc_annual
 export async function getPackageForTier(
-  tier: Tier,
+  _tier: Tier,
   isAnnual: boolean,
 ): Promise<PurchasesPackage | null> {
   const offerings = await Purchases.getOfferings();
-  const pkgId = `${tier}_${isAnnual ? 'annual' : 'monthly'}`;
+  const pkgId = isAnnual ? '$rc_annual' : '$rc_monthly';
   return (
     offerings.current?.availablePackages.find(p => p.identifier === pkgId) ?? null
   );
