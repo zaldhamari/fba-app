@@ -129,7 +129,7 @@ export default function PaywallScreen({ navigation, route }: Props) {
             <Switch
               value={annual}
               onValueChange={setAnnual}
-              trackColor={{ false: colors.gray200, true: colors.cyan }}
+              trackColor={{ false: colors.gray200, true: '#4361EE' }}
               thumbColor={colors.white}
             />
           </View>
@@ -306,126 +306,127 @@ export default function PaywallScreen({ navigation, route }: Props) {
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.surface },
+  container: { flex: 1, backgroundColor: '#F5F7FF' },
   scroll: { flexGrow: 1, paddingBottom: 48 },
 
   header: {
     paddingHorizontal: spacing.lg, paddingTop: spacing.xl, paddingBottom: spacing.lg,
-    backgroundColor: colors.bgCard,
-    borderBottomWidth: 1, borderBottomColor: colors.border,
+    backgroundColor: '#F5F7FF',
+    borderBottomWidth: 1, borderBottomColor: '#E0E8F5',
   },
   logoBadge: {
-    alignSelf: 'flex-start', backgroundColor: colors.cyanDim,
+    alignSelf: 'flex-start', backgroundColor: '#EEF4FF',
     borderRadius: radius.full, paddingHorizontal: spacing.md, paddingVertical: spacing.xs,
-    marginBottom: spacing.md, borderWidth: 1, borderColor: colors.cyanBorder,
+    marginBottom: spacing.md, borderWidth: 1, borderColor: 'rgba(67,97,238,0.22)',
   },
-  logoText: { fontSize: 11, fontWeight: '700', color: colors.cyan, letterSpacing: 0.5 },
+  logoText: { fontSize: 11, fontWeight: '700', color: '#4361EE', letterSpacing: 0.5 },
   headline: {
-    fontSize: 38, fontWeight: '900', color: colors.cyan,
-    letterSpacing: -1.5, lineHeight: 44, marginBottom: spacing.sm,
+    fontSize: 36, fontWeight: '900', color: '#0D1B4B',
+    letterSpacing: -1.5, lineHeight: 42, marginBottom: spacing.sm,
   },
   sub: { fontSize: 15, color: colors.textSecondary, lineHeight: 22 },
 
   toggleCard: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: colors.white, padding: spacing.md,
+    backgroundColor: '#fff', padding: spacing.md,
     marginHorizontal: spacing.lg, marginTop: spacing.md,
-    borderRadius: radius.md, ...shadow.sm,
+    borderRadius: radius.xl, ...shadow.sm,
+    borderWidth: 1, borderColor: '#E0E8F5',
   },
-  toggleTitle: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
+  toggleTitle: { fontSize: 15, fontWeight: '700', color: '#0D1B4B' },
   toggleSub: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
   toggleRight: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   savePill: {
     borderRadius: radius.full, paddingHorizontal: spacing.sm, paddingVertical: 3,
-    borderWidth: 1, borderColor: colors.gray200,
+    borderWidth: 1, borderColor: '#E0E8F5',
   },
   savePillActive: { backgroundColor: colors.greenLight, borderColor: colors.green },
-  savePillText: { fontSize: 9, fontWeight: '800', color: colors.gray400, letterSpacing: 0.5 },
+  savePillText: { fontSize: 9, fontWeight: '800', color: colors.textMuted, letterSpacing: 0.5 },
   savePillTextActive: { color: colors.green },
 
   planCard: {
-    backgroundColor: colors.white, borderRadius: radius.lg,
+    backgroundColor: '#fff', borderRadius: radius.xxl,
     marginHorizontal: spacing.lg, marginTop: spacing.md,
-    padding: spacing.md, borderWidth: 1.5, borderColor: colors.gray200,
+    padding: spacing.lg, borderWidth: 1.5, borderColor: '#E0E8F5',
     ...shadow.sm,
   },
-  planCardRecommended: { borderColor: colors.cyan, ...shadow.md },
-  planCardOperator: { borderColor: colors.cyan },
-  planCardSelected: { borderColor: colors.cyan },
+  planCardRecommended: { borderColor: '#4361EE', ...shadow.md },
+  planCardOperator: { borderColor: '#7C3AED' },
+  planCardSelected: { borderColor: '#4361EE' },
 
   recommendedBadge: {
-    alignSelf: 'flex-start', backgroundColor: colors.cyanLight,
+    alignSelf: 'flex-start', backgroundColor: '#EEF4FF',
     borderRadius: radius.full, paddingHorizontal: spacing.sm, paddingVertical: 4,
     marginBottom: spacing.sm,
   },
-  recommendedText: { fontSize: 9, fontWeight: '800', color: colors.cyan, letterSpacing: 0.5 },
+  recommendedText: { fontSize: 9, fontWeight: '800', color: '#4361EE', letterSpacing: 0.5 },
   operatorBadge: {
-    alignSelf: 'flex-start', backgroundColor: colors.cyanLight,
+    alignSelf: 'flex-start', backgroundColor: 'rgba(124,58,237,0.10)',
     borderRadius: radius.full, paddingHorizontal: spacing.sm, paddingVertical: 4,
     marginBottom: spacing.sm,
   },
-  operatorBadgeText: { fontSize: 9, fontWeight: '800', color: colors.cyan, letterSpacing: 0.5 },
+  operatorBadgeText: { fontSize: 9, fontWeight: '800', color: '#7C3AED', letterSpacing: 0.5 },
   currentBadge: {
-    alignSelf: 'flex-start', backgroundColor: colors.gray100,
+    alignSelf: 'flex-start', backgroundColor: '#EEF2FA',
     borderRadius: radius.full, paddingHorizontal: spacing.sm, paddingVertical: 4,
     marginBottom: spacing.sm,
   },
-  currentText: { fontSize: 9, fontWeight: '800', color: colors.gray600, letterSpacing: 0.5 },
+  currentText: { fontSize: 9, fontWeight: '800', color: colors.textMuted, letterSpacing: 0.5 },
 
   planHeader: {
     flexDirection: 'row', justifyContent: 'space-between',
     alignItems: 'flex-start', marginBottom: spacing.md,
   },
-  planName: { fontSize: 20, fontWeight: '900', color: colors.textPrimary, letterSpacing: -0.5 },
-  planDesc: { fontSize: 12, color: colors.gray600, lineHeight: 16, marginTop: 4, maxWidth: 160 },
+  planName: { fontSize: 20, fontWeight: '900', color: '#0D1B4B', letterSpacing: -0.5 },
+  planDesc: { fontSize: 12, color: colors.textSecondary, lineHeight: 16, marginTop: 4, maxWidth: 160 },
   planPriceWrap: { alignItems: 'flex-end' },
-  planPrice: { fontSize: 22, fontWeight: '900', color: colors.textPrimary, letterSpacing: -0.5 },
-  planBilling: { fontSize: 11, color: colors.gray400, marginTop: 2 },
+  planPrice: { fontSize: 22, fontWeight: '900', color: '#0D1B4B', letterSpacing: -0.5 },
+  planBilling: { fontSize: 11, color: colors.textMuted, marginTop: 2 },
 
-  featureDivider: { height: 1, backgroundColor: colors.gray100, marginBottom: spacing.md },
+  featureDivider: { height: 1, backgroundColor: '#EEF2FA', marginBottom: spacing.md },
 
   featureRow: { flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start', marginBottom: 6 },
   featureCheck: { fontSize: 13, fontWeight: '700', color: colors.green, width: 16 },
-  featureText: { fontSize: 13, color: colors.gray800, flex: 1, lineHeight: 18 },
+  featureText: { fontSize: 13, color: colors.textSecondary, flex: 1, lineHeight: 18 },
 
   planCta: {
-    borderWidth: 1.5, borderRadius: radius.md,
+    borderWidth: 1.5, borderRadius: radius.lg,
     paddingVertical: spacing.md, alignItems: 'center', marginTop: spacing.md,
   },
-  planCtaAccent: { backgroundColor: colors.cyan, borderColor: colors.cyan },
+  planCtaAccent: { backgroundColor: '#4361EE', borderColor: '#4361EE' },
   planCtaText: { fontSize: 15, fontWeight: '700' },
   planCtaTextWhite: { color: colors.white },
 
   tableSection: { paddingHorizontal: spacing.lg, marginTop: spacing.lg },
-  tableTitle: { fontSize: 18, fontWeight: '800', color: colors.cyan, letterSpacing: -0.5, marginBottom: spacing.sm },
+  tableTitle: { fontSize: 18, fontWeight: '800', color: '#0D1B4B', letterSpacing: -0.5, marginBottom: spacing.sm },
   table: {
-    backgroundColor: colors.white, borderRadius: radius.lg,
-    overflow: 'hidden', borderWidth: 1, borderColor: colors.gray200,
+    backgroundColor: '#fff', borderRadius: radius.xl,
+    overflow: 'hidden', borderWidth: 1, borderColor: '#E0E8F5',
   },
   tableRow: { flexDirection: 'row' },
-  tableHeaderRow: { backgroundColor: colors.gray100 },
-  tableRowAlt: { backgroundColor: colors.bgSubtle },
+  tableHeaderRow: { backgroundColor: '#F5F7FF' },
+  tableRowAlt: { backgroundColor: '#FAFBFF' },
   tableCell: {
     flex: 1, paddingVertical: spacing.sm, paddingHorizontal: spacing.sm,
-    fontSize: 11, color: colors.gray800, textAlign: 'center',
-    borderRightWidth: 1, borderRightColor: colors.gray200,
+    fontSize: 11, color: colors.textSecondary, textAlign: 'center',
+    borderRightWidth: 1, borderRightColor: '#E0E8F5',
   },
-  tableCellFeature: { flex: 1.4, textAlign: 'left', fontWeight: '600', color: colors.gray600 },
+  tableCellFeature: { flex: 1.4, textAlign: 'left', fontWeight: '600', color: colors.textSecondary },
   tableCellVal: { fontWeight: '600' },
-  tableHeaderText: { color: colors.cyan, fontWeight: '800', fontSize: 10 },
+  tableHeaderText: { color: '#4361EE', fontWeight: '800', fontSize: 10 },
 
   launchPack: {
     marginHorizontal: spacing.lg, marginTop: spacing.lg,
-    backgroundColor: colors.white, borderRadius: radius.lg, padding: spacing.md,
-    borderWidth: 1.5, borderColor: colors.cyanBorder,
+    backgroundColor: '#fff', borderRadius: radius.xxl, padding: spacing.lg,
+    borderWidth: 1.5, borderColor: 'rgba(67,97,238,0.22)',
   },
   launchPackHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: spacing.sm },
-  launchPackEyebrow: { fontSize: 8, fontWeight: '800', color: colors.cyan, letterSpacing: 1.5, marginBottom: 4 },
-  launchPackTitle: { fontSize: 20, fontWeight: '900', color: colors.textPrimary, letterSpacing: -0.5 },
-  launchPackPrice: { fontSize: 28, fontWeight: '900', color: colors.cyan, letterSpacing: -1 },
+  launchPackEyebrow: { fontSize: 8, fontWeight: '800', color: '#4361EE', letterSpacing: 1.5, marginBottom: 4 },
+  launchPackTitle: { fontSize: 20, fontWeight: '900', color: '#0D1B4B', letterSpacing: -0.5 },
+  launchPackPrice: { fontSize: 28, fontWeight: '900', color: '#4361EE', letterSpacing: -1 },
   launchPackDesc: { fontSize: 13, color: colors.textSecondary, lineHeight: 19, marginBottom: spacing.md },
   launchPackCta: {
-    backgroundColor: colors.cyan, borderRadius: radius.md,
+    backgroundColor: '#4361EE', borderRadius: radius.lg,
     paddingVertical: spacing.sm + 4, alignItems: 'center',
   },
   launchPackCtaText: { fontSize: 14, fontWeight: '700', color: colors.white },

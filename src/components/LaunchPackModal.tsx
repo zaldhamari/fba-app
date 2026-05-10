@@ -157,7 +157,7 @@ const s = StyleSheet.create({
     alignItems: 'flex-start', marginBottom: spacing.sm,
   },
   headerLeft: { flex: 1 },
-  eyebrow: { fontSize: 9, fontWeight: '800', color: colors.cyan, letterSpacing: 1.5, textTransform: 'uppercase' },
+  eyebrow: { fontSize: 9, fontWeight: '800', color: '#4361EE', letterSpacing: 1.5, textTransform: 'uppercase' },
   title: { fontSize: 26, fontWeight: '900', color: colors.textPrimary, letterSpacing: -1, marginTop: 4 },
   productName: { fontSize: 13, color: colors.gray600, marginTop: 4 },
   priceWrap: { alignItems: 'flex-end' },
@@ -179,17 +179,17 @@ const s = StyleSheet.create({
   packItemDesc: { fontSize: 12, color: colors.gray600, lineHeight: 17 },
 
   valueRow: {
-    flexDirection: 'row', backgroundColor: colors.cyanDim,
+    flexDirection: 'row', backgroundColor: 'rgba(67,97,238,0.10)',
     borderRadius: radius.md, marginBottom: spacing.md, overflow: 'hidden',
-    borderWidth: 1, borderColor: colors.cyanBorder,
+    borderWidth: 1, borderColor: 'rgba(67,97,238,0.22)',
   },
   valueItem: { flex: 1, alignItems: 'center', paddingVertical: spacing.md },
-  valueDivider: { width: 1, backgroundColor: colors.cyanBorder },
-  valueNum: { fontSize: 22, fontWeight: '900', color: colors.cyan, letterSpacing: -1 },
+  valueDivider: { width: 1, backgroundColor: 'rgba(67,97,238,0.22)' },
+  valueNum: { fontSize: 22, fontWeight: '900', color: '#4361EE', letterSpacing: -1 },
   valueLabel: { fontSize: 8, fontWeight: '700', color: colors.textMuted, letterSpacing: 1.5, textTransform: 'uppercase', marginTop: 2 },
 
   cta: {
-    backgroundColor: colors.cyan, borderRadius: radius.md,
+    backgroundColor: '#4361EE', borderRadius: radius.md,
     paddingVertical: spacing.md + 2, alignItems: 'center', marginBottom: spacing.sm,
   },
   ctaDisabled: { opacity: 0.5 },
@@ -203,7 +203,7 @@ const s = StyleSheet.create({
   successTitle: { fontSize: 24, fontWeight: '900', color: colors.textPrimary, letterSpacing: -0.5 },
   successSub: { fontSize: 14, color: colors.gray600, textAlign: 'center', lineHeight: 20 },
   doneBtn: {
-    backgroundColor: colors.cyan, borderRadius: radius.md,
+    backgroundColor: '#4361EE', borderRadius: radius.md,
     paddingVertical: spacing.md, paddingHorizontal: spacing.xl,
     marginTop: spacing.sm,
   },

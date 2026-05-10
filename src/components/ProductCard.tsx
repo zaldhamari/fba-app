@@ -175,7 +175,7 @@ export default function ProductCard({
             disabled={analyzing}
           >
             {analyzing
-              ? <PulseDots color={expanded ? colors.cyan : colors.white} />
+              ? <PulseDots color={expanded ? '#4361EE' : colors.white} />
               : <Text style={[s.analyzeBtnText, expanded && s.analyzeBtnTextExpanded]}>
                   {expanded ? 'Hide Analysis ↑' : 'Analyze Product →'}
                 </Text>
@@ -222,21 +222,21 @@ const s = StyleSheet.create({
   signalRow:      { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 1 },
   reviewCount:    { fontSize: 10, color: colors.textSecondary },
   rowDivider:     { fontSize: 10, color: colors.textMuted },
-  insightBtn:     { fontSize: 10, fontWeight: '700', color: colors.cyan },
+  insightBtn:     { fontSize: 10, fontWeight: '700', color: '#4361EE' },
   analyzeBtn: {
-    marginTop: spacing.sm, backgroundColor: colors.cyan,
+    marginTop: spacing.sm, backgroundColor: '#4361EE',
     borderRadius: radius.full, paddingVertical: 10, alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: colors.cyan, minHeight: 38,
+    borderWidth: 1, borderColor: '#4361EE', minHeight: 38,
   },
-  analyzeBtnExpanded:     { backgroundColor: 'transparent', borderColor: colors.cyan },
+  analyzeBtnExpanded:     { backgroundColor: 'transparent', borderColor: '#4361EE' },
   analyzeBtnText:         { fontSize: 13, fontWeight: '700', color: colors.white, letterSpacing: -0.1 },
-  analyzeBtnTextExpanded: { color: colors.cyan },
+  analyzeBtnTextExpanded: { color: '#4361EE' },
   usageMeter:             { fontSize: 10, color: colors.textMuted, textAlign: 'center', marginTop: 2 },
   analyzeHint: {
-    backgroundColor: colors.cyanDim, borderRadius: radius.sm,
+    backgroundColor: 'rgba(67,97,238,0.10)', borderRadius: radius.sm,
     paddingVertical: 4, paddingHorizontal: 8,
     alignSelf: 'flex-start', marginBottom: 2,
-    borderWidth: 1, borderColor: colors.cyanBorder,
+    borderWidth: 1, borderColor: 'rgba(67,97,238,0.22)',
   },
-  analyzeHintText: { fontSize: 10, fontWeight: '700', color: colors.cyan },
+  analyzeHintText: { fontSize: 10, fontWeight: '700', color: '#4361EE' },
 });

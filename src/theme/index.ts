@@ -1,19 +1,19 @@
-// ─── Signal v4 — Cinematic Premium System ──────────────────────────────────────
-// Apple restraint · Linear polish · Arc atmosphere · premium SaaS
+// ─── Signal v5 — Premium SaaS Design System ───────────────────────────────────
+// Linear · Stripe · Notion · Arc · Superhuman · Modern B2B SaaS
 
 export const colors = {
   // ── Canvas layers ─────────────────────────────────────────────────────────
-  bg:         '#ECF1FB',   // Richer blue-tinted canvas
+  bg:         '#F5F7FF',   // Clean blue-white canvas — the premium SaaS baseline
   bgCard:     '#FFFFFF',   // White card surface
-  bgElevated: '#E3EBF7',   // Deeper recessed (inputs, chips)
-  bgSubtle:   '#F4F8FF',   // Very subtle tinted surface
-  bgHero:     '#D8E8FF',   // Atmospheric hero — stronger cyan-blue depth layer
+  bgElevated: '#EEF2FA',   // Slightly elevated (inputs, chips)
+  bgSubtle:   '#F8FAFF',   // Very subtle tinted surface
+  bgHero:     '#EEF4FF',   // Indigo hero bg — light and airy
 
-  // ── Primary — Deep Indigo (Co-Pilot) ──────────────────────────────────────
-  purple:       '#5B50E8',
-  purpleLight:  '#EEF2FF',
-  purpleDim:    'rgba(91,80,232,0.10)',
-  purpleBorder: 'rgba(91,80,232,0.22)',
+  // ── Primary — Indigo (unified accent) ─────────────────────────────────────
+  purple:       '#4361EE',   // Unified indigo accent
+  purpleLight:  '#EEF4FF',
+  purpleDim:    'rgba(67,97,238,0.10)',
+  purpleBorder: 'rgba(67,97,238,0.22)',
 
   // ── Research — Sky Blue ───────────────────────────────────────────────────
   cyan:       '#0284C7',
@@ -45,44 +45,51 @@ export const colors = {
   orangeLight:'rgba(217,119,6,0.12)',
 
   // ── Text — WCAG AA+ on light bg ───────────────────────────────────────────
-  textPrimary:   '#091428',   // Rich navy-black, maximum depth
-  textSecondary: '#375170',   // Blue-tinted medium — strong on cool bg
-  textMuted:     '#6D8DAF',   // Blue-tinted muted — readable, atmospheric
+  textPrimary:   '#0D1B4B',   // Deep navy — premium SaaS standard
+  textSecondary: '#5C6B8A',   // Blue-tinted medium — readable on #F5F7FF
+  textMuted:     '#8196B0',   // Soft muted — atmospheric but readable
 
   // ── Borders ───────────────────────────────────────────────────────────────
-  border:       '#C8D5EA',   // Richer border — more definition
-  borderBright: '#B0C4DF',   // Stronger accent border
+  border:       '#E0E8F5',   // Soft border — premium SaaS standard
+  borderBright: '#C5D5EB',   // Slightly stronger accent border
 
   // ── Utility ───────────────────────────────────────────────────────────────
   white: '#FFFFFF',
   black: '#0F172A',
 
+  // ── Section colors (per-tab identity) ────────────────────────────────────
+  sectionSearch:   '#0284C7',   // Search — Blue
+  sectionBrand:    '#DB2777',   // Brand — Pink
+  sectionCalc:     '#7C3AED',   // Calculate — Purple
+  sectionKeywords: '#D97706',   // Keywords — Amber
+  sectionLaunch:   '#059669',   // Launch — Emerald
+
   // ── Legacy compatibility (screens that reference old keys) ─────────────────
   surface:    '#FFFFFF',
   card:       '#FFFFFF',
-  gray100:    '#EDF2FA',
-  gray200:    '#C8D5EA',
-  gray400:    '#6D8DAF',
-  gray600:    '#375170',
+  gray100:    '#EEF2FA',
+  gray200:    '#E0E8F5',
+  gray400:    '#8196B0',
+  gray600:    '#5C6B8A',
   gray800:    '#1A2D45',
-  accent:     '#5B50E8',
-  accentLight:'#EEF2FF',
-  accentDim:  'rgba(91,80,232,0.08)',
+  accent:     '#4361EE',
+  accentLight:'#EEF4FF',
+  accentDim:  'rgba(67,97,238,0.08)',
   blue:       '#0284C7',
   blueLight:  '#E0F2FE',
-  bgInput:    '#E3EBF7',
+  bgInput:    '#EEF2FA',
 };
 
 export const typography = {
-  h1:      { fontSize: 24, fontWeight: '800' as const, color: '#091428', letterSpacing: -0.8, lineHeight: 30 },
-  h2:      { fontSize: 18, fontWeight: '700' as const, color: '#091428', letterSpacing: -0.4, lineHeight: 24 },
-  h3:      { fontSize: 15, fontWeight: '600' as const, color: '#091428', letterSpacing: -0.2 },
-  body:    { fontSize: 14, fontWeight: '400' as const, color: '#375170', lineHeight: 22 },
-  caption: { fontSize: 12, fontWeight: '400' as const, color: '#6D8DAF' },
+  h1:      { fontSize: 24, fontWeight: '800' as const, color: '#0D1B4B', letterSpacing: -0.8, lineHeight: 30 },
+  h2:      { fontSize: 18, fontWeight: '700' as const, color: '#0D1B4B', letterSpacing: -0.4, lineHeight: 24 },
+  h3:      { fontSize: 15, fontWeight: '600' as const, color: '#0D1B4B', letterSpacing: -0.2 },
+  body:    { fontSize: 14, fontWeight: '400' as const, color: '#5C6B8A', lineHeight: 22 },
+  caption: { fontSize: 12, fontWeight: '400' as const, color: '#8196B0' },
   label:   {
     fontSize: 10,
     fontWeight: '700' as const,
-    color: '#6D8DAF',
+    color: '#8196B0',
     letterSpacing: 1.5,
     textTransform: 'uppercase' as const,
   },
@@ -93,16 +100,16 @@ export const spacing = {
 };
 
 export const radius = {
-  sm: 6, md: 10, lg: 14, xl: 18, xxl: 24, full: 999,
+  sm: 6, md: 10, lg: 16, xl: 20, xxl: 24, full: 999,
 };
 
 export const shadow = {
-  sm:   { shadowColor: '#0D1E3A', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.10, shadowRadius: 5,  elevation: 2 },
-  md:   { shadowColor: '#0D1E3A', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.13, shadowRadius: 14, elevation: 5 },
-  lg:   { shadowColor: '#0D1E3A', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.17, shadowRadius: 24, elevation: 9 },
-  card: { shadowColor: '#0D1E3A', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.12, shadowRadius: 12, elevation: 5 },
-  float:{ shadowColor: '#0D1E3A', shadowOffset: { width: 0, height: 12}, shadowOpacity: 0.22, shadowRadius: 32, elevation: 14 },
-  purple: { shadowColor: '#5B50E8', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 12, elevation: 6 },
+  sm:   { shadowColor: '#0D1B4B', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 6,  elevation: 2 },
+  md:   { shadowColor: '#0D1B4B', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.10, shadowRadius: 16, elevation: 5 },
+  lg:   { shadowColor: '#0D1B4B', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.14, shadowRadius: 28, elevation: 9 },
+  card: { shadowColor: '#0D1B4B', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.09, shadowRadius: 14, elevation: 4 },
+  float:{ shadowColor: '#0D1B4B', shadowOffset: { width: 0, height: 12}, shadowOpacity: 0.18, shadowRadius: 36, elevation: 14 },
+  purple: { shadowColor: '#4361EE', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.22, shadowRadius: 14, elevation: 6 },
   // Verdict chromatic — mid-weight (inline card)
   green: { shadowColor: '#059669', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.20, shadowRadius: 14, elevation: 7 },
   red:   { shadowColor: '#DC2626', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.16, shadowRadius: 12, elevation: 6 },
@@ -127,7 +134,7 @@ export const motion = {
 };
 
 export const borders = {
-  thin:   { borderWidth: 1,   borderColor: '#C8D5EA' },
-  medium: { borderWidth: 1.5, borderColor: '#B0C4DF' },
-  light:  { borderWidth: 1,   borderColor: '#D8E8FF' },
+  thin:   { borderWidth: 1,   borderColor: '#E0E8F5' },
+  medium: { borderWidth: 1.5, borderColor: '#C5D5EB' },
+  light:  { borderWidth: 1,   borderColor: '#EEF2FA' },
 };

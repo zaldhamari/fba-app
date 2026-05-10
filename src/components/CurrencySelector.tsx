@@ -130,13 +130,13 @@ const s = StyleSheet.create({
     paddingVertical: 10, paddingHorizontal: spacing.sm,
     borderRadius: radius.md, marginBottom: 2,
   },
-  optionActive:     { backgroundColor: colors.cyanDim },
+  optionActive:     { backgroundColor: 'rgba(67,97,238,0.10)' },
   optionFlag:       { fontSize: 22 },
   optionText:       { flex: 1 },
   optionName:       { fontSize: 14, fontWeight: '600', color: colors.textPrimary },
-  optionNameActive: { color: colors.cyan },
+  optionNameActive: { color: '#4361EE' },
   optionSub:        { fontSize: 11, color: colors.textMuted, marginTop: 1 },
-  check:            { fontSize: 14, fontWeight: '800', color: colors.cyan },
+  check:            { fontSize: 14, fontWeight: '800', color: '#4361EE' },
 
   currencyRow: { gap: 8, paddingVertical: spacing.xs },
   chip: {
@@ -145,12 +145,12 @@ const s = StyleSheet.create({
     backgroundColor: colors.bgElevated, borderRadius: radius.md,
     borderWidth: 1, borderColor: colors.border,
   },
-  chipActive:    { backgroundColor: colors.cyanDim, borderColor: colors.cyan },
+  chipActive:    { backgroundColor: 'rgba(67,97,238,0.10)', borderColor: '#4361EE' },
   chipFlag:      { fontSize: 20 },
   chipCode:      { fontSize: 10, fontWeight: '800', color: colors.textSecondary },
-  chipCodeActive:{ color: colors.cyan },
+  chipCodeActive:{ color: '#4361EE' },
   chipSym:       { fontSize: 11, color: colors.textMuted },
-  chipSymActive: { color: colors.cyan },
+  chipSymActive: { color: '#4361EE' },
 
   note: {
     fontSize: 10, color: colors.textMuted, textAlign: 'center',

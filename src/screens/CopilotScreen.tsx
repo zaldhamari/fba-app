@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, ScrollView, Animated, Modal,
+  View, Text, StyleSheet, TouchableOpacity, ScrollView, Animated, Modal, RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -19,10 +19,10 @@ const JOURNEY_KEY = 'fba_journey_v5';
 
 // ─── Journey steps ─────────────────────────────────────────────────────────────
 const STEPS = [
-  { id: 'research',  num: '01', title: 'Discover Your Opportunity', desc: 'Surface real demand signals and AI-scored opportunities',        tab: 'Research',  color: colors.cyan,   icon: '◎' },
+  { id: 'research',  num: '01', title: 'Discover Your Opportunity', desc: 'Surface real demand signals and AI-scored opportunities',        tab: 'Search',    color: '#4361EE',     icon: '◎' },
   { id: 'brand',     num: '02', title: 'Build Your Brand',           desc: 'Generate a brand name, tagline, and brand kit with AI',          tab: 'Brand',     color: colors.pink,   icon: '✦' },
-  { id: 'keywords',  num: '03', title: 'Research Keywords',          desc: 'Find the exact terms buyers search — rank from day one',         tab: 'Keywords',  color: colors.amber,  icon: '≋' },
-  { id: 'suppliers', num: '04', title: 'Source Your Supplier',       desc: 'Find vetted global suppliers and send professional outreach',    tab: 'Suppliers', color: colors.green,  icon: '⬡' },
+  { id: 'keywords',  num: '03', title: 'Research Keywords',          desc: 'Find the exact terms buyers search — rank from day one',         tab: 'Brand',     color: colors.amber,  icon: '≋' },
+  { id: 'suppliers', num: '04', title: 'Source Your Supplier',       desc: 'Find vetted global suppliers and send professional outreach',    tab: 'Search',    color: colors.green,  icon: '⬡' },
   { id: 'calculate', num: '05', title: 'Model Your Economics',       desc: 'Model landed cost, FBA fees, PPC, and break-even',              tab: 'Calculate', color: colors.purple, icon: '◈' },
   { id: 'listing',   num: '06', title: 'Create Your Listing',        desc: 'Write a fully optimised title, bullets, and description',       tab: 'Brand',     color: colors.pink,   icon: '≡' },
   { id: 'launch',    num: '07', title: 'Launch with Confidence',     desc: 'Execute your launch plan step by step — go live with clarity',  tab: 'Launch',    color: colors.green,  icon: '↑' },
@@ -48,6 +48,7 @@ export default function CopilotScreen() {
   const [showPlans, setShowPlans]       = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [signingOut, setSigningOut]     = useState(false);
+  const [refreshing, setRefreshing]     = useState(false);
   const [tipIdx]                        = useState(() => Math.floor(Math.random() * TIPS.length));
   const pulseAnim                       = useRef(new Animated.Value(1)).current;
 
@@ -108,11 +109,17 @@ export default function CopilotScreen() {
     }
   }
 
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadJourney();
+    setRefreshing(false);
+  }, []);
+
   const completedCount = done.length;
   const pct            = completedCount / STEPS.length;
 
   const tierLabel = tier === 'operator' ? 'OPERATOR' : tier === 'builder' ? 'BUILDER' : 'EXPLORER';
-  const tierColor = colors.cyan;
+  const tierColor = '#4361EE';
 
   return (
     <SafeAreaView style={s.safe}>
@@ -143,9 +150,9 @@ export default function CopilotScreen() {
           <View style={s.settingsSection}>
             <Text style={s.settingsSectionLabel}>YOUR PLAN</Text>
             <View style={s.settingsPlanRow}>
-              <View style={[s.settingsPlanBadge, { borderColor: `${colors.cyan}40` }]}>
-                <View style={[s.dot, { backgroundColor: colors.cyan }]} />
-                <Text style={[s.settingsPlanText, { color: colors.cyan }]}>{tierLabel}</Text>
+              <View style={[s.settingsPlanBadge, { borderColor: `${tierColor}40` }]}>
+                <View style={[s.dot, { backgroundColor: tierColor }]} />
+                <Text style={[s.settingsPlanText, { color: tierColor }]}>{tierLabel}</Text>
               </View>
               {tier !== 'operator' && (
                 <TouchableOpacity onPress={() => { setShowSettings(false); setTimeout(() => setShowPlans(true), 300); }} activeOpacity={0.8}>
@@ -243,7 +250,7 @@ export default function CopilotScreen() {
               <Text style={s.progressLabel}>steps complete</Text>
             </View>
             <View style={s.progressRight}>
-              <Text style={[s.progressPct, { color: pct === 1 ? colors.green : colors.cyan }]}>
+              <Text style={[s.progressPct, { color: pct === 1 ? colors.green : '#4361EE' }]}>
                 {Math.round(pct * 100)}%
               </Text>
             </View>
@@ -251,7 +258,7 @@ export default function CopilotScreen() {
           <View style={s.track}>
             <View style={[s.fill, {
               width: `${pct * 100}%` as any,
-              backgroundColor: pct === 1 ? colors.green : colors.cyan,
+              backgroundColor: pct === 1 ? colors.green : '#4361EE',
             }]} />
           </View>
           <Text style={s.progressHint}>
@@ -315,7 +322,7 @@ export default function CopilotScreen() {
         {/* ─── Daily Tip ───────────────────────────────────────────── */}
         <View style={s.tipCard}>
           <View style={s.tipTop}>
-            <Animated.View style={[s.dot, { backgroundColor: colors.cyan, opacity: pulseAnim }]} />
+            <Animated.View style={[s.dot, { backgroundColor: '#4361EE', opacity: pulseAnim }]} />
             <Text style={s.tipLabel}>AI TIP</Text>
           </View>
           <Text style={s.tipText}>{TIPS[tipIdx]}</Text>
@@ -337,7 +344,7 @@ export default function CopilotScreen() {
 }
 
 const s = StyleSheet.create({
-  safe:   { flex: 1, backgroundColor: colors.bg },
+  safe:   { flex: 1, backgroundColor: '#F5F7FF' },
   scroll: { paddingBottom: 110 },
 
   // ── Header
@@ -349,38 +356,38 @@ const s = StyleSheet.create({
     paddingTop: spacing.md,
     paddingBottom: spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    backgroundColor: colors.bgHero,
+    borderBottomColor: '#E0E8F5',
+    backgroundColor: '#fff',
   },
   headerLeft: { gap: 2 },
   headerBrand: {
-    fontSize: 22, fontWeight: '900', color: colors.textPrimary, letterSpacing: -0.8,
+    fontSize: 22, fontWeight: '900', color: '#0D1B4B', letterSpacing: -0.8,
   },
   headerEye: {
     fontSize: 9,
     fontWeight: '800',
-    color: colors.cyan,
+    color: '#4361EE',
     letterSpacing: 2.8,
   },
   headerTitle: {
     fontSize: 28,
     fontWeight: '900',
-    color: colors.textPrimary,
+    color: '#0D1B4B',
     letterSpacing: -1.2,
   },
   tierPill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: colors.bgCard,
+    backgroundColor: '#fff',
     borderRadius: radius.full,
     paddingHorizontal: 14,
     paddingVertical: 7,
     borderWidth: 1,
     marginTop: 4,
-    shadowColor: '#0D1E3A',
+    shadowColor: '#0D1B4B',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.10, shadowRadius: 6, elevation: 2,
+    shadowOpacity: 0.08, shadowRadius: 6, elevation: 2,
   },
   dot:      { width: 6, height: 6, borderRadius: 3 },
   tierText: { fontSize: 10, fontWeight: '800', letterSpacing: 1.5 },
@@ -390,15 +397,15 @@ const s = StyleSheet.create({
   progressCard: {
     margin: spacing.lg,
     marginBottom: spacing.md,
-    backgroundColor: colors.bgCard,
+    backgroundColor: '#fff',
     borderRadius: radius.xxl,
     padding: spacing.lg,
     borderWidth: 1,
-    borderColor: colors.cyanBorder,
+    borderColor: '#E0E8F5',
     gap: spacing.sm,
-    shadowColor: '#0284C7',
+    shadowColor: '#0D1B4B',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.10, shadowRadius: 14, elevation: 4,
+    shadowOpacity: 0.08, shadowRadius: 14, elevation: 4,
   },
   progressTop: {
     flexDirection: 'row',
@@ -408,7 +415,7 @@ const s = StyleSheet.create({
   progressNum: {
     fontSize: 48,
     fontWeight: '900',
-    color: colors.textPrimary,
+    color: '#0D1B4B',
     letterSpacing: -2.5,
     lineHeight: 50,
   },
@@ -418,7 +425,7 @@ const s = StyleSheet.create({
   progressPct:   { fontSize: 30, fontWeight: '900', letterSpacing: -1.2 },
   track: {
     height: 6,
-    backgroundColor: colors.bgElevated,
+    backgroundColor: '#E8EDF5',
     borderRadius: radius.full,
     overflow: 'hidden',
   },
@@ -453,17 +460,17 @@ const s = StyleSheet.create({
     gap: spacing.md,
     paddingVertical: spacing.md,
     paddingRight: spacing.md,
-    backgroundColor: colors.bgCard,
+    backgroundColor: '#fff',
     borderRadius: radius.xl,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: '#E0E8F5',
     paddingLeft: spacing.sm,
-    shadowColor: '#0D1E3A',
+    shadowColor: '#0D1B4B',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.07, shadowRadius: 6, elevation: 2,
+    shadowOpacity: 0.06, shadowRadius: 8, elevation: 2,
   },
   stepCardDone: {
-    borderColor: colors.bgElevated,
+    borderColor: '#EEF2FB',
     opacity: 0.65,
     shadowOpacity: 0,
   },
@@ -479,8 +486,8 @@ const s = StyleSheet.create({
     height: 38,
     borderRadius: 19,
     borderWidth: 1.5,
-    borderColor: colors.border,
-    backgroundColor: colors.bgElevated,
+    borderColor: '#C8D5EA',
+    backgroundColor: '#F5F7FF',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -489,7 +496,7 @@ const s = StyleSheet.create({
   connector: {
     width: 1.5,
     flex: 1,
-    backgroundColor: colors.border,
+    backgroundColor: '#D8E4F5',
     marginTop: 4,
     marginBottom: -spacing.md,
   },
@@ -501,7 +508,7 @@ const s = StyleSheet.create({
   stepTitle: {
     fontSize: 15,
     fontWeight: '800',
-    color: colors.textPrimary,
+    color: '#0D1B4B',
     letterSpacing: -0.4,
     flex: 1,
   },
@@ -525,40 +532,40 @@ const s = StyleSheet.create({
   tipCard: {
     marginHorizontal: spacing.lg,
     marginBottom: spacing.md,
-    backgroundColor: colors.bgCard,
+    backgroundColor: '#EEF4FF',
     borderRadius: radius.xxl,
     padding: spacing.md + 2,
     borderWidth: 1,
-    borderColor: colors.cyanBorder,
+    borderColor: '#C7D9FF',
     gap: 8,
-    shadowColor: '#0284C7',
+    shadowColor: '#4361EE',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.08, shadowRadius: 10, elevation: 3,
   },
   tipTop:  { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  tipLabel:{ fontSize: 9, fontWeight: '800', color: colors.textMuted, letterSpacing: 2 },
+  tipLabel:{ fontSize: 9, fontWeight: '800', color: '#4361EE', letterSpacing: 2 },
   tipText: { fontSize: 14, color: colors.textSecondary, lineHeight: 23, fontStyle: 'italic', letterSpacing: -0.1 },
 
   // ── Launch Pack
   launchPackCard: {
     marginHorizontal: spacing.lg,
-    backgroundColor: colors.bgHero,
+    backgroundColor: '#EEF4FF',
     borderRadius: radius.xxl,
     padding: spacing.lg,
     borderWidth: 1.5,
-    borderColor: colors.cyanBorder,
+    borderColor: '#C7D9FF',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    shadowColor: '#0284C7',
+    shadowColor: '#4361EE',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.12, shadowRadius: 14, elevation: 4,
   },
   launchPackLeft:  { flex: 1, gap: 4 },
-  launchPackEye:   { fontSize: 9, fontWeight: '800', color: colors.cyan, letterSpacing: 2.5 },
-  launchPackTitle: { fontSize: 24, fontWeight: '900', color: colors.textPrimary, letterSpacing: -1 },
+  launchPackEye:   { fontSize: 9, fontWeight: '800', color: '#4361EE', letterSpacing: 2.5 },
+  launchPackTitle: { fontSize: 24, fontWeight: '900', color: '#0D1B4B', letterSpacing: -1 },
   launchPackSub:   { fontSize: 12, color: colors.textSecondary, lineHeight: 18 },
-  launchPackArrow: { fontSize: 28, fontWeight: '900', color: colors.cyan, marginLeft: spacing.md },
+  launchPackArrow: { fontSize: 28, fontWeight: '900', color: '#4361EE', marginLeft: spacing.md },
 
   // ── Header right cluster
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: 4 },
@@ -573,7 +580,7 @@ const s = StyleSheet.create({
   // ── Settings sheet
   settingsSheet: {
     flex: 1,
-    backgroundColor: colors.bg,
+    backgroundColor: '#F5F7FF',
   },
   settingsClose: {
     alignSelf: 'flex-end',
@@ -593,14 +600,14 @@ const s = StyleSheet.create({
   settingsOrbBg: {
     position: 'absolute',
     width: 260, height: 260, borderRadius: 130,
-    backgroundColor: colors.cyanDim,
-    opacity: 0.35,
+    backgroundColor: '#EEF4FF',
+    opacity: 0.8,
     top: -20,
   },
   settingsWordmark: {
     fontSize: 48,
     fontWeight: '900',
-    color: colors.textPrimary,
+    color: '#0D1B4B',
     letterSpacing: -2.2,
     marginBottom: spacing.xs,
   },
@@ -615,11 +622,11 @@ const s = StyleSheet.create({
   settingsSection: {
     marginHorizontal: spacing.lg,
     marginBottom: spacing.lg,
-    backgroundColor: colors.bgCard,
+    backgroundColor: '#fff',
     borderRadius: radius.xxl,
     padding: spacing.lg,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: '#E0E8F5',
     gap: spacing.sm,
   },
   settingsSectionLabel: {
@@ -635,7 +642,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 14, paddingVertical: 6,
   },
   settingsPlanText: { fontSize: 11, fontWeight: '800', letterSpacing: 1.5 },
-  settingsUpgradeLink: { fontSize: 13, fontWeight: '700', color: colors.cyan },
+  settingsUpgradeLink: { fontSize: 13, fontWeight: '700', color: '#4361EE' },
   settingsPlanSub: { fontSize: 12, color: colors.textSecondary, lineHeight: 18 },
 
   settingsLinkRow: {
@@ -644,7 +651,7 @@ const s = StyleSheet.create({
   },
   settingsLinkText: { fontSize: 15, color: colors.textSecondary, fontWeight: '500' },
   settingsLinkArrow: { fontSize: 14, color: colors.textMuted },
-  settingsDivider: { height: 1, backgroundColor: colors.border },
+  settingsDivider: { height: 1, backgroundColor: '#E0E8F5' },
 
   settingsEmail: {
     fontSize: 14,
@@ -653,12 +660,12 @@ const s = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   signOutBtn: {
-    backgroundColor: colors.bgElevated,
+    backgroundColor: '#F5F7FF',
     borderRadius: radius.md,
     paddingVertical: spacing.sm + 2,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: '#E0E8F5',
   },
   signOutText: {
     fontSize: 14,

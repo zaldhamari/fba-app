@@ -65,7 +65,7 @@ function CompBar({ competition }: { competition: string }) {
 // ─── Usage badge ──────────────────────────────────────────────────────────────
 
 const USAGE_COLORS: Record<string, string> = {
-  Title:   colors.cyan,
+  Title:   '#D97706',
   Bullet:  colors.green,
   Backend: colors.textMuted,
   PPC:     colors.amber,
@@ -84,7 +84,7 @@ function UsageBadge({ label }: { label: string }) {
 function KeywordCard({ item }: { item: EnrichedKeyword }) {
   const typeColor = item.type === 'Buyer Intent' ? colors.green
     : item.type === 'PPC' ? colors.amber
-    : item.type === 'Long-tail' ? colors.cyan
+    : item.type === 'Long-tail' ? '#D97706'
     : colors.textMuted;
   return (
     <View style={s.kwCard}>
@@ -109,14 +109,14 @@ function KeywordCard({ item }: { item: EnrichedKeyword }) {
 
 const CLUSTER_ACCENT: Record<string, string> = {
   high_intent:    colors.green,
-  long_tail:      colors.cyan,
+  long_tail:      '#D97706',
   ppc:            colors.amber,
   low_competition: colors.green,
   backend:        colors.textMuted,
 };
 
 function ClusterSection({ cluster }: { cluster: KeywordCluster }) {
-  const accent = CLUSTER_ACCENT[cluster.type] ?? colors.cyan;
+  const accent = CLUSTER_ACCENT[cluster.type] ?? '#D97706';
   return (
     <View style={s.clusterWrap}>
       <View style={[s.clusterHeader, { borderLeftColor: accent }]}>
@@ -141,10 +141,10 @@ function ClusterSection({ cluster }: { cluster: KeywordCluster }) {
 // ─── Listing recommendations ──────────────────────────────────────────────────
 
 const REC_LABELS: Array<[keyof ListingRecommendations, string, string]> = [
-  ['title',       'TITLE',      colors.cyan],
+  ['title',       'TITLE',      '#D97706'],
   ['ppc',         'PPC',        colors.amber],
   ['backend',     'BACKEND',    colors.textMuted],
-  ['long_tail',   'LONG-TAIL',  colors.cyan],
+  ['long_tail',   'LONG-TAIL',  '#D97706'],
   ['buyer_intent','BUYER INT.', colors.green],
 ];
 
@@ -184,7 +184,7 @@ function InsightsSection({ insights }: { insights: string[] }) {
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
-export default function KeywordsScreen() {
+export default function KeywordsScreen({ edges }: { edges?: readonly ('top'|'right'|'bottom'|'left')[] } = {}) {
   const [query, setQuery]         = useState('');
   const [result, setResult]       = useState<EnrichedKeywordResult | null>(null);
   const [loading, setLoading]     = useState(false);
@@ -220,7 +220,7 @@ export default function KeywordsScreen() {
   }
 
   return (
-    <SafeAreaView style={s.container}>
+    <SafeAreaView style={s.container} edges={edges as any}>
       <PaywallModal
         visible={showPaywall}
         onClose={() => setShowPaywall(false)}
@@ -254,7 +254,7 @@ export default function KeywordsScreen() {
                 activeOpacity={0.8}
               >
                 {exporting
-                  ? <ActivityIndicator size="small" color={colors.cyan} />
+                  ? <ActivityIndicator size="small" color={'#D97706'} />
                   : <Text style={s.exportBtnText}>↓ Export CSV</Text>}
               </TouchableOpacity>
             )}
@@ -354,7 +354,7 @@ const s = StyleSheet.create({
     paddingBottom: spacing.xl,
     marginBottom: spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: colors.cyanBorder,
+    borderBottomColor: 'rgba(217,119,6,0.22)',
     overflow: 'hidden',
   },
   heroOrb1: {
@@ -366,7 +366,7 @@ const s = StyleSheet.create({
   heroOrb2: {
     position: 'absolute', bottom: -40, left: -30,
     width: 130, height: 130, borderRadius: 65,
-    backgroundColor: colors.cyanDim,
+    backgroundColor: 'rgba(217,119,6,0.10)',
     opacity: 0.35,
   },
   heroTop: {
@@ -375,7 +375,7 @@ const s = StyleSheet.create({
   },
   heroBadges: { alignItems: 'flex-end', gap: 6 },
   brandWord: { fontSize: 20, fontWeight: '900', color: colors.textPrimary, letterSpacing: -0.8, marginBottom: 2 },
-  eyebrow:  { fontSize: 9, fontWeight: '800', color: colors.cyan, letterSpacing: 2.5, marginBottom: 6 },
+  eyebrow:  { fontSize: 9, fontWeight: '800', color: '#D97706', letterSpacing: 2.5, marginBottom: 6 },
   title:    { fontSize: 26, fontWeight: '900', color: colors.textPrimary, letterSpacing: -1, lineHeight: 32 },
   proBadge: {
     backgroundColor: colors.bgElevated, borderRadius: radius.sm,
@@ -384,13 +384,13 @@ const s = StyleSheet.create({
   },
   proBadgeText: { fontSize: 9, fontWeight: '800', color: colors.textSecondary, letterSpacing: 1 },
   exportBtn: {
-    backgroundColor: colors.cyanDim,
+    backgroundColor: 'rgba(217,119,6,0.10)',
     borderRadius: radius.sm,
     paddingHorizontal: spacing.sm, paddingVertical: 4,
-    borderWidth: 1, borderColor: colors.cyanBorder,
+    borderWidth: 1, borderColor: 'rgba(217,119,6,0.22)',
     minWidth: 80, alignItems: 'center',
   },
-  exportBtnText: { fontSize: 9, fontWeight: '800', color: colors.cyan, letterSpacing: 0.5 },
+  exportBtnText: { fontSize: 9, fontWeight: '800', color: '#D97706', letterSpacing: 0.5 },
   searchRow: { flexDirection: 'row', gap: spacing.sm },
   input: {
     flex: 1, backgroundColor: colors.bgElevated,
@@ -399,9 +399,9 @@ const s = StyleSheet.create({
     paddingVertical: spacing.sm + 4, fontSize: 15, color: colors.textPrimary,
   },
   btn: {
-    backgroundColor: colors.cyan, borderRadius: radius.md,
+    backgroundColor: '#D97706', borderRadius: radius.md,
     paddingHorizontal: spacing.lg, justifyContent: 'center', alignItems: 'center',
-    ...shadow.glowCyan,
+    shadowColor: '#D97706', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.22, shadowRadius: 12, elevation: 6,
   },
   btnText: { color: colors.bg, fontSize: 20, fontWeight: '900' },
   error:   { fontSize: 12, color: colors.red, paddingHorizontal: spacing.lg, marginBottom: spacing.xs },
@@ -452,7 +452,7 @@ const s = StyleSheet.create({
   insightRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, marginBottom: 6 },
   insightDot: {
     width: 6, height: 6, borderRadius: 3,
-    backgroundColor: colors.cyan,
+    backgroundColor: '#D97706',
     marginTop: 5, flexShrink: 0,
   },
   insightText: { flex: 1, fontSize: 12, color: colors.textSecondary, lineHeight: 18, letterSpacing: 0.1 },
@@ -465,7 +465,7 @@ const s = StyleSheet.create({
     borderRadius: radius.lg,
     padding: spacing.md,
     borderWidth: 1,
-    borderColor: colors.cyanBorder,
+    borderColor: 'rgba(217,119,6,0.22)',
   },
   recsTitle: {
     fontSize: 8, fontWeight: '800', color: colors.textMuted,

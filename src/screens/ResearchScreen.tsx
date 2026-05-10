@@ -137,7 +137,7 @@ function ReviewInsightsModal({ product, onClose }: { product: Product; onClose: 
                   <Text style={[ri.sectionLabel, { marginTop: spacing.md }]}>BUNDLE IDEAS</Text>
                   {reviews.bundling_ideas.map((b: string, i: number) => (
                     <View key={i} style={ri.row}>
-                      <Text style={[ri.greenDot, { color: colors.cyan }]}>◎</Text>
+                      <Text style={[ri.greenDot, { color: '#0284C7' }]}>◎</Text>
                       <Text style={ri.rowText}>{b}</Text>
                     </View>
                   ))}
@@ -149,7 +149,7 @@ function ReviewInsightsModal({ product, onClose }: { product: Product; onClose: 
           {tab === 'copilot' && (
             loading ? (
               <View style={{ alignItems: 'center', paddingVertical: 40, gap: 10 }}>
-                <PulseDots color={colors.cyan} />
+                <PulseDots color={'#0284C7'} />
                 <Text style={ri.noteText}>Analysing with AI…</Text>
               </View>
             ) : copilot ? (
@@ -231,12 +231,12 @@ const ri = StyleSheet.create({
   rowText: { fontSize: 14, flex: 1, lineHeight: 20, color: colors.textSecondary },
   note: { backgroundColor: colors.bgElevated, borderRadius: radius.md, padding: spacing.md, marginTop: spacing.md, marginBottom: spacing.md },
   noteText: { fontSize: 12, color: colors.textMuted, lineHeight: 18 },
-  closeBtn: { backgroundColor: colors.cyan, borderRadius: radius.md, paddingVertical: spacing.md, alignItems: 'center', marginTop: spacing.sm },
+  closeBtn: { backgroundColor: '#0284C7', borderRadius: radius.md, paddingVertical: spacing.md, alignItems: 'center', marginTop: spacing.sm },
   closeBtnText: { fontSize: 15, fontWeight: '700', color: colors.white },
   // Tabs
   tabs: { flexDirection: 'row', backgroundColor: colors.bgElevated, borderRadius: radius.md, padding: 3, marginBottom: spacing.md, gap: 3 },
   tabBtn: { flex: 1, paddingVertical: 7, alignItems: 'center', borderRadius: radius.sm },
-  tabBtnActive: { backgroundColor: colors.cyan },
+  tabBtnActive: { backgroundColor: '#0284C7' },
   tabBtnText: { fontSize: 11, fontWeight: '700', color: colors.textMuted },
   tabBtnTextActive: { color: colors.white },
   // Copilot
@@ -246,9 +246,9 @@ const ri = StyleSheet.create({
   scoreRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 },
   scoreLabel: { fontSize: 9, fontWeight: '800', color: colors.textMuted, letterSpacing: 1.5 },
   scoreNum: { fontSize: 20, fontWeight: '900', letterSpacing: -0.5 },
-  profitRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.cyanDim, borderRadius: radius.md, padding: spacing.md, marginVertical: spacing.sm, borderWidth: 1, borderColor: colors.cyanBorder },
+  profitRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'rgba(2,132,199,0.09)', borderRadius: radius.md, padding: spacing.md, marginVertical: spacing.sm, borderWidth: 1, borderColor: 'rgba(2,132,199,0.22)' },
   profitLabel: { fontSize: 9, fontWeight: '800', color: colors.textMuted, letterSpacing: 1.5 },
-  profitNum: { fontSize: 22, fontWeight: '900', color: colors.cyan, letterSpacing: -0.5 },
+  profitNum: { fontSize: 22, fontWeight: '900', color: '#0284C7', letterSpacing: -0.5 },
   tabHint: { fontSize: 11.5, color: colors.textMuted, lineHeight: 17, letterSpacing: 0.1, marginBottom: spacing.xs },
 });
 
@@ -266,154 +266,11 @@ function TrendChart({ data }: { data: { month: string; value: number }[] }) {
 }
 const tc = StyleSheet.create({
   wrap: { flexDirection: 'row', alignItems: 'flex-end', height: 40, gap: 2, flex: 1 },
-  bar:  { flex: 1, backgroundColor: colors.cyan, borderRadius: 2, opacity: 0.8 },
+  bar:  { flex: 1, backgroundColor: '#0284C7', borderRadius: 2, opacity: 0.8 },
 });
 
 
-// ─── BSR Estimator ────────────────────────────────────────────────────────────
-const BSR_CATEGORIES = [
-  { label: 'Home & Kitchen', multiplier: 3200 },
-  { label: 'Sports & Outdoors', multiplier: 2800 },
-  { label: 'Beauty', multiplier: 2500 },
-  { label: 'Electronics', multiplier: 4000 },
-  { label: 'Clothing', multiplier: 2000 },
-  { label: 'Toys & Games', multiplier: 2200 },
-  { label: 'Tools', multiplier: 1800 },
-  { label: 'Pet Supplies', multiplier: 2600 },
-];
 
-function BSREstimator() {
-  const { symbol } = useCurrency();
-  const [bsr, setBsr] = useState('');
-  const [price, setPrice] = useState('');
-  const [catIdx, setCatIdx] = useState(0);
-  const [result, setResult] = useState<{ monthly: number; daily: number; revenue: number } | null>(null);
-  const scrollRef = useRef<ScrollView>(null);
-
-  function estimate() {
-    const b = parseInt(bsr);
-    if (!b || b <= 0) return;
-    const { multiplier } = BSR_CATEGORIES[catIdx];
-    const monthly = Math.max(1, Math.round(multiplier * Math.pow(b, -0.7)));
-    const daily = Math.max(1, Math.round(monthly / 30));
-    const p = parseFloat(price) || 0;
-    setResult({ monthly, daily, revenue: p * monthly });
-    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 150);
-  }
-
-  const compLevel = result
-    ? result.monthly >= 500 ? 'High demand' : result.monthly >= 100 ? 'Moderate demand' : 'Low demand'
-    : '';
-  const compColor = result
-    ? result.monthly >= 500 ? colors.green : result.monthly >= 100 ? colors.amber : colors.red
-    : colors.textPrimary;
-
-  return (
-    <ScrollView ref={scrollRef} contentContainerStyle={bsr_s.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-      <View style={bsr_s.inputs}>
-        <View style={bsr_s.row}>
-          <View style={bsr_s.field}>
-            <Text style={bsr_s.label}>BEST SELLER RANK</Text>
-            <TextInput
-              style={bsr_s.input} value={bsr} onChangeText={setBsr}
-              placeholder="e.g. 5000" placeholderTextColor={colors.textMuted}
-              keyboardType="number-pad"
-            />
-          </View>
-          <View style={bsr_s.field}>
-            <Text style={bsr_s.label}>{`SELLING PRICE (${symbol})`}</Text>
-            <TextInput
-              style={bsr_s.input} value={price} onChangeText={setPrice}
-              placeholder="29.99" placeholderTextColor={colors.textMuted}
-              keyboardType="decimal-pad"
-            />
-          </View>
-        </View>
-        <Text style={bsr_s.label}>CATEGORY</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-            {BSR_CATEGORIES.map((c, i) => (
-              <TouchableOpacity key={i} style={[bsr_s.chip, catIdx === i && bsr_s.chipActive]} onPress={() => setCatIdx(i)}>
-                <Text style={[bsr_s.chipText, catIdx === i && bsr_s.chipTextActive]}>{c.label}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </ScrollView>
-        <TouchableOpacity style={bsr_s.btn} onPress={estimate} activeOpacity={0.8}>
-          <Text style={bsr_s.btnText}>Estimate Sales</Text>
-        </TouchableOpacity>
-      </View>
-
-      {result && (
-        <View style={bsr_s.results}>
-          <View style={bsr_s.heroCard}>
-            <Text style={bsr_s.heroLabel}>EST. MONTHLY SALES</Text>
-            <Text style={bsr_s.heroNum}>{result.monthly.toLocaleString()}</Text>
-            <Text style={[bsr_s.demandLabel, { color: compColor }]}>{compLevel}</Text>
-          </View>
-          <View style={bsr_s.statsRow}>
-            {[
-              ['Daily Sales',      `~${result.daily} units`],
-              ['Monthly Revenue',  result.revenue > 0 ? `${symbol}${result.revenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}` : '—'],
-              ['Category',         BSR_CATEGORIES[catIdx].label],
-            ].map(([label, val]) => (
-              <View key={label} style={bsr_s.stat}>
-                <Text style={bsr_s.statVal}>{val}</Text>
-                <Text style={bsr_s.statLabel}>{label}</Text>
-              </View>
-            ))}
-          </View>
-          <View style={bsr_s.note}>
-            <Text style={bsr_s.noteText}>Estimates based on category averages. Actual sales vary by season, listing quality, and PPC.</Text>
-          </View>
-        </View>
-      )}
-    </ScrollView>
-  );
-}
-const bsr_s = StyleSheet.create({
-  scroll:  { padding: spacing.lg, gap: spacing.md, paddingBottom: spacing.xxl },
-  inputs:  { gap: spacing.sm },
-  row:     { flexDirection: 'row', gap: spacing.sm },
-  field:   { flex: 1 },
-  label:   { fontSize: 9, fontWeight: '800', color: colors.textMuted, letterSpacing: 1.5, marginBottom: spacing.xs },
-  input: {
-    borderWidth: 1, borderColor: colors.border, borderRadius: radius.md,
-    paddingHorizontal: spacing.md, paddingVertical: spacing.sm + 2,
-    fontSize: 15, color: colors.textPrimary, backgroundColor: colors.bgElevated,
-  },
-  chip: {
-    paddingHorizontal: spacing.md, paddingVertical: spacing.xs + 2,
-    borderWidth: 1, borderColor: colors.border, borderRadius: radius.full,
-    backgroundColor: colors.bgCard,
-  },
-  chipActive:     { backgroundColor: colors.cyan, borderColor: colors.cyan },
-  chipText:       { fontSize: 12, fontWeight: '700', color: colors.textSecondary },
-  chipTextActive: { color: colors.white },
-  btn: {
-    backgroundColor: colors.cyan, borderRadius: radius.md,
-    paddingVertical: spacing.md, alignItems: 'center',
-  },
-  btnText:    { fontSize: 16, fontWeight: '800', color: colors.bg },
-  results:    { gap: spacing.md },
-  heroCard: {
-    backgroundColor: colors.bgCard, borderRadius: radius.lg,
-    padding: spacing.lg, alignItems: 'center', gap: spacing.xs,
-    borderWidth: 1, borderColor: colors.cyanBorder,
-  },
-  heroLabel:   { fontSize: 9, fontWeight: '800', color: colors.textMuted, letterSpacing: 1.5 },
-  heroNum:     { fontSize: 56, fontWeight: '800', color: colors.textPrimary, letterSpacing: -2 },
-  demandLabel: { fontSize: 13, fontWeight: '700', letterSpacing: 0.5 },
-  statsRow: {
-    flexDirection: 'row', backgroundColor: colors.bgCard,
-    borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, overflow: 'hidden',
-  },
-  stat:      { flex: 1, alignItems: 'center', padding: spacing.md },
-  statVal:   { fontSize: 13, fontWeight: '800', color: colors.textPrimary },
-  statLabel: { fontSize: 8, fontWeight: '700', color: colors.textMuted, letterSpacing: 1, marginTop: 3 },
-  note: { padding: spacing.md, backgroundColor: colors.bgElevated, borderRadius: radius.md },
-  noteText: { fontSize: 12, color: colors.textMuted, textAlign: 'center', lineHeight: 18 },
-});
 
 
 // ─── Analyze Helpers ─────────────────────────────────────────────────────────
@@ -437,8 +294,7 @@ function localFallback(price: number, reviews: number, competition: string): Ana
 }
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
-export default function ResearchScreen() {
-  const [mode, setMode] = useState<'search' | 'bsr'>('search');
+export default function ResearchScreen({ edges }: { edges?: readonly ('top'|'right'|'bottom'|'left')[] } = {}) {
   const [query, setQuery] = useState('');
   const [products, setProducts] = useState<Product[]>([]);
   const [trends, setTrends] = useState<TrendData | null>(null);
@@ -624,7 +480,7 @@ export default function ResearchScreen() {
   const trendArrow = trendDir === 'Rising' ? '↑' : trendDir === 'Declining' ? '↓' : '→';
 
   return (
-    <SafeAreaView style={s.container}>
+    <SafeAreaView style={s.container} edges={edges as any}>
       <PaywallModal visible={showPaywall} onClose={() => setShowPaywall(false)} featureContext="research" />
       {shareEntry && (
         <ShareCard entry={shareEntry} onClose={() => setShareEntry(null)} />
@@ -675,27 +531,7 @@ export default function ResearchScreen() {
           </View>
         </View>
 
-        <View style={s.modeRow}>
-          {(['search', 'bsr'] as const).map(m => (
-            <TouchableOpacity
-              key={m}
-              style={[s.modeTab, mode === m && s.modeTabActive]}
-              onPress={() => { setMode(m); setShowSaved(false); }}
-            >
-              <Text style={[s.modeTabText, mode === m && s.modeTabTextActive]}>
-                {m === 'search' ? 'Search Amazon' : 'BSR Estimator'}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-        <Text style={s.modeHint}>
-          {mode === 'search'
-            ? 'Live Amazon data surfaced by AI — opportunity scored and ready to act on'
-            : 'Estimate monthly revenue from any product\'s bestseller rank'}
-        </Text>
-
-        {mode === 'search' && (
-          <View style={s.searchRow}>
+        <View style={s.searchRow}>
             <TextInput
               style={s.input}
               value={query}
@@ -718,12 +554,9 @@ export default function ResearchScreen() {
               }
             </TouchableOpacity>
           </View>
-        )}
       </View>
 
-      {mode === 'bsr' && <View style={{ flex: 1 }}><BSREstimator /></View>}
-
-      {!!error && mode === 'search' && !showSaved && (
+      {!!error && !showSaved && (
         <Text style={s.errorText}>{error}</Text>
       )}
 
@@ -794,7 +627,7 @@ export default function ResearchScreen() {
       )}
 
       {/* ─── Search results ─── */}
-      {mode === 'search' && !showSaved && (
+      {!showSaved && (
         <FlatList
           data={products}
           keyExtractor={(item, i) => item.asin || String(i)}
@@ -934,14 +767,14 @@ const s = StyleSheet.create({
     paddingTop: spacing.md,
     paddingBottom: spacing.lg,
     borderBottomWidth: 1,
-    borderBottomColor: colors.cyanBorder,
+    borderBottomColor: 'rgba(2,132,199,0.22)',
     overflow: 'hidden',
   },
   // 3-layer orb atmosphere
   heroOrb1: {
     position: 'absolute', top: -70, right: -60,
     width: 260, height: 260, borderRadius: 130,
-    backgroundColor: colors.cyanDim,
+    backgroundColor: 'rgba(2,132,199,0.09)',
     opacity: 0.55,
   },
   heroOrb2: {
@@ -953,7 +786,7 @@ const s = StyleSheet.create({
   heroOrb3: {
     position: 'absolute', bottom: -50, left: -40,
     width: 160, height: 160, borderRadius: 80,
-    backgroundColor: colors.cyanDim,
+    backgroundColor: 'rgba(2,132,199,0.09)',
     opacity: 0.30,
   },
   heroTop: {
@@ -965,7 +798,7 @@ const s = StyleSheet.create({
     letterSpacing: -0.8, marginBottom: 2,
   },
   eyebrow: {
-    fontSize: 9, fontWeight: '800', color: colors.cyan,
+    fontSize: 9, fontWeight: '800', color: '#0284C7',
     letterSpacing: 2.8, marginBottom: 6,
   },
   title: {
@@ -974,11 +807,11 @@ const s = StyleSheet.create({
   },
   titleSub: { fontSize: 11, color: colors.textSecondary, marginTop: 6, letterSpacing: 0.1 },
   usagePill: {
-    backgroundColor: colors.cyanDim, borderRadius: radius.full,
+    backgroundColor: 'rgba(2,132,199,0.09)', borderRadius: radius.full,
     paddingHorizontal: spacing.sm + 4, paddingVertical: 5,
-    borderWidth: 1, borderColor: colors.cyanBorder,
+    borderWidth: 1, borderColor: 'rgba(2,132,199,0.22)',
   },
-  usagePillText: { fontSize: 10, fontWeight: '700', color: colors.cyan },
+  usagePillText: { fontSize: 10, fontWeight: '700', color: '#0284C7' },
   savedBtn: {
     backgroundColor: colors.bgCard, borderRadius: radius.full,
     paddingHorizontal: spacing.md, paddingVertical: spacing.xs + 2,
@@ -986,17 +819,6 @@ const s = StyleSheet.create({
     ...shadow.sm,
   },
   savedBtnText: { fontSize: 10, fontWeight: '700', color: colors.textSecondary },
-  modeRow: {
-    flexDirection: 'row', marginBottom: spacing.md,
-    backgroundColor: colors.bgElevated,
-    borderRadius: radius.full, overflow: 'hidden',
-    alignSelf: 'flex-start',
-    borderWidth: 1, borderColor: colors.border,
-  },
-  modeTab:          { paddingHorizontal: spacing.md, paddingVertical: spacing.xs + 3 },
-  modeTabActive:    { backgroundColor: colors.cyan },
-  modeTabText:      { fontSize: 10, fontWeight: '700', color: colors.textMuted },
-  modeTabTextActive:{ color: colors.bg },
   searchRow: { flexDirection: 'row', gap: spacing.sm },
   input: {
     flex: 1, backgroundColor: colors.bgElevated,
@@ -1005,9 +827,9 @@ const s = StyleSheet.create({
     paddingVertical: spacing.sm + 4, fontSize: 15, color: colors.textPrimary,
   },
   searchBtn: {
-    backgroundColor: colors.cyan, borderRadius: radius.md,
+    backgroundColor: '#0284C7', borderRadius: radius.md,
     paddingHorizontal: spacing.lg, justifyContent: 'center', alignItems: 'center',
-    ...shadow.glowCyan,
+    shadowColor: '#0284C7', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.22, shadowRadius: 12, elevation: 6,
   },
   searchBtnText: { color: colors.bg, fontSize: 20, fontWeight: '900' },
   errorText: { fontSize: 12, color: colors.red, paddingHorizontal: spacing.lg, marginVertical: spacing.sm },
@@ -1018,7 +840,7 @@ const s = StyleSheet.create({
     marginHorizontal: spacing.lg, marginBottom: spacing.md,
     borderRadius: radius.lg, padding: spacing.md,
     flexDirection: 'row', gap: spacing.md,
-    borderWidth: 1, borderColor: colors.cyanBorder,
+    borderWidth: 1, borderColor: 'rgba(2,132,199,0.22)',
   },
   trendLeft:       { flex: 1 },
   trendLabel:      { fontSize: 8, fontWeight: '800', color: colors.textMuted, letterSpacing: 1.5, marginBottom: 4 },
@@ -1039,7 +861,7 @@ const s = StyleSheet.create({
   // Compare bar
   compareBar: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
-    backgroundColor: colors.cyan,
+    backgroundColor: '#0284C7',
     paddingVertical: 14, paddingHorizontal: spacing.lg,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
   },
@@ -1053,12 +875,12 @@ const s = StyleSheet.create({
   empty: { alignItems: 'center', paddingTop: 72, gap: spacing.xs + 2, paddingHorizontal: spacing.lg },
   emptyOrb: {
     width: 72, height: 72, borderRadius: 36,
-    backgroundColor: colors.cyanDim,
-    borderWidth: 1.5, borderColor: colors.cyanBorder,
+    backgroundColor: 'rgba(2,132,199,0.09)',
+    borderWidth: 1.5, borderColor: 'rgba(2,132,199,0.22)',
     justifyContent: 'center', alignItems: 'center',
     marginBottom: spacing.sm,
   },
-  emptyOrbIcon:  { fontSize: 32, color: colors.cyan },
+  emptyOrbIcon:  { fontSize: 32, color: '#0284C7' },
   emptyTitle:    { fontSize: 20, fontWeight: '800', color: colors.textPrimary, letterSpacing: -0.5, textAlign: 'center' },
   emptyText:     { fontSize: 13, color: colors.textSecondary, textAlign: 'center', letterSpacing: 0.2, marginTop: 2 },
   emptySubtext:  { fontSize: 12, color: colors.textMuted, textAlign: 'center', marginTop: -2 },
@@ -1071,12 +893,11 @@ const s = StyleSheet.create({
   demoChip: {
     backgroundColor: colors.bgCard, borderRadius: radius.full,
     paddingHorizontal: 12, paddingVertical: 6,
-    borderWidth: 1, borderColor: colors.cyanBorder,
+    borderWidth: 1, borderColor: 'rgba(2,132,199,0.22)',
     ...shadow.sm,
   },
-  demoChipText: { fontSize: 11, fontWeight: '700', color: colors.cyan },
+  demoChipText: { fontSize: 11, fontWeight: '700', color: '#0284C7' },
 
-  modeHint: { fontSize: 11.5, color: colors.textMuted, lineHeight: 17, letterSpacing: 0.1, marginBottom: spacing.sm },
 
   // ── Vault toolbar
   vaultToolbar: {
@@ -1100,7 +921,7 @@ const s = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs + 2,
     borderWidth: 1,
-    borderColor: colors.cyanBorder,
+    borderColor: 'rgba(2,132,199,0.22)',
   },
-  exportToolbarBtnText: { fontSize: 12, fontWeight: '800', color: colors.cyan },
+  exportToolbarBtnText: { fontSize: 12, fontWeight: '800', color: '#0284C7' },
 });

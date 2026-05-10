@@ -103,7 +103,7 @@ export default function PaywallModal({
               <Switch
                 value={annual}
                 onValueChange={setAnnual}
-                trackColor={{ false: colors.gray200, true: colors.cyan }}
+                trackColor={{ false: colors.gray200, true: '#4361EE' }}
                 thumbColor={colors.white}
               />
             </View>
@@ -198,7 +198,7 @@ const s = StyleSheet.create({
     backgroundColor: colors.bgCard,
     borderTopLeftRadius: 28, borderTopRightRadius: 28,
     borderTopWidth: 1, borderLeftWidth: 1, borderRightWidth: 1,
-    borderColor: colors.cyanBorder,
+    borderColor: 'rgba(67,97,238,0.22)',
     paddingHorizontal: spacing.lg,
     paddingBottom: 36,
     paddingTop: spacing.md,
@@ -208,7 +208,7 @@ const s = StyleSheet.create({
     width: 40, height: 4, borderRadius: 2,
     backgroundColor: colors.bgElevated, alignSelf: 'center', marginBottom: spacing.lg,
   },
-  context: { fontSize: 9, fontWeight: '800', color: colors.cyan, letterSpacing: 2, marginBottom: spacing.xs },
+  context: { fontSize: 9, fontWeight: '800', color: '#4361EE', letterSpacing: 2, marginBottom: spacing.xs },
   title: {
     fontSize: 28, fontWeight: '900', color: colors.textPrimary,
     letterSpacing: -1, lineHeight: 34, marginBottom: spacing.md,
@@ -233,28 +233,28 @@ const s = StyleSheet.create({
     borderRadius: radius.md, padding: spacing.md, gap: 4,
     backgroundColor: colors.bgElevated,
   },
-  tierCardActive: { borderColor: colors.cyan, backgroundColor: colors.cyanDim },
+  tierCardActive: { borderColor: '#4361EE', backgroundColor: 'rgba(67,97,238,0.10)' },
   popularBadge: {
-    backgroundColor: colors.cyan, borderRadius: radius.full,
+    backgroundColor: '#4361EE', borderRadius: radius.full,
     paddingHorizontal: 6, paddingVertical: 2, alignSelf: 'flex-start',
     marginBottom: 4,
   },
   popularText: { fontSize: 8, fontWeight: '800', color: colors.white, letterSpacing: 0.5 },
   tierName: { fontSize: 13, fontWeight: '800', color: colors.textMuted },
-  tierNameActive: { color: colors.cyan },
+  tierNameActive: { color: '#4361EE' },
   tierPrice: { fontSize: 22, fontWeight: '900', color: colors.textPrimary, letterSpacing: -0.5 },
-  tierPriceActive: { color: colors.cyan },
+  tierPriceActive: { color: '#4361EE' },
   tierPer: { fontSize: 13, fontWeight: '400' },
   tierSub: { fontSize: 11, color: colors.textMuted, lineHeight: 15 },
-  tierSubActive: { color: colors.cyan },
+  tierSubActive: { color: '#4361EE' },
 
   featureScroll: { maxHeight: 160, marginBottom: spacing.md },
   featureRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: 5 },
-  featureDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.cyan },
+  featureDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#4361EE' },
   featureText: { fontSize: 13, color: colors.textSecondary, flex: 1, lineHeight: 18 },
 
   cta: {
-    backgroundColor: colors.cyan, borderRadius: radius.md,
+    backgroundColor: '#4361EE', borderRadius: radius.md,
     paddingVertical: spacing.md + 2, alignItems: 'center', marginBottom: spacing.sm,
   },
   ctaDisabled: { opacity: 0.5 },

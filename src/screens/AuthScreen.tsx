@@ -211,7 +211,7 @@ export default function AuthScreen({ navigation }: Props) {
 }
 
 const s = StyleSheet.create({
-  safe:  { flex: 1, backgroundColor: colors.bgHero },
+  safe:  { flex: 1, backgroundColor: '#F5F7FF' },
   flex:  { flex: 1 },
   scroll: {
     flexGrow: 1,
@@ -222,18 +222,18 @@ const s = StyleSheet.create({
 
   orb1: {
     position: 'absolute', top: -80, right: -80,
-    width: 320, height: 320, borderRadius: 160,
-    backgroundColor: colors.cyanDim, opacity: 0.6,
+    width: 300, height: 300, borderRadius: 150,
+    backgroundColor: 'rgba(67,97,238,0.07)',
   },
   orb2: {
     position: 'absolute', bottom: -40, left: -60,
     width: 220, height: 220, borderRadius: 110,
-    backgroundColor: colors.purpleDim, opacity: 0.4,
+    backgroundColor: 'rgba(67,97,238,0.05)',
   },
 
   brand: { alignItems: 'center', marginBottom: spacing.xl },
   wordmark: {
-    fontSize: 38, fontWeight: '900', color: colors.textPrimary, letterSpacing: -1.8,
+    fontSize: 38, fontWeight: '900', color: '#0D1B4B', letterSpacing: -1.8,
   },
   tagline: {
     fontSize: 12, color: colors.textMuted, letterSpacing: 0.4, marginTop: 4, opacity: 0.8,
@@ -244,14 +244,14 @@ const s = StyleSheet.create({
     borderRadius: radius.xxl,
     padding: spacing.lg,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: '#E0E8F5',
     gap: spacing.md,
     ...shadow.float,
   },
 
   toggle: {
     flexDirection: 'row',
-    backgroundColor: colors.bgElevated,
+    backgroundColor: '#E8EDF5',
     borderRadius: radius.full,
     padding: 3,
   },
@@ -260,10 +260,10 @@ const s = StyleSheet.create({
   },
   toggleActive:     { backgroundColor: colors.bgCard, ...shadow.sm },
   toggleText:       { fontSize: 13, fontWeight: '600', color: colors.textMuted },
-  toggleTextActive: { color: colors.textPrimary, fontWeight: '800' },
+  toggleTextActive: { color: '#0D1B4B', fontWeight: '800' },
 
   cardTitle: {
-    fontSize: 26, fontWeight: '900', color: colors.textPrimary,
+    fontSize: 26, fontWeight: '900', color: '#0D1B4B',
     letterSpacing: -1, marginTop: spacing.xs,
   },
   cardSub: {
@@ -276,14 +276,14 @@ const s = StyleSheet.create({
     fontSize: 9, fontWeight: '800', color: colors.textMuted, letterSpacing: 2,
   },
   input: {
-    backgroundColor: colors.bgElevated,
+    backgroundColor: '#EEF2FA',
     borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: '#E0E8F5',
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm + 4,
     fontSize: 15,
-    color: colors.textPrimary,
+    color: '#0D1B4B',
   },
 
   successRow: {
@@ -300,11 +300,15 @@ const s = StyleSheet.create({
   errorText: { fontSize: 13, color: colors.red, fontWeight: '500' },
 
   cta: {
-    backgroundColor: colors.cyan,
+    backgroundColor: '#4361EE',
     borderRadius: radius.full,
     paddingVertical: spacing.md + 4,
     alignItems: 'center',
-    ...shadow.glowCyan,
+    shadowColor: '#4361EE',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.28,
+    shadowRadius: 16,
+    elevation: 8,
   },
   ctaText: { color: colors.white, fontSize: 16, fontWeight: '800', letterSpacing: -0.2 },
 

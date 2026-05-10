@@ -23,8 +23,8 @@ const SLIDES: Slide[] = [
     eyebrow: 'DISCOVER · 1 OF 3',
     title: "Find what's\nworth building.",
     body: 'Real Amazon signals. Trend data. Competition scored. One search reveals genuine demand.',
-    accentColor: colors.cyan,
-    accentBg: colors.cyanDim,
+    accentColor: '#4361EE',
+    accentBg: 'rgba(67,97,238,0.10)',
   },
   {
     icon: '⚡',
@@ -40,8 +40,8 @@ const SLIDES: Slide[] = [
     eyebrow: 'BUILD · 3 OF 3',
     title: 'From signal\nto business.',
     body: 'Brand, listing, keywords, supplier — your full commerce stack in one place.',
-    accentColor: colors.purple,
-    accentBg: colors.purpleDim,
+    accentColor: '#4361EE',
+    accentBg: 'rgba(67,97,238,0.10)',
   },
 ];
 
@@ -214,7 +214,7 @@ export default function OnboardingScreen({ navigation }: Props) {
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bgCard },
+  container: { flex: 1, backgroundColor: '#F5F7FF' },
 
   // Atmospheric ambient background
   ambientOrb: {

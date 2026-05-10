@@ -99,7 +99,7 @@ export default function AnalyzeInlineCard({
         </View>
       ) : loading ? (
         <View style={ai.loadingWrap}>
-          <PulseDots color={colors.cyan} />
+          <PulseDots color={'#4361EE'} />
           <View style={ai.loadingTextWrap}>
             <Text style={ai.loadingTitle}>Analyzing market signals…</Text>
             <Text style={ai.loadingSub}>Margin · competition · trend · risk</Text>
@@ -245,7 +245,7 @@ const ai = StyleSheet.create({
   },
   limitTitle:     { fontSize: 14, fontWeight: '800', color: colors.textPrimary },
   limitSub:       { fontSize: 12, color: colors.textSecondary, lineHeight: 18 },
-  upgradeBtn:     { backgroundColor: colors.cyan, borderRadius: radius.full, paddingVertical: 12, alignItems: 'center' },
+  upgradeBtn:     { backgroundColor: '#4361EE', borderRadius: radius.full, paddingVertical: 12, alignItems: 'center' },
   upgradeBtnText: { fontSize: 14, fontWeight: '700', color: colors.white },
   upgradePerks:   { fontSize: 10, color: colors.textMuted, textAlign: 'center' },
   verdictCard: {
@@ -280,10 +280,10 @@ const ai = StyleSheet.create({
   riskLabel: { fontSize: 8, fontWeight: '800', color: colors.red, letterSpacing: 1.8, marginBottom: 3 },
   riskText:  { fontSize: 12, color: colors.textPrimary, lineHeight: 18 },
   nextCard: {
-    backgroundColor: colors.cyanDim, borderRadius: radius.lg,
-    padding: spacing.sm + 4, borderLeftWidth: 3, borderLeftColor: colors.cyan,
+    backgroundColor: 'rgba(67,97,238,0.10)', borderRadius: radius.lg,
+    padding: spacing.sm + 4, borderLeftWidth: 3, borderLeftColor: '#4361EE',
   },
-  nextLabel: { fontSize: 8, fontWeight: '800', color: colors.cyan, letterSpacing: 1.8, marginBottom: 3 },
+  nextLabel: { fontSize: 8, fontWeight: '800', color: '#4361EE', letterSpacing: 1.8, marginBottom: 3 },
   nextText:  { fontSize: 13, fontWeight: '600', color: colors.textPrimary, lineHeight: 18 },
   metricsRow: {
     flexDirection: 'row', backgroundColor: colors.bgElevated,
@@ -305,12 +305,12 @@ const ai = StyleSheet.create({
   launchCtaText:     { fontSize: 15, fontWeight: '800', color: colors.white, letterSpacing: -0.3 },
   footer:            { flexDirection: 'row', gap: spacing.sm, alignItems: 'center' },
   saveBtn: {
-    flex: 1, borderWidth: 1, borderColor: colors.cyan,
+    flex: 1, borderWidth: 1, borderColor: '#4361EE',
     borderRadius: radius.full, paddingVertical: 9, alignItems: 'center',
-    backgroundColor: colors.cyanDim,
+    backgroundColor: 'rgba(67,97,238,0.10)',
   },
   saveBtnDone:         { backgroundColor: colors.greenLight, borderColor: colors.green },
-  saveBtnText:         { fontSize: 12, fontWeight: '700', color: colors.cyan },
+  saveBtnText:         { fontSize: 12, fontWeight: '700', color: '#4361EE' },
   saveBtnTextDone:     { color: colors.green, fontWeight: '700' },
   compareBtn: {
     borderWidth: 1, borderColor: colors.border, borderRadius: radius.full,

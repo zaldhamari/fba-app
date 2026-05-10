@@ -16,13 +16,12 @@ export default function SplashScreen({ navigation }: Props) {
 
   const wordmarkOpacity  = useRef(new Animated.Value(0)).current;
   const taglineOpacity   = useRef(new Animated.Value(0)).current;
-  const contentTranslate = useRef(new Animated.Value(10)).current;
+  const contentTranslate = useRef(new Animated.Value(12)).current;
 
   const startTime = useRef(Date.now());
   const navigated = useRef(false);
 
   useEffect(() => {
-    // Cinematic entrance: wordmark fades + rises, tagline fades after a beat
     Animated.sequence([
       Animated.parallel([
         Animated.timing(wordmarkOpacity,  { toValue: 1, duration: 500, useNativeDriver: true }),
@@ -57,17 +56,22 @@ export default function SplashScreen({ navigation }: Props) {
 
   return (
     <View style={s.container}>
-      {/* Atmospheric depth — two orbs, very restrained */}
+      {/* Atmospheric depth orbs */}
       <View style={s.orb1} pointerEvents="none" />
       <View style={s.orb2} pointerEvents="none" />
+      <View style={s.orb3} pointerEvents="none" />
 
-      {/* Brand lockup — vertically centered */}
+      {/* Brand lockup */}
       <Animated.View
         style={[s.content, {
           opacity: wordmarkOpacity,
           transform: [{ translateY: contentTranslate }],
         }]}
       >
+        {/* Icon mark */}
+        <View style={s.iconMark}>
+          <Text style={s.iconSymbol}>◎</Text>
+        </View>
         <Text style={s.wordmark}>Siftly</Text>
         <Animated.Text style={[s.tagline, { opacity: taglineOpacity }]}>
           Built for modern independence.
@@ -80,41 +84,56 @@ export default function SplashScreen({ navigation }: Props) {
 const s = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.bgHero,
+    backgroundColor: '#F5F7FF',
     alignItems: 'center',
     justifyContent: 'center',
   },
 
-  // Atmospheric orbs — very low opacity, positioned to frame without distracting
   orb1: {
-    position: 'absolute', top: -80, right: -80,
-    width: 320, height: 320, borderRadius: 160,
-    backgroundColor: colors.cyanDim,
-    opacity: 0.5,
+    position: 'absolute', top: -100, right: -60,
+    width: 300, height: 300, borderRadius: 150,
+    backgroundColor: 'rgba(67,97,238,0.07)',
   },
   orb2: {
-    position: 'absolute', bottom: -60, left: -60,
-    width: 220, height: 220, borderRadius: 110,
-    backgroundColor: colors.purpleDim,
-    opacity: 0.35,
+    position: 'absolute', bottom: -80, left: -80,
+    width: 260, height: 260, borderRadius: 130,
+    backgroundColor: 'rgba(67,97,238,0.05)',
+  },
+  orb3: {
+    position: 'absolute', top: '40%', left: -40,
+    width: 160, height: 160, borderRadius: 80,
+    backgroundColor: 'rgba(13,27,75,0.03)',
   },
 
-  // Brand lockup — centered, unhurried
   content: {
     alignItems: 'center',
     gap: spacing.sm,
   },
+  iconMark: {
+    width: 52, height: 52,
+    borderRadius: 16,
+    backgroundColor: '#EEF4FF',
+    borderWidth: 1,
+    borderColor: 'rgba(67,97,238,0.20)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.xs,
+  },
+  iconSymbol: {
+    fontSize: 22, color: '#4361EE', fontWeight: '700',
+  },
   wordmark: {
     fontSize: 42,
     fontWeight: '900',
-    color: colors.textPrimary,
+    color: '#0D1B4B',
     letterSpacing: -2,
   },
   tagline: {
     fontSize: 13,
     fontWeight: '400',
-    color: colors.textMuted,
+    color: '#8196B0',
     letterSpacing: 0.4,
     textAlign: 'center',
+    marginTop: 4,
   },
 });

@@ -128,7 +128,7 @@ export default function VaultExportModal({ visible, entries, onClose }: Props) {
               <Text style={s.optionDesc}>Open in Excel, Google Sheets or Numbers</Text>
             </View>
             {csvLoading
-              ? <ActivityIndicator color={colors.cyan} size="small" />
+              ? <ActivityIndicator color={'#4361EE'} size="small" />
               : <Text style={[s.arrow, empty && s.dimText]}>↗</Text>}
           </TouchableOpacity>
 
@@ -191,7 +191,7 @@ const s = StyleSheet.create({
     marginBottom: spacing.sm,
     borderWidth: 1, borderColor: colors.border,
   },
-  optionCardReport: { backgroundColor: colors.cyan, borderColor: colors.cyan },
+  optionCardReport: { backgroundColor: '#4361EE', borderColor: '#4361EE' },
   optionDisabled: { opacity: 0.4 },
   optionIcon: {
     width: 44, height: 44, borderRadius: radius.md,
@@ -199,7 +199,7 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   optionIconReport: { backgroundColor: 'rgba(255,255,255,0.2)' },
-  optionIconText: { fontSize: 22, color: colors.cyan },
+  optionIconText: { fontSize: 22, color: '#4361EE' },
   optionBody:       { flex: 1 },
   optionTitle:      { fontSize: 15, fontWeight: '800', color: colors.textPrimary, marginBottom: 2 },
   optionTitleReport:{ color: colors.bg },

@@ -4,23 +4,19 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { colors, radius, spacing } from '../theme';
 import CopilotScreen    from '../screens/CopilotScreen';
-import ResearchScreen   from '../screens/ResearchScreen';
+import SearchScreen     from '../screens/SearchScreen';
 import BrandScreen      from '../screens/BrandScreen';
-import KeywordsScreen   from '../screens/KeywordsScreen';
-import SuppliersScreen  from '../screens/SuppliersScreen';
 import CalculatorScreen from '../screens/CalculatorScreen';
 import LaunchScreen     from '../screens/LaunchScreen';
 
 const Tab = createBottomTabNavigator();
 
 const TABS = [
-  { name: 'Co-Pilot',  icon: '⚡', label: 'Pilot',     color: colors.purple, component: CopilotScreen    },
-  { name: 'Research',  icon: '◎',  label: 'Research',  color: colors.cyan,   component: ResearchScreen   },
-  { name: 'Brand',     icon: '✦',  label: 'Brand',     color: colors.pink,   component: BrandScreen      },
-  { name: 'Keywords',  icon: '≋',  label: 'SEO',       color: colors.amber,  component: KeywordsScreen   },
-  { name: 'Suppliers', icon: '⬡',  label: 'Suppliers', color: colors.green,  component: SuppliersScreen  },
-  { name: 'Calculate', icon: '◈',  label: 'Calculate', color: colors.purple, component: CalculatorScreen },
-  { name: 'Launch',    icon: '↑',  label: 'Launch',    color: colors.green,  component: LaunchScreen     },
+  { name: 'Co-Pilot',  icon: '⚡', label: 'Pilot',     color: '#4361EE', component: CopilotScreen    },
+  { name: 'Search',    icon: '◎',  label: 'Search',    color: '#0284C7', component: SearchScreen     },
+  { name: 'Calculate', icon: '◈',  label: 'Calculate', color: '#7C3AED', component: CalculatorScreen },
+  { name: 'Brand',     icon: '✦',  label: 'Brand',     color: '#DB2777', component: BrandScreen      },
+  { name: 'Launch',    icon: '↑',  label: 'Launch',    color: '#059669', component: LaunchScreen     },
 ];
 
 function CustomTabBar({ state, navigation }: BottomTabBarProps) {
@@ -37,16 +33,15 @@ function CustomTabBar({ state, navigation }: BottomTabBarProps) {
               onPress={() => navigation.navigate(route.name)}
               activeOpacity={0.7}
             >
-              {active ? (
-                <View style={[s.activeChip, { backgroundColor: `${tab.color}22` }]}>
-                  <Text style={[s.tabIcon, { color: tab.color }]}>{tab.icon}</Text>
-                  <Text style={[s.tabLabel, { color: tab.color }]}>{tab.label}</Text>
-                </View>
-              ) : (
-                <View style={s.inactiveChip}>
-                  <Text style={[s.tabIcon, { color: colors.textMuted }]}>{tab.icon}</Text>
-                </View>
-              )}
+              <View style={[s.iconWrap, active && { backgroundColor: `${tab.color}18` }]}>
+                <Text style={[s.tabIcon, { color: active ? tab.color : colors.textMuted }]}>
+                  {tab.icon}
+                </Text>
+              </View>
+              <Text style={[s.tabLabel, { color: active ? tab.color : colors.textMuted, fontWeight: active ? '700' : '500' }]}>
+                {tab.label}
+              </Text>
+              {active && <View style={[s.activeDot, { backgroundColor: tab.color }]} />}
             </TouchableOpacity>
           );
         })}
@@ -70,37 +65,41 @@ export default function TabNavigator() {
 
 const s = StyleSheet.create({
   wrapper: {
-    backgroundColor: colors.bgCard,
+    backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
-    borderTopColor: colors.border,
-    paddingHorizontal: spacing.sm,
+    borderTopColor: '#E0E8F5',
+    paddingHorizontal: spacing.xs,
     paddingTop: 6,
-    paddingBottom: Platform.OS === 'ios' ? 22 : 6,
+    paddingBottom: Platform.OS === 'ios' ? 24 : 6,
   },
   bar: {
     flexDirection: 'row',
-    backgroundColor: colors.bgElevated,
-    borderRadius: radius.full,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: 3,
-    alignItems: 'center',
   },
-  tabBtn: { flex: 1, alignItems: 'center' },
-  activeChip: {
-    flexDirection: 'row',
+  tabBtn: {
+    flex: 1,
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    borderRadius: radius.full,
+    gap: 3,
+    paddingVertical: 2,
   },
-  inactiveChip: {
-    paddingHorizontal: 6,
-    paddingVertical: 7,
-    borderRadius: radius.full,
+  iconWrap: {
+    width: 44,
+    height: 26,
+    borderRadius: 13,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  tabIcon:  { fontSize: 13, fontWeight: '700' as const },
-  tabLabel: { fontSize: 11, fontWeight: '700' as const, letterSpacing: -0.2 },
+  tabIcon: {
+    fontSize: 15,
+    fontWeight: '700' as const,
+  },
+  tabLabel: {
+    fontSize: 10,
+    letterSpacing: 0.1,
+  },
+  activeDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    marginTop: 1,
+  },
 });

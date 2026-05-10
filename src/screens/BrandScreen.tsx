@@ -4,12 +4,14 @@ import {
   ScrollView, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors, spacing, radius } from '../theme';
+import { colors, spacing, radius, shadow } from '../theme';
 import { api, BrandResult } from '../services/api';
 import { useSubscription } from '../hooks/useSubscription';
 import PaywallModal from '../components/PaywallModal';
+import KeywordsScreen from './KeywordsScreen';
+import { IdeasMode } from './LaunchScreen';
 
-type Mode = 'brand' | 'listing';
+type Mode = 'brand' | 'ideas' | 'keywords' | 'listing';
 const STYLES = ['minimal', 'modern', 'premium', 'playful'] as const;
 
 // ─── Listing score ────────────────────────────────────────────────────────────
@@ -351,6 +353,13 @@ function ListingTab() {
 export default function BrandScreen() {
   const [mode, setMode] = useState<Mode>('brand');
 
+  const BRAND_TABS: { key: Mode; label: string; icon: string }[] = [
+    { key: 'brand',    label: 'Brand',    icon: '✦' },
+    { key: 'ideas',    label: 'Ideas',    icon: '◉' },
+    { key: 'keywords', label: 'Keywords', icon: '≋' },
+    { key: 'listing',  label: 'Listing',  icon: '≡' },
+  ];
+
   return (
     <SafeAreaView style={s.container}>
       {/* Header */}
@@ -362,52 +371,52 @@ export default function BrandScreen() {
 
       {/* Tab switcher */}
       <View style={s.tabs}>
-        {([
-          { key: 'brand',   label: 'Brand Creator',   icon: '✦' },
-          { key: 'listing', label: 'Listing Builder',  icon: '≡' },
-        ] as const).map(m => (
+        {BRAND_TABS.map(m => (
           <TouchableOpacity
             key={m.key}
             style={[s.tab, mode === m.key && s.tabActive]}
             onPress={() => setMode(m.key)}
-            activeOpacity={0.7}
+            activeOpacity={0.75}
           >
             <Text style={[s.tabText, mode === m.key && s.tabTextActive]}>
-              {m.icon} {m.label}
+              {m.label}
             </Text>
           </TouchableOpacity>
         ))}
       </View>
 
+      {/* Keep all tabs mounted to preserve state */}
       <View style={{ flex: 1 }}>
-        {mode === 'brand' ? <BrandTab /> : <ListingTab />}
+        <View style={[{ flex: 1 }, mode !== 'brand'    && { display: 'none' }]}><BrandTab /></View>
+        <View style={[{ flex: 1 }, mode !== 'ideas'    && { display: 'none' }]}><IdeasMode /></View>
+        <View style={[{ flex: 1 }, mode !== 'keywords' && { display: 'none' }]}><KeywordsScreen edges={[]} /></View>
+        <View style={[{ flex: 1 }, mode !== 'listing'  && { display: 'none' }]}><ListingTab /></View>
       </View>
     </SafeAreaView>
   );
 }
 
+const BRAND_COLOR = '#DB2777';
+
 // ─── Screen styles ─────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
+  container: { flex: 1, backgroundColor: '#F5F7FF' },
   header: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
     paddingBottom: spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: '#E0E8F5',
+    backgroundColor: '#fff',
   },
-  brandWord: { fontSize: 20, fontWeight: '900', color: colors.textPrimary, letterSpacing: -0.8, marginBottom: 2 },
-  eyebrow: { fontSize: 9, fontWeight: '800', color: colors.cyan, letterSpacing: 2.5, marginBottom: 6 },
-  title:   { fontSize: 26, fontWeight: '900', color: colors.textPrimary, letterSpacing: -1, lineHeight: 32 },
-  tabs: {
-    flexDirection: 'row', marginHorizontal: spacing.lg, marginVertical: spacing.md,
-    backgroundColor: colors.bgCard, borderRadius: radius.lg, overflow: 'hidden',
-    borderWidth: 1, borderColor: colors.border,
-  },
-  tab:          { flex: 1, paddingVertical: spacing.sm + 3, alignItems: 'center' },
-  tabActive:    { backgroundColor: colors.cyan },
-  tabText:      { fontSize: 12, fontWeight: '700', color: colors.textMuted },
-  tabTextActive:{ color: colors.bg },
+  brandWord: { fontSize: 20, fontWeight: '900', color: '#0D1B4B', letterSpacing: -0.8, marginBottom: 2 },
+  eyebrow: { fontSize: 9, fontWeight: '800', color: BRAND_COLOR, letterSpacing: 2.5, marginBottom: 6 },
+  title:   { fontSize: 26, fontWeight: '900', color: '#0D1B4B', letterSpacing: -1, lineHeight: 32 },
+  tabs:         { flexDirection: 'row', marginHorizontal: spacing.lg, marginTop: spacing.sm, marginBottom: spacing.sm, backgroundColor: '#E8EDF5', borderRadius: radius.lg, padding: 3, borderWidth: 1, borderColor: '#D0DAF0' },
+  tab:          { flex: 1, paddingVertical: spacing.sm + 2, alignItems: 'center', borderRadius: radius.md - 2 },
+  tabActive:    { backgroundColor: '#fff', ...shadow.sm },
+  tabText:      { fontSize: 13, fontWeight: '700', color: colors.textMuted },
+  tabTextActive:{ color: '#0D1B4B', fontWeight: '800' },
 });
 
 // ─── Tab-internal styles ───────────────────────────────────────────────────────
@@ -430,13 +439,13 @@ const b = StyleSheet.create({
     borderWidth: 1, borderColor: colors.border, borderRadius: radius.full,
     backgroundColor: colors.bgCard,
   },
-  styleChipActive:    { backgroundColor: colors.cyan, borderColor: colors.cyan },
+  styleChipActive:    { backgroundColor: '#DB2777', borderColor: '#DB2777' },
   styleChipText:      { fontSize: 12, fontWeight: '700', color: colors.textSecondary },
   styleChipTextActive:{ color: colors.bg },
 
   btn: {
     marginHorizontal: spacing.lg, marginBottom: spacing.md,
-    backgroundColor: colors.cyan, borderRadius: radius.md,
+    backgroundColor: '#DB2777', borderRadius: radius.md,
     paddingVertical: spacing.md, alignItems: 'center',
   },
   btnText:   { fontSize: 16, fontWeight: '800', color: colors.bg },
@@ -452,7 +461,7 @@ const b = StyleSheet.create({
   blockHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   blockLabel:  { fontSize: 9, fontWeight: '800', color: colors.textMuted, letterSpacing: 1.5 },
   blockHint:   { fontSize: 11, color: colors.textMuted, lineHeight: 16, letterSpacing: 0.1, marginTop: -4 },
-  copyBtn:     { fontSize: 12, fontWeight: '700', color: colors.cyan },
+  copyBtn:     { fontSize: 12, fontWeight: '700', color: '#DB2777' },
 
   bigName:  { fontSize: 28, fontWeight: '900', color: colors.textPrimary, letterSpacing: -1 },
   namesGrid:{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
@@ -461,9 +470,9 @@ const b = StyleSheet.create({
     borderWidth: 1, borderColor: colors.border, borderRadius: radius.full,
     backgroundColor: colors.bgElevated,
   },
-  nameChipActive:    { backgroundColor: colors.cyanDim, borderColor: colors.cyanBorder },
+  nameChipActive:    { backgroundColor: 'rgba(219,39,119,0.09)', borderColor: 'rgba(219,39,119,0.22)' },
   nameChipText:      { fontSize: 14, fontWeight: '700', color: colors.textSecondary },
-  nameChipTextActive:{ color: colors.cyan },
+  nameChipTextActive:{ color: '#DB2777' },
   tagline: { fontSize: 13, color: colors.textMuted, fontStyle: 'italic' },
 
   tagCloud: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs + 2 },
@@ -475,7 +484,7 @@ const b = StyleSheet.create({
   tagText:  { fontSize: 12, color: colors.textSecondary },
   copyText: { fontSize: 14, color: colors.textSecondary, lineHeight: 22 },
   bullet:   { flexDirection: 'row', gap: spacing.sm },
-  bulletDash:{ fontSize: 14, fontWeight: '700', color: colors.cyan },
+  bulletDash:{ fontSize: 14, fontWeight: '700', color: '#DB2777' },
   bulletText:{ fontSize: 14, flex: 1, lineHeight: 22, color: colors.textSecondary },
 
   // Listing score

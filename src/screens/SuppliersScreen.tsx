@@ -37,7 +37,7 @@ function SupplierCard({ item, product }: { item: Supplier; product: string }) {
   }
 
   const gradeColor = scoreData?.grade === 'A' ? colors.green
-    : scoreData?.grade === 'B' ? colors.cyan
+    : scoreData?.grade === 'B' ? '#059669'
     : scoreData?.grade === 'C' ? colors.amber : colors.red;
 
   return (
@@ -59,7 +59,7 @@ function SupplierCard({ item, product }: { item: Supplier; product: string }) {
               {item.url && <Text style={s.link}>View →</Text>}
               <TouchableOpacity style={s.scoreBtn} onPress={score} disabled={scoring} activeOpacity={0.8}>
                 {scoring
-                  ? <ActivityIndicator size="small" color={colors.cyan} style={{ width: 40 }} />
+                  ? <ActivityIndicator size="small" color={'#059669'} style={{ width: 40 }} />
                   : <Text style={s.scoreBtnText}>
                       {scoreData ? `Grade ${scoreData.grade}` : 'Score ◎'}
                     </Text>
@@ -172,7 +172,7 @@ function SupplierCard({ item, product }: { item: Supplier; product: string }) {
               <Text style={[sc.sectionLabel, { marginTop: spacing.md }]}>LEVERAGE POINTS</Text>
               {scoreData.negotiation_strategy.leverage_points?.map((p: string, i: number) => (
                 <View key={i} style={sc.flagRow}>
-                  <Text style={{ color: colors.cyan, fontWeight: '800' }}>✦</Text>
+                  <Text style={{ color: '#059669', fontWeight: '800' }}>✦</Text>
                   <Text style={sc.flagText}>{p}</Text>
                 </View>
               ))}
@@ -199,7 +199,7 @@ const sc = StyleSheet.create({
   handle: { width: 36, height: 4, backgroundColor: colors.bgElevated, borderRadius: 2, alignSelf: 'center', marginBottom: spacing.md },
 
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: spacing.sm },
-  eyebrow: { fontSize: 9, fontWeight: '800', color: colors.cyan, letterSpacing: 2 },
+  eyebrow: { fontSize: 9, fontWeight: '800', color: '#059669', letterSpacing: 2 },
   name: { fontSize: 15, fontWeight: '800', color: colors.textPrimary, marginTop: 2 },
   gradeBadge: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   gradeText: { fontSize: 18, fontWeight: '900', color: colors.white },
@@ -239,11 +239,11 @@ const sc = StyleSheet.create({
   negLabel: { fontSize: 12, color: colors.textSecondary },
   negVal: { fontSize: 13, fontWeight: '800', color: colors.textPrimary },
 
-  closeBtn: { backgroundColor: colors.cyan, borderRadius: radius.md, paddingVertical: spacing.md, alignItems: 'center', marginTop: spacing.md },
+  closeBtn: { backgroundColor: '#059669', borderRadius: radius.md, paddingVertical: spacing.md, alignItems: 'center', marginTop: spacing.md },
   closeBtnText: { fontSize: 15, fontWeight: '700', color: colors.white },
 });
 
-export default function SuppliersScreen() {
+export default function SuppliersScreen({ edges }: { edges?: readonly ('top'|'right'|'bottom'|'left')[] } = {}) {
   const [tab, setTab] = useState<STab>('search');
   const [query, setQuery] = useState('');
   const [maxPrice, setMaxPrice] = useState('');
@@ -301,7 +301,7 @@ export default function SuppliersScreen() {
   }
 
   return (
-    <SafeAreaView style={s.container}>
+    <SafeAreaView style={s.container} edges={edges as any}>
       <PaywallModal visible={showPaywall} onClose={() => setShowPaywall(false)} featureContext="suppliers" />
 
       <View style={s.header}>
@@ -450,7 +450,7 @@ const s = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   brandWord: { fontSize: 20, fontWeight: '900', color: colors.textPrimary, letterSpacing: -0.8, marginBottom: 2 },
-  eyebrow: { fontSize: 9, fontWeight: '800', color: colors.cyan, letterSpacing: 2.5, marginBottom: 6 },
+  eyebrow: { fontSize: 9, fontWeight: '800', color: '#059669', letterSpacing: 2.5, marginBottom: 6 },
   subtitle: { fontSize: 13, color: colors.textSecondary, marginTop: 4, lineHeight: 20 },
   title: {
     fontSize: 26, fontWeight: '900', color: colors.textPrimary,
@@ -463,7 +463,7 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: colors.border, overflow: 'hidden', padding: 3,
   },
   tab: { flex: 1, paddingVertical: spacing.sm + 2, alignItems: 'center', borderRadius: radius.sm },
-  tabActive: { backgroundColor: colors.cyan },
+  tabActive: { backgroundColor: '#059669' },
   tabText: { fontSize: 9, fontWeight: '800', color: colors.textMuted, letterSpacing: 1 },
   tabTextActive: { color: colors.bg },
   emailScroll: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.md },
@@ -477,7 +477,7 @@ const s = StyleSheet.create({
   emailBlockHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   emailBlockLabel: { fontSize: 9, fontWeight: '800', color: colors.textMuted, letterSpacing: 1.5 },
   emailText: { fontSize: 14, color: colors.textSecondary, lineHeight: 22 },
-  copyBtn: { fontSize: 11, fontWeight: '700', color: colors.cyan },
+  copyBtn: { fontSize: 11, fontWeight: '700', color: '#059669' },
   searchRow: {
     flexDirection: 'row', gap: spacing.sm,
     paddingHorizontal: spacing.lg, paddingBottom: spacing.md,
@@ -489,18 +489,18 @@ const s = StyleSheet.create({
     paddingVertical: spacing.sm + 2, fontSize: 15, color: colors.textPrimary,
   },
   searchBtn: {
-    backgroundColor: colors.cyan, borderRadius: radius.md,
+    backgroundColor: '#059669', borderRadius: radius.md,
     paddingHorizontal: spacing.md, justifyContent: 'center', alignItems: 'center',
   },
   searchBtnDisabled: { opacity: 0.5 },
   searchBtnText: { color: colors.bg, fontSize: 20, fontWeight: '700' },
   usagePill: {
     alignSelf: 'flex-start', marginTop: spacing.sm,
-    backgroundColor: colors.cyanDim, borderRadius: radius.full,
+    backgroundColor: 'rgba(5,150,105,0.10)', borderRadius: radius.full,
     paddingHorizontal: spacing.sm, paddingVertical: 4,
-    borderWidth: 1, borderColor: colors.cyanBorder,
+    borderWidth: 1, borderColor: 'rgba(5,150,105,0.22)',
   },
-  usagePillText: { fontSize: 10, fontWeight: '700', color: colors.cyan },
+  usagePillText: { fontSize: 10, fontWeight: '700', color: '#059669' },
   emailHint: { fontSize: 12, color: colors.textMuted, lineHeight: 17, letterSpacing: 0.1, marginBottom: spacing.sm },
   errorText: { fontSize: 12, color: colors.red, paddingHorizontal: spacing.lg, marginBottom: spacing.sm },
   list: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl },
@@ -517,9 +517,9 @@ const s = StyleSheet.create({
   price: { fontSize: 16, fontWeight: '800', color: colors.green },
   moq: { fontSize: 11, color: colors.textMuted },
   supplier: { fontSize: 11, color: colors.textMuted },
-  link: { fontSize: 11, color: colors.cyan, fontWeight: '700' },
-  scoreBtn: { borderWidth: 1, borderColor: colors.cyanBorder, borderRadius: radius.full, paddingHorizontal: spacing.sm, paddingVertical: 3, backgroundColor: colors.cyanDim },
-  scoreBtnText: { fontSize: 10, fontWeight: '800', color: colors.cyan },
+  link: { fontSize: 11, color: '#059669', fontWeight: '700' },
+  scoreBtn: { borderWidth: 1, borderColor: 'rgba(5,150,105,0.22)', borderRadius: radius.full, paddingHorizontal: spacing.sm, paddingVertical: 3, backgroundColor: 'rgba(5,150,105,0.10)' },
+  scoreBtnText: { fontSize: 10, fontWeight: '800', color: '#059669' },
   empty: { alignItems: 'center', paddingTop: 80, gap: spacing.sm, paddingHorizontal: spacing.lg },
   emptyIcon: { fontSize: 48, color: colors.textMuted, marginBottom: spacing.sm },
   emptyText: { fontSize: 14, color: colors.textSecondary, textAlign: 'center', lineHeight: 22 },

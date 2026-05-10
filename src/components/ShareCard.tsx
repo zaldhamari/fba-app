@@ -161,7 +161,7 @@ const s = StyleSheet.create({
   brandName: {
     fontSize: 11,
     fontWeight: '900',
-    color: colors.cyan,
+    color: '#4361EE',
     letterSpacing: 2.5,
   },
   brandSub: {
@@ -249,7 +249,7 @@ const s = StyleSheet.create({
 
   // ── Bottom actions
   shareBtn: {
-    backgroundColor: colors.cyan,
+    backgroundColor: '#4361EE',
     borderRadius: radius.lg,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.xl,

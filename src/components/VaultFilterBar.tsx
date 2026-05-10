@@ -115,10 +115,10 @@ const s = StyleSheet.create({
     backgroundColor: colors.bgElevated,
   },
   chipActive: {
-    borderColor: colors.cyan,
-    backgroundColor: colors.cyanDim,
+    borderColor: '#4361EE',
+    backgroundColor: 'rgba(67,97,238,0.10)',
   },
   chipDot: { width: 6, height: 6, borderRadius: 3 },
   chipText: { fontSize: 10, fontWeight: '600', color: colors.textMuted },
-  chipTextActive: { color: colors.cyan, fontWeight: '700' },
+  chipTextActive: { color: '#4361EE', fontWeight: '700' },
 });

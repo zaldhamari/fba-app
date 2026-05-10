@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity,
   ScrollView, ActivityIndicator, KeyboardTypeOptions,
@@ -11,7 +11,7 @@ import { useCurrency } from '../context/CurrencyContext';
 import { CurrencySelector } from '../components/CurrencySelector';
 
 const CATEGORIES = ['all', 'electronics', 'home', 'kitchen', 'sports', 'beauty', 'clothing', 'tools'];
-type Mode = 'fees' | 'landed' | 'freight' | 'cashflow' | 'ppc' | 'breakeven' | 'scenario' | 'ranking' | 'reorder' | 'simulate';
+type Mode = 'fees' | 'landed' | 'freight' | 'cashflow' | 'ppc' | 'breakeven' | 'scenario' | 'ranking' | 'reorder' | 'simulate' | 'bsr';
 
 function Field({
   label, value, onChange, placeholder, keyboard = 'decimal-pad', badge,
@@ -40,7 +40,7 @@ const f = StyleSheet.create({
   group: { flex: 1, minWidth: 100 },
   labelRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: spacing.xs },
   label: { fontSize: 9, fontWeight: '700' as const, color: colors.textMuted, letterSpacing: 1.5 },
-  badge: { backgroundColor: colors.cyan, borderRadius: radius.full, paddingHorizontal: 5, paddingVertical: 1 },
+  badge: { backgroundColor: '#7C3AED', borderRadius: radius.full, paddingHorizontal: 5, paddingVertical: 1 },
   badgeText: { fontSize: 7, fontWeight: '800', color: colors.white, letterSpacing: 0.5 },
   input: {
     borderWidth: 1, borderColor: colors.border, borderRadius: radius.md,
@@ -248,7 +248,7 @@ function FreightTab() {
   const totalKg = wt * qty * 0.453592;
 
   const methods = [
-    { name: 'Sea Freight (LCL)', days: '25–35 days', rateKg: 9,  icon: '🚢', color: colors.cyan },
+    { name: 'Sea Freight (LCL)', days: '25–35 days', rateKg: 9,  icon: '🚢', color: '#7C3AED' },
     { name: 'Air Freight',        days: '5–7 days',   rateKg: 8,  icon: '✈️', color: colors.orange },
     { name: 'Express (DHL/FedEx)',days: '3–5 days',   rateKg: 16, icon: '⚡', color: colors.red },
   ];
@@ -728,7 +728,7 @@ function LandedTab() {
                 <View style={{ flex: 1 }}>
                   <Text style={t.feeLabel}>{label}</Text>
                   <View style={{ height: 3, backgroundColor: colors.bgElevated, borderRadius: 2, marginTop: 4 }}>
-                    <View style={{ width: Math.min(200, trueCost > 0 ? (val/trueCost)*200 : 0), height: 3, backgroundColor: colors.cyan, borderRadius: 2 }} />
+                    <View style={{ width: Math.min(200, trueCost > 0 ? (val/trueCost)*200 : 0), height: 3, backgroundColor: '#7C3AED', borderRadius: 2 }} />
                   </View>
                 </View>
                 <Text style={[t.feeVal, { marginLeft: spacing.md }]}>{symbol}{val.toFixed(2)}</Text>
@@ -736,7 +736,7 @@ function LandedTab() {
             ))}
             <View style={[t.feeRow, { borderBottomWidth: 0, backgroundColor: colors.bgElevated }]}>
               <Text style={[t.feeLabel, { fontWeight: '800', color: colors.textPrimary }]}>True cost / unit</Text>
-              <Text style={[t.feeVal, { color: colors.cyan }]}>{symbol}{trueCost.toFixed(2)}</Text>
+              <Text style={[t.feeVal, { color: '#7C3AED' }]}>{symbol}{trueCost.toFixed(2)}</Text>
             </View>
           </View>
 
@@ -948,9 +948,9 @@ function RankingTab() {
 
       {calculated && p > 0 && (
         <View style={t.results}>
-          <View style={[t.profitCard, { borderColor: colors.cyanBorder }]}>
+          <View style={[t.profitCard, { borderColor: 'rgba(124,58,237,0.22)' }]}>
             <Text style={t.profitLabel}>30-DAY PPC TO RANK</Text>
-            <Text style={[t.profitNum, { color: colors.cyan }]}>{symbol}{ppc30Day.toFixed(0)}</Text>
+            <Text style={[t.profitNum, { color: '#7C3AED' }]}>{symbol}{ppc30Day.toFixed(0)}</Text>
             <Text style={t.profitStat}>{symbol}{ppcPerDay.toFixed(2)}/day for 30 days</Text>
           </View>
 
@@ -1211,12 +1211,12 @@ const sim = StyleSheet.create({
   form: { backgroundColor: colors.bgCard, borderRadius: radius.lg, padding: spacing.md, gap: spacing.sm, borderWidth: 1, borderColor: colors.border },
   label: { fontSize: 9, fontWeight: '700' as const, color: colors.textMuted, letterSpacing: 1.5, marginBottom: spacing.xs },
   catChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.full, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bgCard },
-  catChipActive: { backgroundColor: colors.cyan, borderColor: colors.cyan },
+  catChipActive: { backgroundColor: '#7C3AED', borderColor: '#7C3AED' },
   catText: { fontSize: 12, fontWeight: '500' as const, color: colors.textSecondary },
   catTextActive: { color: '#fff', fontWeight: '600' as const },
-  sweetCard: { backgroundColor: colors.cyanDim, borderRadius: radius.lg, padding: spacing.md, borderWidth: 1.5, borderColor: colors.cyanBorder, alignItems: 'center', gap: 4 },
-  sweetLabel: { fontSize: 9, fontWeight: '800' as const, color: colors.cyan, letterSpacing: 2 },
-  sweetPrice: { fontSize: 36, fontWeight: '900' as const, color: colors.cyan, letterSpacing: -1 },
+  sweetCard: { backgroundColor: 'rgba(124,58,237,0.08)', borderRadius: radius.lg, padding: spacing.md, borderWidth: 1.5, borderColor: 'rgba(124,58,237,0.22)', alignItems: 'center', gap: 4 },
+  sweetLabel: { fontSize: 9, fontWeight: '800' as const, color: '#7C3AED', letterSpacing: 2 },
+  sweetPrice: { fontSize: 36, fontWeight: '900' as const, color: '#7C3AED', letterSpacing: -1 },
   sweetSub: { fontSize: 12, color: colors.textSecondary, textAlign: 'center' },
   sectionTitle: { fontSize: 9, fontWeight: '800' as const, color: colors.textMuted, letterSpacing: 1.5 },
   row: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bgCard, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderWidth: 1, borderColor: colors.border },
@@ -1235,6 +1235,152 @@ const sim = StyleSheet.create({
   shipImpact: { fontSize: 11, fontWeight: '700' as const },
 });
 
+// ─── BSR Estimator Tab ───────────────────────────────────────────────────────
+const BSR_CATEGORIES = [
+  { label: 'Home & Kitchen', multiplier: 3200 },
+  { label: 'Sports & Outdoors', multiplier: 2800 },
+  { label: 'Beauty', multiplier: 2500 },
+  { label: 'Electronics', multiplier: 4000 },
+  { label: 'Clothing', multiplier: 2000 },
+  { label: 'Toys & Games', multiplier: 2200 },
+  { label: 'Tools', multiplier: 1800 },
+  { label: 'Pet Supplies', multiplier: 2600 },
+];
+
+function BSRTab() {
+  const { symbol } = useCurrency();
+  const [bsr, setBsr] = useState('');
+  const [price, setPrice] = useState('');
+  const [catIdx, setCatIdx] = useState(0);
+  const [result, setResult] = useState<{ monthly: number; daily: number; revenue: number } | null>(null);
+  const scrollRef = useRef<ScrollView>(null);
+
+  function estimate() {
+    const b = parseInt(bsr);
+    if (!b || b <= 0) return;
+    const { multiplier } = BSR_CATEGORIES[catIdx];
+    const monthly = Math.max(1, Math.round(multiplier * Math.pow(b, -0.7)));
+    const daily = Math.max(1, Math.round(monthly / 30));
+    const p = parseFloat(price) || 0;
+    setResult({ monthly, daily, revenue: p * monthly });
+    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 150);
+  }
+
+  const compLevel = result
+    ? result.monthly >= 500 ? 'High demand' : result.monthly >= 100 ? 'Moderate demand' : 'Low demand'
+    : '';
+  const compColor = result
+    ? result.monthly >= 500 ? colors.green : result.monthly >= 100 ? colors.amber : colors.red
+    : colors.textPrimary;
+
+  return (
+    <ScrollView ref={scrollRef} contentContainerStyle={bsrS.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+      <View style={bsrS.inputs}>
+        <View style={bsrS.row}>
+          <View style={bsrS.field}>
+            <Text style={bsrS.label}>BEST SELLER RANK</Text>
+            <TextInput
+              style={bsrS.input} value={bsr} onChangeText={setBsr}
+              placeholder="e.g. 5000" placeholderTextColor={colors.gray400}
+              keyboardType="number-pad"
+            />
+          </View>
+          <View style={bsrS.field}>
+            <Text style={bsrS.label}>{`SELLING PRICE (${symbol})`}</Text>
+            <TextInput
+              style={bsrS.input} value={price} onChangeText={setPrice}
+              placeholder="29.99" placeholderTextColor={colors.gray400}
+              keyboardType="decimal-pad"
+            />
+          </View>
+        </View>
+        <Text style={bsrS.label}>CATEGORY</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+            {BSR_CATEGORIES.map((c, i) => (
+              <TouchableOpacity key={i} style={[bsrS.chip, catIdx === i && bsrS.chipActive]} onPress={() => setCatIdx(i)}>
+                <Text style={[bsrS.chipText, catIdx === i && bsrS.chipTextActive]}>{c.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </ScrollView>
+        <TouchableOpacity style={bsrS.btn} onPress={estimate} activeOpacity={0.8}>
+          <Text style={bsrS.btnText}>Estimate Sales</Text>
+        </TouchableOpacity>
+      </View>
+
+      {result && (
+        <View style={bsrS.results}>
+          <View style={bsrS.heroCard}>
+            <Text style={bsrS.heroLabel}>EST. MONTHLY SALES</Text>
+            <Text style={bsrS.heroNum}>{result.monthly.toLocaleString()}</Text>
+            <Text style={[bsrS.demandLabel, { color: compColor }]}>{compLevel}</Text>
+          </View>
+          <View style={bsrS.statsRow}>
+            {[
+              ['Daily Sales',     `~${result.daily} units`],
+              ['Monthly Revenue', result.revenue > 0 ? `${symbol}${result.revenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}` : '—'],
+              ['Category',        BSR_CATEGORIES[catIdx].label],
+            ].map(([label, val]) => (
+              <View key={label} style={bsrS.stat}>
+                <Text style={bsrS.statVal}>{val}</Text>
+                <Text style={bsrS.statLabel}>{label}</Text>
+              </View>
+            ))}
+          </View>
+          <View style={bsrS.note}>
+            <Text style={bsrS.noteText}>Estimates based on category averages. Actual sales vary by season, listing quality, and PPC.</Text>
+          </View>
+        </View>
+      )}
+    </ScrollView>
+  );
+}
+
+const bsrS = StyleSheet.create({
+  scroll:  { padding: spacing.lg, gap: spacing.md, paddingBottom: 120 },
+  inputs:  { gap: spacing.sm },
+  row:     { flexDirection: 'row', gap: spacing.sm },
+  field:   { flex: 1 },
+  label:   { fontSize: 9, fontWeight: '800' as const, color: colors.textMuted, letterSpacing: 1.5, marginBottom: spacing.xs },
+  input: {
+    borderWidth: 1, borderColor: colors.border, borderRadius: radius.md,
+    paddingHorizontal: spacing.md, paddingVertical: spacing.sm + 2,
+    fontSize: 15, color: colors.textPrimary, backgroundColor: colors.bgElevated,
+  },
+  chip: {
+    paddingHorizontal: spacing.md, paddingVertical: spacing.xs + 2,
+    borderWidth: 1, borderColor: colors.border, borderRadius: radius.full,
+    backgroundColor: colors.bgCard,
+  },
+  chipActive:     { backgroundColor: '#7C3AED', borderColor: '#7C3AED' },
+  chipText:       { fontSize: 12, fontWeight: '700' as const, color: colors.textSecondary },
+  chipTextActive: { color: colors.white },
+  btn: {
+    backgroundColor: '#7C3AED', borderRadius: radius.md,
+    paddingVertical: spacing.md, alignItems: 'center' as const,
+  },
+  btnText:    { fontSize: 16, fontWeight: '800' as const, color: colors.bg },
+  results:    { gap: spacing.md },
+  heroCard: {
+    backgroundColor: colors.bgCard, borderRadius: radius.lg,
+    padding: spacing.lg, alignItems: 'center' as const, gap: spacing.xs,
+    borderWidth: 1, borderColor: 'rgba(124,58,237,0.22)',
+  },
+  heroLabel:   { fontSize: 9, fontWeight: '800' as const, color: colors.textMuted, letterSpacing: 1.5 },
+  heroNum:     { fontSize: 56, fontWeight: '800' as const, color: colors.textPrimary, letterSpacing: -2 },
+  demandLabel: { fontSize: 13, fontWeight: '700' as const, letterSpacing: 0.5 },
+  statsRow: {
+    flexDirection: 'row' as const, backgroundColor: colors.bgCard,
+    borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' as const,
+  },
+  stat:      { flex: 1, alignItems: 'center' as const, padding: spacing.md },
+  statVal:   { fontSize: 13, fontWeight: '800' as const, color: colors.textPrimary },
+  statLabel: { fontSize: 8, fontWeight: '700' as const, color: colors.textMuted, letterSpacing: 1, marginTop: 3 },
+  note:      { padding: spacing.md, backgroundColor: colors.bgElevated, borderRadius: radius.md },
+  noteText:  { fontSize: 12, color: colors.textMuted, textAlign: 'center' as const, lineHeight: 18 },
+});
+
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 const MODES: { key: Mode; label: string; desc: string }[] = [
   { key: 'fees',      label: 'FBA Fees',    desc: 'Know your profit, margin & ROI before placing any order' },
@@ -1247,6 +1393,7 @@ const MODES: { key: Mode; label: string; desc: string }[] = [
   { key: 'breakeven', label: 'Break-even',  desc: 'Find how many sales it takes until your investment pays off' },
   { key: 'scenario',  label: 'What-if',     desc: 'Model price drops & cost spikes before they happen' },
   { key: 'reorder',   label: 'Reorder',     desc: 'Never stock out — a stockout permanently damages your ranking' },
+  { key: 'bsr',       label: 'BSR',         desc: 'Estimate monthly sales volume from any product\'s bestseller rank' },
 ];
 
 export default function CalculatorScreen() {
@@ -1295,42 +1442,46 @@ export default function CalculatorScreen() {
         {mode === 'breakeven' && <BreakevenTab />}
         {mode === 'scenario'  && <ScenarioTab />}
         {mode === 'reorder'   && <ReorderTab />}
+        {mode === 'bsr'       && <BSRTab />}
       </View>
     </SafeAreaView>
   );
 }
 
+const CALC_COLOR = '#7C3AED';
+
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
+  container: { flex: 1, backgroundColor: '#F5F7FF' },
   header: {
     paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.sm,
-    borderBottomWidth: 1, borderBottomColor: colors.border,
+    borderBottomWidth: 1, borderBottomColor: '#E0E8F5',
+    backgroundColor: '#fff',
   },
   headerTop: {
     flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between',
   },
-  brandWord: { fontSize: 20, fontWeight: '900' as const, color: colors.textPrimary, letterSpacing: -0.8, marginBottom: 2 },
-  eyebrow: { fontSize: 9, fontWeight: '700' as const, color: colors.cyan, letterSpacing: 2.5, marginBottom: 6, textTransform: 'uppercase' as const },
-  title: { fontSize: 24, fontWeight: '800' as const, color: colors.textPrimary, letterSpacing: -1, lineHeight: 30 },
-  tabsWrap: { height: 48, marginBottom: 2 },
+  brandWord: { fontSize: 20, fontWeight: '900' as const, color: '#0D1B4B', letterSpacing: -0.8, marginBottom: 2 },
+  eyebrow: { fontSize: 9, fontWeight: '800' as const, color: CALC_COLOR, letterSpacing: 2.5, marginBottom: 6, textTransform: 'uppercase' as const },
+  title: { fontSize: 24, fontWeight: '900' as const, color: '#0D1B4B', letterSpacing: -1, lineHeight: 30 },
+  tabsWrap: { height: 48, marginBottom: 2, backgroundColor: '#fff' },
   tabsContent: { paddingHorizontal: spacing.lg, gap: 8, alignItems: 'center', flexDirection: 'row' },
   tab: {
     height: 34, paddingHorizontal: 14,
-    borderWidth: 1, borderColor: colors.border, borderRadius: radius.full,
+    borderWidth: 1, borderColor: '#E0E8F5', borderRadius: radius.full,
     justifyContent: 'center', alignItems: 'center',
-    backgroundColor: colors.bgCard,
+    backgroundColor: '#F5F7FF',
   },
-  tabActive: { backgroundColor: colors.cyan, borderColor: colors.cyan },
+  tabActive: { backgroundColor: CALC_COLOR, borderColor: CALC_COLOR },
   tabText: { fontSize: 12, fontWeight: '600' as const, color: colors.textMuted },
-  tabTextActive: { color: '#fff' },
+  tabTextActive: { color: '#fff', fontWeight: '700' as const },
   tabInfo: {
     marginHorizontal: spacing.lg, marginBottom: spacing.sm,
-    backgroundColor: colors.cyanDim, borderRadius: radius.md,
-    borderLeftWidth: 3, borderLeftColor: colors.cyan,
+    backgroundColor: 'rgba(124,58,237,0.06)', borderRadius: radius.lg,
+    borderLeftWidth: 3, borderLeftColor: CALC_COLOR,
     paddingHorizontal: spacing.md, paddingVertical: 10,
   },
-  tabInfoLabel: { fontSize: 9, fontWeight: '800' as const, color: colors.cyan, letterSpacing: 1.5, marginBottom: 2 },
-  tabInfoDesc: { fontSize: 13, fontWeight: '500' as const, color: colors.textPrimary, lineHeight: 18 },
+  tabInfoLabel: { fontSize: 9, fontWeight: '800' as const, color: CALC_COLOR, letterSpacing: 1.5, marginBottom: 2 },
+  tabInfoDesc: { fontSize: 13, fontWeight: '500' as const, color: '#0D1B4B', lineHeight: 18 },
 });
 
 const t = StyleSheet.create({
@@ -1347,7 +1498,7 @@ const t = StyleSheet.create({
   },
   boxHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   boxLabel: { fontSize: 9, fontWeight: '700' as const, color: colors.textMuted, letterSpacing: 1.5 },
-  autoBadge: { backgroundColor: colors.cyan, borderRadius: radius.full, paddingHorizontal: 8, paddingVertical: 2 },
+  autoBadge: { backgroundColor: '#7C3AED', borderRadius: radius.full, paddingHorizontal: 8, paddingVertical: 2 },
   autoText: { fontSize: 7, fontWeight: '800' as const, color: colors.white, letterSpacing: 1 },
   shipRow: {
     flexDirection: 'row', alignItems: 'center',
@@ -1367,16 +1518,16 @@ const t = StyleSheet.create({
     borderWidth: 1, borderColor: colors.border, borderRadius: radius.full,
     backgroundColor: colors.bgCard,
   },
-  catChipActive: { backgroundColor: colors.cyan, borderColor: colors.cyan },
+  catChipActive: { backgroundColor: '#7C3AED', borderColor: '#7C3AED' },
   catChipText: { fontSize: 12, fontWeight: '600' as const, color: colors.textSecondary },
-  catChipTextActive: { color: colors.bg },
+  catChipTextActive: { color: '#fff' },
 
   btn: {
     marginHorizontal: spacing.lg, marginBottom: spacing.sm,
-    backgroundColor: colors.cyan, borderRadius: radius.md,
+    backgroundColor: '#7C3AED', borderRadius: radius.lg,
     paddingVertical: spacing.md, alignItems: 'center',
   },
-  btnText: { fontSize: 16, fontWeight: '800' as const, color: colors.bg },
+  btnText: { fontSize: 16, fontWeight: '800' as const, color: '#fff' },
   error: { fontSize: 12, color: colors.red, paddingHorizontal: spacing.lg },
 
   results: { paddingHorizontal: spacing.lg, gap: spacing.md },
@@ -1440,11 +1591,11 @@ const t = StyleSheet.create({
   acosHint: { alignItems: 'center' },
   acosHintText: { fontSize: 9, fontWeight: '700' as const, color: colors.textMuted, letterSpacing: 1.5 },
   ppcHero: {
-    borderWidth: 1, borderColor: colors.cyanBorder, borderRadius: radius.lg,
+    borderWidth: 1, borderColor: 'rgba(124,58,237,0.22)', borderRadius: radius.lg,
     padding: spacing.lg, alignItems: 'center', gap: 4, backgroundColor: colors.bgCard,
   },
   ppcHeroLabel: { fontSize: 10, fontWeight: '700' as const, color: colors.textMuted, letterSpacing: 1.5 },
-  ppcHeroNum: { fontSize: 44, fontWeight: '800' as const, color: colors.cyan, letterSpacing: -2 },
+  ppcHeroNum: { fontSize: 44, fontWeight: '800' as const, color: '#7C3AED', letterSpacing: -2 },
   ppcHeroSub: { fontSize: 12, color: colors.textSecondary, textAlign: 'center' },
   ppcTips: {
     borderWidth: 1, borderColor: colors.border, borderRadius: radius.md,
@@ -1456,7 +1607,7 @@ const t = StyleSheet.create({
   ppcTipText: { fontSize: 13, flex: 1, lineHeight: 20, color: colors.textSecondary },
   tabGuide: {
     marginHorizontal: spacing.lg, marginBottom: spacing.md,
-    borderLeftWidth: 3, borderLeftColor: colors.cyan,
+    borderLeftWidth: 3, borderLeftColor: '#7C3AED',
     backgroundColor: colors.bgElevated,
     borderRadius: radius.sm,
     paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
