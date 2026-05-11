@@ -9,6 +9,7 @@ import { api, Supplier } from '../services/api';
 import { SupplierScoreResult } from '../types';
 import { useSubscription } from '../hooks/useSubscription';
 import PaywallModal from '../components/PaywallModal';
+import { SegmentedControl, EmptyState } from '../components/ui';
 
 type STab = 'search' | 'email';
 
@@ -305,10 +306,18 @@ export default function SuppliersScreen({ edges }: { edges?: readonly ('top'|'ri
       <PaywallModal visible={showPaywall} onClose={() => setShowPaywall(false)} featureContext="suppliers" />
 
       <View style={s.header}>
-        <Text style={s.brandWord}>Siftly</Text>
-        <Text style={s.eyebrow}>SUPPLIER SOURCING</Text>
-        <Text style={s.title}>Find the right{'\n'}supplier.</Text>
-        <Text style={s.subtitle}>Surface vetted global suppliers and send professional outreach — ranked by quality signals</Text>
+        <View style={s.heroOrb} pointerEvents="none" />
+        <View style={s.heroTop}>
+          <View style={{ flex: 1 }}>
+            <Text style={s.brandWord}>Siftly</Text>
+            <Text style={s.eyebrow}>SUPPLIER SOURCING</Text>
+            <Text style={s.title}>Find the right{'\n'}supplier.</Text>
+            <Text style={s.subtitle}>Vetted global suppliers ranked by quality · send outreach in one tap</Text>
+          </View>
+          <View style={s.heroIconWrap}>
+            <Text style={s.heroIcon}>⬡</Text>
+          </View>
+        </View>
         {isFree && (
           <TouchableOpacity
             style={s.usagePill}
@@ -320,12 +329,16 @@ export default function SuppliersScreen({ edges }: { edges?: readonly ('top'|'ri
         )}
       </View>
 
-      <View style={s.tabs}>
-        {([{ key: 'search', label: 'Find Suppliers' }, { key: 'email', label: 'Draft Email' }] as const).map(m => (
-          <TouchableOpacity key={m.key} style={[s.tab, tab === m.key && s.tabActive]} onPress={() => setTab(m.key)} activeOpacity={0.7}>
-            <Text style={[s.tabText, tab === m.key && s.tabTextActive]}>{m.label}</Text>
-          </TouchableOpacity>
-        ))}
+      <View style={s.tabsWrap}>
+        <SegmentedControl<STab>
+          options={[
+            { key: 'search', label: 'Find Suppliers', icon: '⬡' },
+            { key: 'email',  label: 'Draft Email',    icon: '✉' },
+          ]}
+          value={tab}
+          onChange={setTab}
+          accentColor="#059669"
+        />
       </View>
 
       {tab === 'email' && (
@@ -378,6 +391,19 @@ export default function SuppliersScreen({ edges }: { edges?: readonly ('top'|'ri
                   ))}
                 </View>
               )}
+
+              {/* Open in mail app with pre-filled subject + body */}
+              <TouchableOpacity
+                style={s.sendMailBtn}
+                onPress={() => {
+                  const subject = encodeURIComponent(emailResult.subject);
+                  const body    = encodeURIComponent(emailResult.body);
+                  Linking.openURL(`mailto:?subject=${subject}&body=${body}`);
+                }}
+                activeOpacity={0.85}
+              >
+                <Text style={s.sendMailBtnText}>✉  Open in Mail App</Text>
+              </TouchableOpacity>
             </View>
           )}
         </ScrollView>
@@ -424,10 +450,13 @@ export default function SuppliersScreen({ edges }: { edges?: readonly ('top'|'ri
         ItemSeparatorComponent={() => <View style={{ height: spacing.sm }} />}
         ListEmptyComponent={
           !loading && !error ? (
-            <View style={s.empty}>
-              <Text style={s.emptyIcon}>⊞</Text>
-              <Text style={s.emptyText}>Enter a product — we surface suppliers{'\n'}ranked by quality signals, globally.</Text>
-            </View>
+            <EmptyState
+              icon="⬡"
+              title="Find global suppliers"
+              subtitle="Enter a product — we surface suppliers ranked by quality signals, globally."
+              iconBg="rgba(5,150,105,0.09)"
+              iconSize={72}
+            />
           ) : null
         }
         renderItem={({ item }) => (
@@ -441,14 +470,29 @@ export default function SuppliersScreen({ edges }: { edges?: readonly ('top'|'ri
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   header: {
-    backgroundColor: colors.bgCard,
+    backgroundColor: '#EDFAF4',
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
+    paddingTop: spacing.md,
     paddingBottom: spacing.lg,
     marginBottom: spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: 'rgba(5,150,105,0.22)',
+    overflow: 'hidden',
   },
+  heroOrb: {
+    position: 'absolute', top: -60, right: -50,
+    width: 200, height: 200, borderRadius: 100,
+    backgroundColor: 'rgba(5,150,105,0.09)',
+  },
+  heroTop: { flexDirection: 'row', alignItems: 'flex-start' },
+  heroIconWrap: {
+    width: 52, height: 52, borderRadius: 16,
+    backgroundColor: 'rgba(5,150,105,0.12)',
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: 'rgba(5,150,105,0.22)',
+    marginTop: 4,
+  },
+  heroIcon: { fontSize: 24, color: '#059669' },
   brandWord: { fontSize: 20, fontWeight: '900', color: colors.textPrimary, letterSpacing: -0.8, marginBottom: 2 },
   eyebrow: { fontSize: 9, fontWeight: '800', color: '#059669', letterSpacing: 2.5, marginBottom: 6 },
   subtitle: { fontSize: 13, color: colors.textSecondary, marginTop: 4, lineHeight: 20 },
@@ -457,15 +501,7 @@ const s = StyleSheet.create({
     letterSpacing: -1, lineHeight: 32,
   },
   limit: { fontSize: 11, color: colors.textMuted },
-  tabs: {
-    flexDirection: 'row', marginHorizontal: spacing.lg, marginBottom: spacing.md,
-    backgroundColor: colors.bgElevated, borderRadius: radius.md,
-    borderWidth: 1, borderColor: colors.border, overflow: 'hidden', padding: 3,
-  },
-  tab: { flex: 1, paddingVertical: spacing.sm + 2, alignItems: 'center', borderRadius: radius.sm },
-  tabActive: { backgroundColor: '#059669' },
-  tabText: { fontSize: 9, fontWeight: '800', color: colors.textMuted, letterSpacing: 1 },
-  tabTextActive: { color: colors.bg },
+  tabsWrap: { marginHorizontal: spacing.lg, marginBottom: spacing.md },
   emailScroll: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.md },
   emailField: { gap: spacing.xs },
   emailLabel: { fontSize: 9, fontWeight: '800', color: colors.textMuted, letterSpacing: 1.5 },
@@ -501,7 +537,9 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: 'rgba(5,150,105,0.22)',
   },
   usagePillText: { fontSize: 10, fontWeight: '700', color: '#059669' },
-  emailHint: { fontSize: 12, color: colors.textMuted, lineHeight: 17, letterSpacing: 0.1, marginBottom: spacing.sm },
+  emailHint:      { fontSize: 12, color: colors.textMuted, lineHeight: 17, letterSpacing: 0.1, marginBottom: spacing.sm },
+  sendMailBtn:    { backgroundColor: '#059669', borderRadius: radius.md, paddingVertical: spacing.md, alignItems: 'center' },
+  sendMailBtnText:{ fontSize: 15, fontWeight: '800', color: colors.white, letterSpacing: 0.2 },
   errorText: { fontSize: 12, color: colors.red, paddingHorizontal: spacing.lg, marginBottom: spacing.sm },
   list: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl },
   card: {
@@ -520,9 +558,4 @@ const s = StyleSheet.create({
   link: { fontSize: 11, color: '#059669', fontWeight: '700' },
   scoreBtn: { borderWidth: 1, borderColor: 'rgba(5,150,105,0.22)', borderRadius: radius.full, paddingHorizontal: spacing.sm, paddingVertical: 3, backgroundColor: 'rgba(5,150,105,0.10)' },
   scoreBtnText: { fontSize: 10, fontWeight: '800', color: '#059669' },
-  empty: { alignItems: 'center', paddingTop: 80, gap: spacing.sm, paddingHorizontal: spacing.lg },
-  emptyIcon: { fontSize: 48, color: colors.textMuted, marginBottom: spacing.sm },
-  emptyText: { fontSize: 14, color: colors.textSecondary, textAlign: 'center', lineHeight: 22 },
 });
-;
-;

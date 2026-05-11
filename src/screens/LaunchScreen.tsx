@@ -1,20 +1,34 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  LayoutAnimation, Platform, UIManager, Modal,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { colors, spacing, radius, shadow } from '../theme';
-import { useSubscription } from '../hooks/useSubscription';
+import { useNavigation } from '@react-navigation/native';
+import type { CompositeNavigationProp } from '@react-navigation/native';
+import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import type { StackNavigationProp } from '@react-navigation/stack';
+import { AppCard, SectionHeader, StatusBadge, PrimaryButton, SecondaryButton, DS } from '../components/ds';
+import type { RootStackParamList } from '../navigation/RootNavigator';
 
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
+// ─── Navigation type ──────────────────────────────────────────────────────────
+
+type TabParamList = {
+  Launch:    undefined;
+  Search:    undefined;
+  Calculate: undefined;
+  Brand:     undefined;
+  CoPilot:   undefined;
+};
+
+type NavProp = CompositeNavigationProp<
+  BottomTabNavigationProp<TabParamList>,
+  StackNavigationProp<RootStackParamList>
+>;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type LaunchTab = 'checklist' | 'ideas';
 interface CLItem { id: string; text: string; aiKey: string }
 interface Phase  {
   id: string; num: string; icon: string; title: string; desc: string;
@@ -39,7 +53,7 @@ const PHASES: Phase[] = [
   {
     id: 'brand', num: '02', icon: '✦', title: 'Build Your Brand',
     desc: 'Create a memorable brand identity with AI-powered name and kit generation.',
-    time: '~45 min', color: colors.pink,
+    time: '~45 min', color: '#DB2777',
     items: [
       { id: 'b1', text: 'Choose brand name and create logo', aiKey: 'brandname' },
       { id: 'b2', text: 'Register Amazon Seller Central (Professional — $39.99/mo)', aiKey: 'seller_central' },
@@ -51,7 +65,7 @@ const PHASES: Phase[] = [
   {
     id: 'keywords', num: '03', icon: '≋', title: 'Research Keywords',
     desc: 'Uncover the exact search terms buyers use to find your product.',
-    time: '~30 min', color: colors.amber,
+    time: '~30 min', color: '#D97706',
     items: [
       { id: 'k1', text: 'Find top 10 keywords with high search volume, low competition', aiKey: 'keyword_research' },
       { id: 'k2', text: 'Research competitor keyword strategies and index terms', aiKey: 'competitor_kw' },
@@ -62,7 +76,7 @@ const PHASES: Phase[] = [
   {
     id: 'supplier', num: '04', icon: '⬡', title: 'Source Your Supplier',
     desc: 'Find vetted global suppliers and negotiate the best terms.',
-    time: '~45 min', color: colors.green,
+    time: '~45 min', color: '#059669',
     items: [
       { id: 's1', text: 'Approve final sample — check packaging and labelling', aiKey: 'sample_approval' },
       { id: 's2', text: 'Negotiate MOQ, price per unit, and lead time', aiKey: 'negotiate' },
@@ -74,7 +88,7 @@ const PHASES: Phase[] = [
   {
     id: 'listing', num: '05', icon: '≡', title: 'Listing & SEO',
     desc: 'Write a fully optimised listing that ranks and converts.',
-    time: '~45 min', color: colors.purple,
+    time: '~45 min', color: '#7C3AED',
     items: [
       { id: 'l1', text: 'Create product ASIN in Seller Central', aiKey: 'asin' },
       { id: 'l2', text: 'Write keyword-optimised title (150–200 chars)', aiKey: 'listing_title' },
@@ -110,8 +124,30 @@ const PHASES: Phase[] = [
   },
 ];
 
-const ALL_IDS    = PHASES.flatMap(p => p.items.map(i => i.id));
+const ALL_IDS     = PHASES.flatMap(p => p.items.map(i => i.id));
 const STORAGE_KEY = 'fba_launch_checklist';
+
+// ─── Stage chips config ───────────────────────────────────────────────────────
+
+const STAGE_CHIPS = [
+  { phaseId: 'discover',  label: 'Research',   icon: '◎' },
+  { phaseId: 'keywords',  label: 'Validation', icon: '≋' },
+  { phaseId: 'supplier',  label: 'Sourcing',   icon: '⬡' },
+  { phaseId: 'brand',     label: 'Branding',   icon: '✦' },
+  { phaseId: 'inventory', label: 'Logistics',  icon: '📦' },
+  { phaseId: 'listing',   label: 'Listing',    icon: '≡' },
+  { phaseId: 'go',        label: 'Launch',     icon: '🚀' },
+] as const;
+
+// ─── Milestones ───────────────────────────────────────────────────────────────
+
+const MILESTONES = [
+  { id: 'product_selected',   label: 'Product Selected',    icon: '◎', requiredIds: ['p1','p2','p3','p4','p5'] },
+  { id: 'supplier_confirmed', label: 'Supplier Confirmed',  icon: '⬡', requiredIds: ['s1','s2','s3','s4','s5'] },
+  { id: 'inventory_ordered',  label: 'Inventory Ordered',   icon: '📦', requiredIds: ['sh1','sh2','sh3','sh4']  },
+  { id: 'listing_published',  label: 'Listing Published',   icon: '≡', requiredIds: ['l1','l2','l3','l4','l5','l6'] },
+  { id: 'first_sale',         label: 'First Sale',          icon: '🏆', requiredIds: ['la1','la2','la3','la4','la5','la6'] },
+];
 
 // ─── AI guidance ──────────────────────────────────────────────────────────────
 
@@ -144,57 +180,30 @@ const AI_GUIDE: Record<string, { title: string; body: string }> = {
     body: 'Check every day for the first 30 days:\n• Sessions: listing views\n• Unit Session %: conversion (target 10–15%+)\n• ACoS: ad spend / revenue (target < 35%)\n• Inventory: never run out in first 90 days\n• Buy Box %: should be 95–100%\n\nIf conversion < 8%, your images or price need work.' },
 };
 
-// ─── Circular Progress Ring ───────────────────────────────────────────────────
-
-function RingProgress({ pct, size = 84, color = '#4361EE' }: { pct: number; size?: number; color?: string }) {
-  const stroke = 9;
-  const half   = size / 2;
-  const deg    = Math.min(Math.max(pct, 0), 100) * 3.6;
-  const rDeg   = Math.min(deg, 180);
-  const lDeg   = Math.max(deg - 180, 0);
-  const inner  = size - stroke * 2;
-  const trackColor = '#E8EDF8';
-
-  return (
-    <View style={{ width: size, height: size }}>
-      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: half, borderWidth: stroke, borderColor: trackColor }} />
-      <View style={{ position: 'absolute', top: 0, right: 0, width: half, height: size, overflow: 'hidden' }}>
-        <View style={{ position: 'absolute', top: 0, right: 0, width: size, height: size, borderRadius: half, borderWidth: stroke, borderColor: deg > 0 ? color : trackColor, transform: [{ rotate: `${rDeg - 180}deg` }] }} />
-      </View>
-      {deg > 180 && (
-        <View style={{ position: 'absolute', top: 0, left: 0, width: half, height: size, overflow: 'hidden' }}>
-          <View style={{ position: 'absolute', top: 0, left: 0, width: size, height: size, borderRadius: half, borderWidth: stroke, borderColor: color, transform: [{ rotate: `${lDeg}deg` }] }} />
-        </View>
-      )}
-      <View style={{ position: 'absolute', top: stroke, left: stroke, width: inner, height: inner, borderRadius: inner / 2, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' }}>
-        <Text style={{ fontSize: Math.floor(size * 0.22), fontWeight: '900', color: '#0D1B4B', letterSpacing: -0.5, lineHeight: Math.floor(size * 0.25) }}>{Math.round(pct)}%</Text>
-      </View>
-    </View>
-  );
-}
-
 // ─── AI Modal ─────────────────────────────────────────────────────────────────
 
 function AIModal({ aiKey, onClose }: { aiKey: string | null; onClose: () => void }) {
   const g = aiKey ? AI_GUIDE[aiKey] : null;
   return (
     <Modal visible={!!aiKey} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: DS.bgCard }}>
         <View style={aim.header}>
-          <View style={aim.iconWrap}><Text style={{ fontSize: 16 }}>✦</Text></View>
+          <View style={aim.iconWrap}>
+            <Text style={{ fontSize: 15 }}>✦</Text>
+          </View>
           <Text style={aim.title} numberOfLines={2}>{g?.title ?? ''}</Text>
           <TouchableOpacity onPress={onClose} hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}>
-            <Text style={{ fontSize: 22, color: colors.textMuted, fontWeight: '300' }}>✕</Text>
+            <Text style={{ fontSize: 22, color: DS.textMuted, fontWeight: '300' }}>✕</Text>
           </TouchableOpacity>
         </View>
-        <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.md, paddingBottom: 40 }}>
+        <ScrollView contentContainerStyle={{ padding: 20, gap: 16, paddingBottom: 40 }}>
           <Text style={aim.body}>{g?.body ?? ''}</Text>
           <View style={aim.tip}>
             <Text style={aim.tipLabel}>✦ AI TIP</Text>
             <Text style={aim.tipBody}>Use the Search, Brand, and Calculate tabs to complete this step faster with Siftly's built-in tools.</Text>
           </View>
         </ScrollView>
-        <View style={{ padding: spacing.lg, borderTopWidth: 1, borderTopColor: colors.border }}>
+        <View style={{ padding: 20, borderTopWidth: 1, borderTopColor: DS.border }}>
           <TouchableOpacity style={aim.btn} onPress={onClose} activeOpacity={0.85}>
             <Text style={aim.btnText}>Got it — back to checklist</Text>
           </TouchableOpacity>
@@ -204,144 +213,616 @@ function AIModal({ aiKey, onClose }: { aiKey: string | null; onClose: () => void
   );
 }
 const aim = StyleSheet.create({
-  header:   { flexDirection: 'row', alignItems: 'center', gap: 12, padding: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.border },
-  iconWrap: { width: 36, height: 36, borderRadius: 10, backgroundColor: '#EEF2FF', alignItems: 'center', justifyContent: 'center' },
-  title:    { flex: 1, fontSize: 16, fontWeight: '800', color: '#0D1B4B', letterSpacing: -0.3, lineHeight: 22 },
-  body:     { fontSize: 14, color: colors.textSecondary, lineHeight: 24 },
-  tip:      { backgroundColor: '#EEF4FF', borderRadius: radius.lg, borderWidth: 1, borderColor: '#C7D9FF', padding: spacing.md, gap: 6 },
-  tipLabel: { fontSize: 9, fontWeight: '800', color: '#4361EE', letterSpacing: 2 },
-  tipBody:  { fontSize: 13, color: colors.textSecondary, lineHeight: 20 },
-  btn:      { backgroundColor: '#4361EE', borderRadius: radius.md, paddingVertical: spacing.md, alignItems: 'center' },
+  header:   { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 20, borderBottomWidth: 1, borderBottomColor: DS.border },
+  iconWrap: { width: 36, height: 36, borderRadius: 10, backgroundColor: DS.indigoLight, alignItems: 'center', justifyContent: 'center' },
+  title:    { flex: 1, fontSize: 16, fontWeight: '800', color: DS.textPrimary, letterSpacing: -0.3, lineHeight: 22 },
+  body:     { fontSize: 14, color: DS.textSecondary, lineHeight: 24 },
+  tip:      { backgroundColor: DS.indigoLight, borderRadius: 14, borderWidth: 1, borderColor: DS.border, padding: 14, gap: 6 },
+  tipLabel: { fontSize: 9, fontWeight: '800', color: DS.indigo, letterSpacing: 2 },
+  tipBody:  { fontSize: 13, color: DS.textSecondary, lineHeight: 20 },
+  btn:      { backgroundColor: DS.indigo, borderRadius: 14, paddingVertical: 15, alignItems: 'center' },
   btnText:  { fontSize: 15, fontWeight: '800', color: '#fff' },
 });
 
-// ─── Phase Card ───────────────────────────────────────────────────────────────
+// ─── Hero progress card ────────────────────────────────────────────────────────
 
-function PhaseCard({ phase, checked, onToggle, onAI }: {
-  phase: Phase; checked: Set<string>; onToggle: (id: string) => void; onAI: (k: string) => void;
-}) {
-  const [expanded, setExpanded] = useState(false);
-  const done  = phase.items.filter(i => checked.has(i.id)).length;
-  const total = phase.items.length;
-  const pct   = Math.round((done / total) * 100);
-  const allDone = done === total;
+function HeroProgressCard({ checked }: { checked: Set<string> }) {
+  const done  = checked.size;
+  const total = ALL_IDS.length;
+  const pct   = total > 0 ? Math.round((done / total) * 100) : 0;
 
-  function toggle() {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setExpanded(e => !e);
-  }
+  const currentPhase = PHASES.find(p => p.items.some(i => !checked.has(i.id)));
+  const remaining    = total - done;
 
-  const dimColor = phase.color + '18';
+  let statusVariant: 'success' | 'warning' | 'info' | 'neutral' = 'neutral';
+  let statusLabel = 'Planning';
+  if (pct === 100) { statusVariant = 'success'; statusLabel = 'Complete'; }
+  else if (pct >= 75) { statusVariant = 'success'; statusLabel = 'Launch Ready'; }
+  else if (pct >= 50) { statusVariant = 'info';    statusLabel = 'Validating'; }
+  else if (pct >= 25) { statusVariant = 'warning'; statusLabel = 'Building'; }
 
   return (
-    <View style={[pc.card, allDone && { borderColor: `${colors.green}40` }]}>
-      <TouchableOpacity onPress={toggle} activeOpacity={0.72} style={pc.headerBtn}>
-        {/* Num badge */}
-        <View style={[pc.numBadge, { backgroundColor: dimColor }]}>
-          <Text style={[pc.numText, { color: phase.color }]}>{phase.num}</Text>
-        </View>
-        {/* Icon circle */}
-        <View style={[pc.iconCircle, { backgroundColor: dimColor }]}>
-          <Text style={[pc.iconText, { color: phase.color }]}>{phase.icon}</Text>
-        </View>
-        {/* Title + desc */}
-        <View style={{ flex: 1 }}>
-          <Text style={[pc.title, allDone && { color: colors.textMuted }]}>{phase.title}</Text>
-          {expanded && <Text style={pc.desc}>{phase.desc}</Text>}
-        </View>
-        {/* Right meta */}
-        <View style={pc.meta}>
-          <Text style={[pc.metaPct, { color: phase.color }]}>{pct}%</Text>
-          <Text style={pc.metaLabel}>Complete</Text>
-          <Text style={pc.metaTime}>⏱ {phase.time}</Text>
-        </View>
-        <Text style={pc.chevron}>{expanded ? '∧' : '∨'}</Text>
-      </TouchableOpacity>
+    <View style={hero.card}>
+      {/* Gradient band */}
+      <View style={hero.band} />
 
-      {/* Expanded checklist */}
-      {expanded && (
-        <View style={pc.itemsWrap}>
-          {phase.items.map((item, idx) => {
-            const isDone = checked.has(item.id);
-            const isLast = idx === phase.items.length - 1;
-            return (
-              <View key={item.id} style={pc.itemRow}>
-                {/* Dot + connector line */}
-                <View style={pc.dotCol}>
-                  <TouchableOpacity
-                    style={[pc.dot, isDone && { backgroundColor: phase.color, borderColor: phase.color }]}
-                    onPress={() => onToggle(item.id)}
-                    activeOpacity={0.7}
-                  >
-                    {isDone && <Text style={pc.dotCheck}>✓</Text>}
-                  </TouchableOpacity>
-                  {!isLast && <View style={[pc.connector, { backgroundColor: isDone ? phase.color : '#D8E4F5' }]} />}
-                </View>
-                {/* Text */}
-                <TouchableOpacity style={{ flex: 1 }} onPress={() => onToggle(item.id)} activeOpacity={0.7}>
-                  <Text style={[pc.itemText, isDone && pc.itemDone]}>{item.text}</Text>
-                </TouchableOpacity>
-                {/* AI button */}
-                <TouchableOpacity
-                  style={[pc.aiBtn, { borderColor: phase.color + '50', backgroundColor: dimColor }]}
-                  onPress={() => onAI(item.aiKey)}
-                  activeOpacity={0.75}
-                >
-                  <Text style={[pc.aiBtnText, { color: phase.color }]}>✦ AI</Text>
-                </TouchableOpacity>
-              </View>
-            );
-          })}
+      <View style={hero.inner}>
+        <View style={hero.topRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={hero.eyebrow}>OVERALL PROGRESS</Text>
+            <Text style={hero.pct}>{pct}%</Text>
+            <Text style={hero.subtitle}>
+              {done} of {total} tasks complete
+            </Text>
+          </View>
+          <View style={hero.ringWrap}>
+            <MiniRing percent={pct} />
+          </View>
         </View>
-      )}
+
+        {/* Progress bar */}
+        <View style={hero.barTrack}>
+          <View style={[hero.barFill, { width: `${pct}%` as any }]} />
+        </View>
+
+        {/* Footer strip */}
+        <View style={hero.footer}>
+          <StatusBadge label={statusLabel} variant={statusVariant} dot />
+          {currentPhase && (
+            <Text style={hero.footerRight}>
+              Up next: {currentPhase.icon} {currentPhase.title}
+            </Text>
+          )}
+          {!currentPhase && pct === 100 && (
+            <Text style={hero.footerRight}>Journey complete 🏆</Text>
+          )}
+        </View>
+
+        {/* Stats row */}
+        <View style={hero.statsRow}>
+          <View style={hero.stat}>
+            <Text style={[hero.statVal, { color: DS.accent }]}>{done}</Text>
+            <Text style={hero.statLabel}>DONE</Text>
+          </View>
+          <View style={hero.statDiv} />
+          <View style={hero.stat}>
+            <Text style={[hero.statVal, { color: DS.indigo }]}>{remaining}</Text>
+            <Text style={hero.statLabel}>LEFT</Text>
+          </View>
+          <View style={hero.statDiv} />
+          <View style={hero.stat}>
+            <Text style={[hero.statVal, { color: DS.textPrimary }]}>{PHASES.length}</Text>
+            <Text style={hero.statLabel}>STAGES</Text>
+          </View>
+          <View style={hero.statDiv} />
+          <View style={hero.stat}>
+            <Text style={[hero.statVal, { color: '#D97706' }]}>
+              {MILESTONES.filter(m => m.requiredIds.every(id => checked.has(id))).length}
+            </Text>
+            <Text style={hero.statLabel}>MILESTONES</Text>
+          </View>
+        </View>
+      </View>
     </View>
   );
 }
 
-const pc = StyleSheet.create({
-  card:      { backgroundColor: '#fff', borderRadius: radius.xl, borderWidth: 1, borderColor: '#E8EDF5', overflow: 'hidden', ...shadow.sm },
-  headerBtn: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: spacing.md },
-  numBadge:  { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  numText:   { fontSize: 10, fontWeight: '900', letterSpacing: 0.3 },
-  iconCircle:{ width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  iconText:  { fontSize: 16 },
-  title:     { fontSize: 14, fontWeight: '800', color: '#0D1B4B', letterSpacing: -0.3 },
-  desc:      { fontSize: 11, color: colors.textMuted, lineHeight: 16, marginTop: 3 },
-  meta:      { alignItems: 'flex-end', gap: 1 },
-  metaPct:   { fontSize: 12, fontWeight: '800' },
-  metaLabel: { fontSize: 8, color: colors.textMuted, fontWeight: '600' },
-  metaTime:  { fontSize: 9, color: colors.textMuted },
-  chevron:   { fontSize: 10, color: colors.textMuted, marginLeft: 4 },
+function MiniRing({ percent }: { percent: number }) {
+  const size   = 64;
+  const half   = size / 2;
+  const stroke = 6;
+  const inner  = size - stroke * 2;
+  const deg    = (percent / 100) * 360;
+  const right  = Math.min(0, deg - 180);
+  const left   = 180 - Math.max(0, deg - 180);
 
-  itemsWrap: { borderTopWidth: 1, borderTopColor: '#EEF2FB', paddingVertical: spacing.xs },
-  itemRow:   { flexDirection: 'row', alignItems: 'flex-start', paddingRight: spacing.md, paddingLeft: spacing.md, minHeight: 44 },
-  dotCol:    { width: 28, alignItems: 'center', paddingTop: 12 },
-  dot: {
-    width: 20, height: 20, borderRadius: 10,
-    borderWidth: 1.5, borderColor: '#C8D5EA',
-    backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center',
-    marginBottom: 2,
-  },
-  dotCheck:  { fontSize: 10, color: '#fff', fontWeight: '900' },
-  connector: { flex: 1, width: 1.5, minHeight: 12 },
-  itemText:  { flex: 1, fontSize: 13, color: colors.textSecondary, lineHeight: 20, paddingTop: 10, paddingRight: 6 },
-  itemDone:  { color: colors.textMuted, textDecorationLine: 'line-through' },
-  aiBtn:     { marginTop: 8, paddingHorizontal: 8, paddingVertical: 4, borderRadius: radius.full, borderWidth: 1 },
-  aiBtnText: { fontSize: 9, fontWeight: '900', letterSpacing: 0.3 },
+  return (
+    <View style={{ width: size, height: size }}>
+      <View style={[StyleSheet.absoluteFillObject, { borderRadius: half, backgroundColor: DS.border }]} />
+      <View style={{ position: 'absolute', left: half, top: 0, width: half, height: size, overflow: 'hidden' }}>
+        <View style={{
+          position: 'absolute', left: -half, top: 0, width: size, height: size,
+          borderRadius: half, backgroundColor: DS.accent,
+          transform: [{ rotate: `${right}deg` }],
+        }} />
+      </View>
+      <View style={{ position: 'absolute', left: 0, top: 0, width: half, height: size, overflow: 'hidden' }}>
+        <View style={{
+          position: 'absolute', left: 0, top: 0, width: size, height: size,
+          borderRadius: half, backgroundColor: DS.accent,
+          transform: [{ rotate: `${left}deg` }],
+        }} />
+      </View>
+      <View style={{
+        position: 'absolute', top: stroke, left: stroke,
+        width: inner, height: inner, borderRadius: inner / 2,
+        backgroundColor: DS.bgCard, alignItems: 'center', justifyContent: 'center',
+      }}>
+        <Text style={{ fontSize: 13, fontWeight: '900', color: DS.accent, letterSpacing: -0.5 }}>{percent}%</Text>
+      </View>
+    </View>
+  );
+}
+
+const hero = StyleSheet.create({
+  card:       { borderRadius: 24, overflow: 'hidden', borderWidth: 1, borderColor: DS.border, backgroundColor: DS.bgCard },
+  band:       { height: 4, backgroundColor: DS.accent },
+  inner:      { padding: 18, gap: 14 },
+  topRow:     { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+  eyebrow:    { fontSize: 9, fontWeight: '800', color: DS.accent, letterSpacing: 2.5, marginBottom: 4 },
+  pct:        { fontSize: 38, fontWeight: '900', color: DS.textPrimary, letterSpacing: -1.5, lineHeight: 42 },
+  subtitle:   { fontSize: 13, color: DS.textSecondary, marginTop: 4 },
+  ringWrap:   { paddingTop: 4 },
+  barTrack:   { height: 6, backgroundColor: DS.border, borderRadius: 3 },
+  barFill:    { height: 6, backgroundColor: DS.accent, borderRadius: 3 },
+  footer:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  footerRight:{ fontSize: 11, color: DS.textMuted, flex: 1, textAlign: 'right' },
+  statsRow:   { flexDirection: 'row', backgroundColor: DS.bgSubtle, borderRadius: 12, paddingVertical: 12, borderWidth: 1, borderColor: DS.border },
+  stat:       { flex: 1, alignItems: 'center', gap: 2 },
+  statVal:    { fontSize: 16, fontWeight: '900', letterSpacing: -0.5 },
+  statLabel:  { fontSize: 7, fontWeight: '700', color: DS.textMuted, letterSpacing: 1.5 },
+  statDiv:    { width: 1, backgroundColor: DS.border },
 });
 
-// ─── ChecklistMode ────────────────────────────────────────────────────────────
+// ─── Stage chips ──────────────────────────────────────────────────────────────
 
-function ChecklistMode() {
-  const [checked,  setChecked]  = useState<Set<string>>(new Set());
-  const [aiKey,    setAiKey]    = useState<string | null>(null);
-  const { usage, tier } = useSubscription();
+function StageChips({
+  selected,
+  checked,
+  onSelect,
+}: {
+  selected: string;
+  checked: Set<string>;
+  onSelect: (id: string) => void;
+}) {
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={sc.row}
+    >
+      {STAGE_CHIPS.map(stage => {
+        const phase     = PHASES.find(p => p.id === stage.phaseId)!;
+        const done      = phase.items.filter(i => checked.has(i.id)).length;
+        const total     = phase.items.length;
+        const phaseDone = done === total;
+        const isActive  = selected === stage.phaseId;
 
-  useEffect(() => {
-    AsyncStorage.getItem(STORAGE_KEY).then(v => {
-      if (v) { try { setChecked(new Set(JSON.parse(v))); } catch { /* ignore */ } }
-    });
-  }, []);
+        return (
+          <TouchableOpacity
+            key={stage.phaseId}
+            style={[
+              sc.chip,
+              isActive && { backgroundColor: phase.color, borderColor: phase.color },
+              phaseDone && !isActive && { borderColor: DS.accent + '60' },
+            ]}
+            onPress={() => onSelect(stage.phaseId)}
+            activeOpacity={0.75}
+          >
+            <Text style={sc.chipIcon}>{stage.icon}</Text>
+            <Text style={[sc.chipLabel, isActive && { color: '#fff' }]}>{stage.label}</Text>
+            <View style={[sc.chipPct, isActive && { backgroundColor: 'rgba(255,255,255,0.25)' }]}>
+              <Text style={[sc.chipPctText, isActive && { color: '#fff' }]}>
+                {done}/{total}
+              </Text>
+            </View>
+            {phaseDone && (
+              <View style={sc.doneCheck}>
+                <Text style={{ fontSize: 7, color: DS.accent, fontWeight: '900' }}>✓</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        );
+      })}
+    </ScrollView>
+  );
+}
+
+const sc = StyleSheet.create({
+  row:          { paddingHorizontal: DS.pagePadding, gap: 8 },
+  chip: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: DS.bgCard, borderRadius: 20, borderWidth: 1, borderColor: DS.border,
+    paddingHorizontal: 12, paddingVertical: 8,
+  },
+  chipIcon:     { fontSize: 13 },
+  chipLabel:    { fontSize: 12, fontWeight: '700', color: DS.textSecondary },
+  chipPct: {
+    backgroundColor: DS.bgSubtle, borderRadius: 8,
+    paddingHorizontal: 6, paddingVertical: 2,
+  },
+  chipPctText:  { fontSize: 9, fontWeight: '700', color: DS.textMuted },
+  doneCheck: {
+    width: 14, height: 14, borderRadius: 7, backgroundColor: DS.accentLight,
+    alignItems: 'center', justifyContent: 'center',
+  },
+});
+
+// ─── Task list card ───────────────────────────────────────────────────────────
+
+const PRIORITY: Record<number, { label: string; color: string; bg: string }> = {
+  0: { label: 'HIGH',   color: '#DC2626', bg: '#FEF2F2' },
+  1: { label: 'HIGH',   color: '#DC2626', bg: '#FEF2F2' },
+  2: { label: 'MED',    color: '#D97706', bg: '#FFFBEB' },
+  3: { label: 'MED',    color: '#D97706', bg: '#FFFBEB' },
+  4: { label: 'STD',    color: DS.textMuted, bg: DS.bgSubtle },
+  5: { label: 'STD',    color: DS.textMuted, bg: DS.bgSubtle },
+};
+
+function TaskListCard({
+  phaseId, checked, onToggle, onAI,
+}: {
+  phaseId: string;
+  checked: Set<string>;
+  onToggle: (id: string) => void;
+  onAI: (k: string) => void;
+}) {
+  const phase = PHASES.find(p => p.id === phaseId);
+  if (!phase) return null;
+
+  const done  = phase.items.filter(i => checked.has(i.id)).length;
+  const total = phase.items.length;
+  const pct   = Math.round((done / total) * 100);
+
+  return (
+    <AppCard>
+      {/* Header */}
+      <View style={tl.header}>
+        <View style={[tl.iconBadge, { backgroundColor: phase.color + '18' }]}>
+          <Text style={{ fontSize: 16 }}>{phase.icon}</Text>
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={tl.phaseNum}>PHASE {phase.num}</Text>
+          <Text style={tl.phaseTitle}>{phase.title}</Text>
+        </View>
+        <View style={tl.progress}>
+          <Text style={[tl.progressPct, { color: done === total ? DS.accent : phase.color }]}>
+            {pct}%
+          </Text>
+          <Text style={tl.progressSub}>{done}/{total}</Text>
+        </View>
+      </View>
+
+      {/* Progress bar */}
+      <View style={tl.barTrack}>
+        <View style={[tl.barFill, { width: `${pct}%` as any, backgroundColor: done === total ? DS.accent : phase.color }]} />
+      </View>
+
+      {/* Task rows */}
+      <View style={tl.tasks}>
+        {phase.items.map((item, idx) => {
+          const isDone = checked.has(item.id);
+          const pri    = PRIORITY[idx] ?? PRIORITY[4];
+          return (
+            <View key={item.id} style={[tl.row, idx < phase.items.length - 1 && tl.rowBorder]}>
+              {/* Checkbox */}
+              <TouchableOpacity
+                style={[tl.checkbox, isDone && { backgroundColor: phase.color, borderColor: phase.color }]}
+                onPress={() => onToggle(item.id)}
+                activeOpacity={0.7}
+              >
+                {isDone && <Text style={tl.checkmark}>✓</Text>}
+              </TouchableOpacity>
+
+              {/* Text */}
+              <TouchableOpacity style={{ flex: 1 }} onPress={() => onToggle(item.id)} activeOpacity={0.7}>
+                <Text style={[tl.taskText, isDone && tl.taskDone]}>{item.text}</Text>
+              </TouchableOpacity>
+
+              {/* Right: priority + AI btn */}
+              <View style={tl.rightCol}>
+                <View style={[tl.priBadge, { backgroundColor: pri.bg }]}>
+                  <Text style={[tl.priText, { color: pri.color }]}>{pri.label}</Text>
+                </View>
+                <TouchableOpacity
+                  style={[tl.aiBtn, { backgroundColor: phase.color + '14', borderColor: phase.color + '40' }]}
+                  onPress={() => onAI(item.aiKey)}
+                  activeOpacity={0.75}
+                >
+                  <Text style={[tl.aiBtnText, { color: phase.color }]}>✦ AI</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          );
+        })}
+      </View>
+
+      {/* Phase desc */}
+      <View style={[tl.descBand, { backgroundColor: phase.color + '0C', borderColor: phase.color + '25' }]}>
+        <Text style={tl.descIcon}>💡</Text>
+        <Text style={tl.descText}>{phase.desc}</Text>
+      </View>
+    </AppCard>
+  );
+}
+
+const tl = StyleSheet.create({
+  header:      { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
+  iconBadge:   { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  phaseNum:    { fontSize: 8, fontWeight: '800', color: DS.textMuted, letterSpacing: 2 },
+  phaseTitle:  { fontSize: 15, fontWeight: '800', color: DS.textPrimary, letterSpacing: -0.3 },
+  progress:    { alignItems: 'flex-end' },
+  progressPct: { fontSize: 18, fontWeight: '900', letterSpacing: -0.5 },
+  progressSub: { fontSize: 9, color: DS.textMuted, fontWeight: '600' },
+
+  barTrack:   { height: 4, backgroundColor: DS.border, borderRadius: 2, marginBottom: 16 },
+  barFill:    { height: 4, borderRadius: 2 },
+
+  tasks:    { gap: 0 },
+  row:      { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 12, gap: 10 },
+  rowBorder:{ borderBottomWidth: 1, borderBottomColor: DS.border },
+
+  checkbox: {
+    width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: DS.border,
+    backgroundColor: DS.bgCard, alignItems: 'center', justifyContent: 'center',
+    marginTop: 1, flexShrink: 0,
+  },
+  checkmark: { fontSize: 11, color: '#fff', fontWeight: '900' },
+  taskText:  { fontSize: 13, color: DS.textSecondary, lineHeight: 20 },
+  taskDone:  { color: DS.textMuted, textDecorationLine: 'line-through' },
+
+  rightCol:  { alignItems: 'flex-end', gap: 4, flexShrink: 0 },
+  priBadge:  { borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
+  priText:   { fontSize: 8, fontWeight: '800', letterSpacing: 1 },
+  aiBtn:     { borderRadius: 10, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 4 },
+  aiBtnText: { fontSize: 9, fontWeight: '900', letterSpacing: 0.3 },
+
+  descBand: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginTop: 14, borderRadius: 10, borderWidth: 1, padding: 10 },
+  descIcon: { fontSize: 13, marginTop: 1 },
+  descText: { flex: 1, fontSize: 12, color: DS.textSecondary, lineHeight: 18 },
+});
+
+// ─── Stage summary card ───────────────────────────────────────────────────────
+
+function StageSummaryCard({ phaseId, checked }: { phaseId: string; checked: Set<string> }) {
+  const phase = PHASES.find(p => p.id === phaseId);
+  if (!phase) return null;
+
+  const done        = phase.items.filter(i => checked.has(i.id)).length;
+  const remaining   = phase.items.length - done;
+  const nextTask    = phase.items.find(i => !checked.has(i.id));
+  const isComplete  = remaining === 0;
+
+  return (
+    <AppCard>
+      <Text style={ss.heading}>Stage Summary</Text>
+      <View style={ss.row}>
+        <View style={ss.stat}>
+          <Text style={[ss.val, { color: DS.accent }]}>{done}</Text>
+          <Text style={ss.lbl}>Completed</Text>
+        </View>
+        <View style={ss.div} />
+        <View style={ss.stat}>
+          <Text style={[ss.val, { color: DS.indigo }]}>{remaining}</Text>
+          <Text style={ss.lbl}>Remaining</Text>
+        </View>
+        <View style={ss.div} />
+        <View style={ss.stat}>
+          <Text style={[ss.val, { color: DS.textPrimary }]}>{phase.items.length}</Text>
+          <Text style={ss.lbl}>Total</Text>
+        </View>
+        <View style={ss.div} />
+        <View style={ss.stat}>
+          <Text style={ss.time}>{phase.time}</Text>
+          <Text style={ss.lbl}>Est. Time</Text>
+        </View>
+      </View>
+      {!isComplete && nextTask && (
+        <View style={ss.nextBand}>
+          <Text style={ss.nextLabel}>NEXT TASK</Text>
+          <Text style={ss.nextText}>{nextTask.text}</Text>
+        </View>
+      )}
+      {isComplete && (
+        <View style={[ss.nextBand, { backgroundColor: DS.accentLight, borderColor: DS.accent + '40' }]}>
+          <Text style={[ss.nextLabel, { color: DS.accent }]}>STAGE COMPLETE</Text>
+          <Text style={[ss.nextText, { color: DS.accentDark }]}>All tasks done — move to the next stage!</Text>
+        </View>
+      )}
+    </AppCard>
+  );
+}
+
+const ss = StyleSheet.create({
+  heading:  { fontSize: 14, fontWeight: '800', color: DS.textPrimary, marginBottom: 12 },
+  row:      { flexDirection: 'row', backgroundColor: DS.bgSubtle, borderRadius: 12, paddingVertical: 14, borderWidth: 1, borderColor: DS.border, marginBottom: 12 },
+  stat:     { flex: 1, alignItems: 'center', gap: 2 },
+  val:      { fontSize: 20, fontWeight: '900', letterSpacing: -0.5 },
+  time:     { fontSize: 13, fontWeight: '800', color: DS.textPrimary },
+  lbl:      { fontSize: 8, fontWeight: '700', color: DS.textMuted, letterSpacing: 1.2 },
+  div:      { width: 1, backgroundColor: DS.border },
+  nextBand: { backgroundColor: DS.indigoLight, borderRadius: 10, borderWidth: 1, borderColor: DS.border, padding: 12, gap: 4 },
+  nextLabel:{ fontSize: 8, fontWeight: '800', color: DS.indigo, letterSpacing: 2 },
+  nextText: { fontSize: 13, color: DS.textSecondary, lineHeight: 19 },
+});
+
+// ─── Milestones card ──────────────────────────────────────────────────────────
+
+function MilestonesCard({ checked }: { checked: Set<string> }) {
+  const completedCount = MILESTONES.filter(m => m.requiredIds.every(id => checked.has(id))).length;
+
+  return (
+    <AppCard>
+      <View style={ms.header}>
+        <Text style={ms.heading}>Milestones</Text>
+        <StatusBadge label={`${completedCount}/${MILESTONES.length} reached`} variant={completedCount > 0 ? 'success' : 'neutral'} />
+      </View>
+      <View style={ms.list}>
+        {MILESTONES.map((m, idx) => {
+          const done = m.requiredIds.every(id => checked.has(id));
+          const isLast = idx === MILESTONES.length - 1;
+          return (
+            <View key={m.id} style={ms.item}>
+              {/* Connector line */}
+              <View style={ms.connectorCol}>
+                <View style={[ms.dot, done && { backgroundColor: DS.accent, borderColor: DS.accent }]}>
+                  {done && <Text style={{ fontSize: 9, color: '#fff', fontWeight: '900' }}>✓</Text>}
+                </View>
+                {!isLast && <View style={[ms.line, done && { backgroundColor: DS.accent }]} />}
+              </View>
+              {/* Content */}
+              <View style={[ms.content, !isLast && { paddingBottom: 20 }]}>
+                <Text style={ms.icon}>{m.icon}</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={[ms.label, done && { color: DS.accent }]}>{m.label}</Text>
+                  <Text style={ms.sub}>{m.requiredIds.length} tasks required</Text>
+                </View>
+                {done && (
+                  <View style={ms.doneBadge}>
+                    <Text style={ms.doneText}>Reached</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+          );
+        })}
+      </View>
+    </AppCard>
+  );
+}
+
+const ms = StyleSheet.create({
+  header:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
+  heading: { fontSize: 14, fontWeight: '800', color: DS.textPrimary },
+  list:    { gap: 0 },
+  item:    { flexDirection: 'row', gap: 12 },
+  connectorCol: { width: 20, alignItems: 'center' },
+  dot: {
+    width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: DS.border,
+    backgroundColor: DS.bgCard, alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+  },
+  line:    { flex: 1, width: 2, backgroundColor: DS.border, marginTop: 2 },
+  content: { flex: 1, flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  icon:    { fontSize: 16, marginTop: 1 },
+  label:   { fontSize: 13, fontWeight: '700', color: DS.textPrimary },
+  sub:     { fontSize: 11, color: DS.textMuted, marginTop: 2 },
+  doneBadge: { backgroundColor: DS.accentLight, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: DS.accent + '40' },
+  doneText:  { fontSize: 9, fontWeight: '800', color: DS.accentDark, letterSpacing: 0.5 },
+});
+
+// ─── Smart recommendations ────────────────────────────────────────────────────
+
+function SmartRecommendationsCard({ checked }: { checked: Set<string> }) {
+  const pct = ALL_IDS.length > 0 ? (checked.size / ALL_IDS.length) * 100 : 0;
+
+  const tips: Array<{ icon: string; title: string; body: string; color: string }> = pct < 25
+    ? [
+        { icon: '◎', title: 'Validate demand first', body: 'Always confirm 3+ demand signals before sourcing suppliers. BSR, Google Trends, and autocomplete are your trinity.', color: '#4361EE' },
+        { icon: '≋', title: 'Keywords drive ranking', body: 'Build your keyword list in parallel with product research — it shapes your listing before you write a single word.', color: '#D97706' },
+        { icon: '◈', title: 'Start with your profit target', body: 'Work backwards from a 30%+ margin. Use the Calculate tab to stress-test your unit economics early.', color: '#7C3AED' },
+      ]
+    : pct < 60
+    ? [
+        { icon: '⬡', title: 'Shortlist 3 suppliers', body: 'Get quotes from at least 3 factories. Compare MOQ, lead time, and sample quality side-by-side before committing.', color: '#059669' },
+        { icon: '✦', title: 'Register your brand early', body: 'Amazon Brand Registry takes 2–4 weeks. Start your trademark application now to unlock A+ Content at launch.', color: '#DB2777' },
+        { icon: '≡', title: 'Draft your listing copy', body: 'Write your title and 5 bullets before product arrives. Use your keyword list as the foundation.', color: '#7C3AED' },
+      ]
+    : [
+        { icon: '📦', title: 'Inventory timing is critical', body: 'Never run out of stock in the first 90 days. It kills your BSR and is very hard to recover from.', color: '#F59E0B' },
+        { icon: '🚀', title: 'Launch price strategy', body: 'Price 10–15% below median competitors. Raise to median after 20 reviews, then above after 50+.', color: '#7C3AED' },
+        { icon: '◉', title: 'PPC: auto first, then manual', body: 'Run auto campaigns for 2 weeks. Mine the Search Term Report and move winners to manual exact-match campaigns.', color: '#4361EE' },
+      ];
+
+  return (
+    <AppCard>
+      <View style={sr.header}>
+        <Text style={sr.heading}>Smart Recommendations</Text>
+        <StatusBadge label="AI" variant="info" />
+      </View>
+      <View style={sr.list}>
+        {tips.map((tip, idx) => (
+          <View key={idx} style={[sr.item, idx < tips.length - 1 && sr.itemBorder]}>
+            <View style={[sr.iconBadge, { backgroundColor: tip.color + '14' }]}>
+              <Text style={{ fontSize: 14 }}>{tip.icon}</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={sr.title}>{tip.title}</Text>
+              <Text style={sr.body}>{tip.body}</Text>
+            </View>
+          </View>
+        ))}
+      </View>
+    </AppCard>
+  );
+}
+
+const sr = StyleSheet.create({
+  header:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
+  heading:   { fontSize: 14, fontWeight: '800', color: DS.textPrimary },
+  list:      { gap: 0 },
+  item:      { flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingVertical: 12 },
+  itemBorder:{ borderBottomWidth: 1, borderBottomColor: DS.border },
+  iconBadge: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  title:     { fontSize: 13, fontWeight: '700', color: DS.textPrimary, marginBottom: 4 },
+  body:      { fontSize: 12, color: DS.textSecondary, lineHeight: 18 },
+});
+
+// ─── Primary actions card ─────────────────────────────────────────────────────
+
+function PrimaryActionsCard({
+  checked, onToggle, onOpenAI,
+}: {
+  checked: Set<string>;
+  onToggle: (id: string) => void;
+  onOpenAI: (k: string) => void;
+}) {
+  const navigation = useNavigation<NavProp>();
+  const nextTask = PHASES.flatMap(p => p.items).find(i => !checked.has(i.id));
+
+  function handleMarkNext() {
+    if (nextTask) onToggle(nextTask.id);
+  }
+
+  return (
+    <AppCard>
+      <Text style={pa.heading}>Primary Actions</Text>
+      <View style={pa.btns}>
+        <PrimaryButton
+          label={nextTask ? 'Mark Next Task Complete' : 'All Tasks Complete!'}
+          onPress={handleMarkNext}
+          disabled={!nextTask}
+          style={{ alignSelf: 'stretch' }}
+        />
+        <SecondaryButton
+          label="Ask Co-Pilot for Guidance"
+          onPress={() => navigation.navigate('CoPilot')}
+          style={{ alignSelf: 'stretch' }}
+        />
+      </View>
+      {nextTask && (
+        <View style={pa.nextBand}>
+          <Text style={pa.nextLabel}>NEXT TASK</Text>
+          <Text style={pa.nextTask}>{nextTask.text}</Text>
+        </View>
+      )}
+    </AppCard>
+  );
+}
+
+const pa = StyleSheet.create({
+  heading:   { fontSize: 14, fontWeight: '800', color: DS.textPrimary, marginBottom: 14 },
+  btns:      { gap: 10 },
+  nextBand:  { marginTop: 12, backgroundColor: DS.indigoLight, borderRadius: 10, borderWidth: 1, borderColor: DS.border, padding: 12, gap: 4 },
+  nextLabel: { fontSize: 8, fontWeight: '800', color: DS.indigo, letterSpacing: 2 },
+  nextTask:  { fontSize: 13, color: DS.textSecondary, lineHeight: 19 },
+});
+
+// ─── Screen ───────────────────────────────────────────────────────────────────
+
+export default function LaunchScreen() {
+  const [checked,     setChecked]     = useState<Set<string>>(new Set());
+  const [selectedId,  setSelectedId]  = useState<string>(PHASES[0].id);
+  const [aiKey,       setAiKey]       = useState<string | null>(null);
+  const scrollRef = useRef<ScrollView>(null);
+
+  useEffect(() => { loadChecklist(); }, []);
+
+  async function loadChecklist() {
+    const raw = await AsyncStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      try { setChecked(new Set(JSON.parse(raw))); } catch { /* ignore */ }
+    }
+  }
 
   async function toggle(id: string) {
     setChecked(prev => {
@@ -352,267 +833,53 @@ function ChecklistMode() {
     });
   }
 
-  const totalItems = ALL_IDS.length;
-  const doneCount  = checked.size;
-  const pct        = totalItems > 0 ? (doneCount / totalItems) * 100 : 0;
-
-  const tierLabel  = tier === 'operator' ? 'OPERATOR' : tier === 'builder' ? 'BUILDER' : 'EXPLORER';
-  const tierColor  = tier === 'operator' ? colors.purple : tier === 'builder' ? '#4361EE' : colors.textMuted;
+  const onSelectStage = useCallback((id: string) => {
+    setSelectedId(id);
+    scrollRef.current?.scrollTo({ y: 0, animated: false });
+  }, []);
 
   return (
-    <>
+    <SafeAreaView style={s.safe} edges={['top']}>
       <AIModal aiKey={aiKey} onClose={() => setAiKey(null)} />
-      <ScrollView contentContainerStyle={cl.scroll} showsVerticalScrollIndicator={false}>
 
-        {/* ══ HERO CARD ═══════════════════════════════════════════════════════ */}
-        <View style={cl.hero}>
-          {/* Header row */}
-          <View style={cl.heroHeader}>
-            <View>
-              <Text style={cl.heroWordmark}>Siftly</Text>
-              <Text style={cl.heroEyebrow}>LAUNCH CONTROL</Text>
-            </View>
-            <View style={[cl.tierPill, { borderColor: tierColor + '50' }]}>
-              <View style={[cl.tierDot, { backgroundColor: tierColor }]} />
-              <Text style={[cl.tierLabel, { color: tierColor }]}>{tierLabel}</Text>
-              <Text style={[cl.tierChevron, { color: tierColor }]}>∨</Text>
-            </View>
-          </View>
-
-          {/* Title row + rocket */}
-          <View style={cl.heroBody}>
-            <View style={{ flex: 1, paddingRight: spacing.sm }}>
-              <Text style={cl.heroTitle}>
-                {'Launch Your First\nProfitable '}
-                <Text style={cl.heroTitleAccent}>Amazon</Text>
-                {' Product'}
-              </Text>
-              <Text style={cl.heroSub}>Your AI-powered roadmap from idea to first sale.</Text>
-                <Text style={cl.heroClock}>⏱  Estimated time to launch: 3–5 hours</Text>
-            </View>
-            {/* Rocket illustration placeholder */}
-            <View style={cl.rocketWrap}>
-              <View style={cl.rocketGlow} />
-              <Text style={cl.rocketEmoji}>🚀</Text>
-              <View style={cl.rocketChart}>
-                {[40, 60, 75, 90].map((h, i) => (
-                  <View key={i} style={[cl.bar, { height: h * 0.5, backgroundColor: i === 3 ? '#4361EE' : `rgba(67,97,238,${0.3 + i * 0.15})` }]} />
-                ))}
-              </View>
-            </View>
-          </View>
-
+      {/* Pinned header */}
+      <View style={s.header}>
+        <View>
+          <Text style={s.eyebrow}>LAUNCH SYSTEM</Text>
+          <Text style={s.title}>Your Product Launch Roadmap</Text>
         </View>
+      </View>
 
-        {/* ══ PROGRESS CARD ══════════════════════════════════════════════════ */}
-        <View style={cl.card}>
-          {/* Left: ring + text */}
-          <View style={cl.progressLeft}>
-            <View style={cl.progressTopRow}>
-              <Text style={cl.progressTitle}>Launch Progress</Text>
-              <View style={[cl.levelBadge, { backgroundColor: '#EEF4FF' }]}>
-                <Text style={{ fontSize: 9, fontWeight: '800', color: '#4361EE' }}>Level: {tierLabel[0] + tierLabel.slice(1).toLowerCase()}</Text>
-              </View>
-            </View>
-            <View style={cl.ringRow}>
-              <RingProgress pct={pct} size={80} color={pct === 100 ? colors.green : '#4361EE'} />
-              <View style={{ flex: 1, justifyContent: 'center', gap: 2 }}>
-                <Text style={cl.ringCount}><Text style={cl.ringBig}>{doneCount}</Text> of {totalItems}</Text>
-                <Text style={cl.ringLabel}>steps complete</Text>
-              </View>
-            </View>
-            <View style={cl.progressBar}>
-              <View style={[cl.progressFill, { width: `${pct}%` as any, backgroundColor: pct === 100 ? colors.green : '#4361EE' }]} />
-            </View>
-            <Text style={cl.progressHint}>
-              {pct === 100
-                ? "🎉 All steps done — time to launch!"
-                : `You're ${totalItems - doneCount} steps away from your first sale!`}
-            </Text>
-          </View>
+      {/* Stage chips (pinned below header) */}
+      <View style={s.chipsWrap}>
+        <StageChips selected={selectedId} checked={checked} onSelect={onSelectStage} />
+      </View>
 
-          {/* Divider */}
-          <View style={cl.cardDivider} />
+      <ScrollView
+        ref={scrollRef}
+        contentContainerStyle={s.scroll}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        <HeroProgressCard checked={checked} />
 
-          {/* Right: stats 2×2 */}
-          <View style={cl.statsGrid}>
-            {[
-              { icon: '🔍', label: 'Opportunities\nFound',    val: usage.research  ?? 0, sub: 'High potential'    },
-              { icon: '👑', label: 'Brands\nCreated',         val: usage.brands    ?? 0, sub: 'AI-generated'      },
-              { icon: '🔑', label: 'Keywords\nResearched',    val: usage.keywords  ?? 0, sub: 'Top opportunities' },
-              { icon: '🚚', label: 'Suppliers\nShortlisted',  val: usage.suppliers ?? 0, sub: 'Vetted suppliers'  },
-            ].map((s, i) => (
-              <View key={i} style={cl.statCell}>
-                <Text style={cl.statIcon}>{s.icon}</Text>
-                <Text style={cl.statLabel}>{s.label}</Text>
-                <Text style={cl.statVal}>{s.val}</Text>
-                <Text style={cl.statSub}>{s.sub}</Text>
-              </View>
-            ))}
-          </View>
-        </View>
+        <SectionHeader title="Stage Tasks" />
+        <TaskListCard phaseId={selectedId} checked={checked} onToggle={toggle} onAI={setAiKey} />
 
-        {/* ══ LAUNCH BLUEPRINT ═══════════════════════════════════════════════ */}
-        <View style={cl.blueprintHeader}>
-          <Text style={cl.blueprintTitle}>Your Launch Blueprint</Text>
-          {/* Dotted path decoration */}
-          <View style={cl.pathRow}>
-            {PHASES.map((p, i) => (
-              <React.Fragment key={p.id}>
-                <View style={[cl.pathDot, { backgroundColor: p.color }]} />
-                {i < PHASES.length - 1 && <View style={cl.pathLine} />}
-              </React.Fragment>
-            ))}
-            <Text style={cl.pathPin}>📍</Text>
-          </View>
-        </View>
+        <SectionHeader title="Stage Overview" />
+        <StageSummaryCard phaseId={selectedId} checked={checked} />
 
-        <View style={cl.phases}>
-          {PHASES.map(p => (
-            <PhaseCard key={p.id} phase={p} checked={checked} onToggle={toggle} onAI={setAiKey} />
-          ))}
-        </View>
+        <SectionHeader title="Milestones" />
+        <MilestonesCard checked={checked} />
 
-        {/* ══ MOTIVATION CARD ════════════════════════════════════════════════ */}
-        <View style={cl.motivCard}>
-          <View style={cl.motivLeft}>
-            <Text style={cl.motivGraphic}>📈</Text>
-            <Text style={cl.motivCoins}>💰</Text>
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={cl.motivTitle}>Stay consistent, follow the process, and your success is inevitable.</Text>
-            <Text style={cl.motivSub}>You've got the plan. We'll guide the way.</Text>
-          </View>
-          <TouchableOpacity style={cl.motivBtn} activeOpacity={0.8}>
-            <Text style={cl.motivBtnText}>View Success Stories →</Text>
-          </TouchableOpacity>
-        </View>
+        <SectionHeader title="Smart Recommendations" />
+        <SmartRecommendationsCard checked={checked} />
 
+        <SectionHeader title="Actions" />
+        <PrimaryActionsCard checked={checked} onToggle={toggle} onOpenAI={setAiKey} />
+
+        <View style={{ height: 40 }} />
       </ScrollView>
-    </>
-  );
-}
-
-// ─── Product Ideas ────────────────────────────────────────────────────────────
-
-const IDEAS = [
-  { name: 'Resistance Bands Set',      cat: 'Sports',  price: '$20–$35', margin: '50%', comp: 'Medium', weight: 'Light',  budget: 800,  trend: true,  why: 'Home fitness boom, high margin, lightweight to ship' },
-  { name: 'Silicone Baby Feeding Set', cat: 'Baby',    price: '$25–$40', margin: '42%', comp: 'Low',    weight: 'Light',  budget: 1200, trend: true,  why: 'Parents spend freely, gift market, repeat buyers' },
-  { name: 'Reusable Produce Bags',     cat: 'Kitchen', price: '$12–$22', margin: '58%', comp: 'Low',    weight: 'Light',  budget: 500,  trend: true,  why: 'Eco trend, very cheap to source, repeat purchases' },
-  { name: 'Dog Grooming Glove',        cat: 'Pet',     price: '$12–$25', margin: '55%', comp: 'Low',    weight: 'Light',  budget: 600,  trend: true,  why: 'Pet market growing fast, low returns, gift-worthy' },
-  { name: 'Desk Cable Organizer',      cat: 'Office',  price: '$15–$28', margin: '50%', comp: 'Low',    weight: 'Light',  budget: 700,  trend: true,  why: 'WFH demand, cheap to source, simple differentiation' },
-  { name: 'Electric Lint Remover',     cat: 'Home',    price: '$20–$38', margin: '48%', comp: 'Low',    weight: 'Light',  budget: 900,  trend: true,  why: 'TikTok viral, high perceived value, impulse buy' },
-  { name: 'Posture Corrector',         cat: 'Health',  price: '$25–$45', margin: '44%', comp: 'Medium', weight: 'Light',  budget: 900,  trend: true,  why: 'WFH trend, high perceived value, easy to brand premium' },
-  { name: 'Bamboo Cutting Board Set',  cat: 'Kitchen', price: '$30–$55', margin: '38%', comp: 'Medium', weight: 'Medium', budget: 1500, trend: false, why: 'Evergreen demand, eco angle, great bundle potential' },
-  { name: 'Silicone Ice Cube Molds',   cat: 'Kitchen', price: '$12–$20', margin: '62%', comp: 'Low',    weight: 'Light',  budget: 500,  trend: true,  why: 'Craft cocktail trend, very cheap to source' },
-  { name: 'Travel Packing Cubes',      cat: 'Travel',  price: '$22–$40', margin: '42%', comp: 'Medium', weight: 'Light',  budget: 1000, trend: true,  why: 'Travel rebound, bundle sets, loyal repeat customers' },
-  { name: 'Knee Compression Sleeve',   cat: 'Health',  price: '$18–$35', margin: '46%', comp: 'Medium', weight: 'Light',  budget: 800,  trend: false, why: 'Aging population, sports recovery, year-round demand' },
-  { name: 'Wooden Spice Rack',         cat: 'Kitchen', price: '$30–$60', margin: '40%', comp: 'Low',    weight: 'Medium', budget: 1500, trend: true,  why: 'Home cooking trend, premium aesthetic, organics angle' },
-  { name: 'Velvet Hangers 50-Pack',    cat: 'Home',    price: '$18–$30', margin: '52%', comp: 'Medium', weight: 'Medium', budget: 800,  trend: false, why: 'Constant demand, high units per order, repeat buyer' },
-  { name: 'Car Phone Holder',          cat: 'Auto',    price: '$15–$30', margin: '48%', comp: 'High',   weight: 'Light',  budget: 600,  trend: false, why: 'Universal need — win with magnetic/wireless angle' },
-  { name: 'Yoga Blocks (pair)',        cat: 'Sports',  price: '$20–$38', margin: '44%', comp: 'Low',    weight: 'Medium', budget: 1000, trend: true,  why: 'Yoga market growing, simple product, easy to brand' },
-  { name: 'Silicone Stretch Lids Set', cat: 'Kitchen', price: '$15–$28', margin: '56%', comp: 'Low',    weight: 'Light',  budget: 600,  trend: true,  why: 'Eco/sustainability angle, cheap to source, high reviews' },
-  { name: 'Foam Roller',              cat: 'Sports',  price: '$25–$45', margin: '40%', comp: 'Medium', weight: 'Medium', budget: 1200, trend: false, why: 'Recovery market booming, gym and home users' },
-  { name: 'Phone Stand for Desk',     cat: 'Office',  price: '$15–$28', margin: '52%', comp: 'Medium', weight: 'Light',  budget: 700,  trend: true,  why: 'WFH + content creation boom, cheap to source' },
-];
-
-const BUDGETS = [{ label: '$500–$1k', min: 0, max: 1000 }, { label: '$1k–$3k', min: 1000, max: 3000 }, { label: '$3k+', min: 3000, max: 99999 }];
-const WEIGHTS = ['Any', 'Light', 'Medium'];
-const COMPS   = ['Any', 'Low', 'Medium'];
-
-export function IdeasMode() {
-  const [budget, setBudget]   = useState(0);
-  const [weight, setWeight]   = useState('Any');
-  const [comp,   setComp]     = useState('Any');
-  const [results, setResults] = useState<typeof IDEAS>([]);
-  const [searched, setSearched] = useState(false);
-
-  function generate() {
-    const bf = BUDGETS[budget];
-    const filtered = IDEAS.filter(i =>
-      i.budget >= bf.min && i.budget <= bf.max &&
-      (weight === 'Any' || i.weight === weight) &&
-      (comp   === 'Any' || i.comp   === comp)
-    );
-    setResults([...filtered].sort((a, b) => (b.trend ? 1 : 0) - (a.trend ? 1 : 0)).slice(0, 8));
-    setSearched(true);
-  }
-
-  return (
-    <ScrollView contentContainerStyle={id.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-      <View style={id.filters}>
-        {[
-          { label: 'STARTUP BUDGET', opts: BUDGETS.map((b, i) => ({ key: String(i), label: b.label })), val: String(budget), set: (v: string) => setBudget(Number(v)) },
-          { label: 'UNIT WEIGHT',    opts: WEIGHTS.map(w => ({ key: w, label: w })), val: weight, set: setWeight },
-          { label: 'COMPETITION',    opts: COMPS.map(c => ({ key: c, label: c })),   val: comp,   set: setComp   },
-        ].map(row => (
-          <View key={row.label}>
-            <Text style={id.filterLabel}>{row.label}</Text>
-            <View style={id.chipRow}>
-              {row.opts.map(o => (
-                <TouchableOpacity key={o.key} style={[id.chip, row.val === o.key && id.chipActive]} onPress={() => row.set(o.key)}>
-                  <Text style={[id.chipText, row.val === o.key && id.chipTextActive]}>{o.label}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        ))}
-      </View>
-      <TouchableOpacity style={id.btn} onPress={generate} activeOpacity={0.85}>
-        <Text style={id.btnText}>Generate Ideas</Text>
-      </TouchableOpacity>
-      {searched && results.length === 0 && <Text style={id.noResults}>No matches — try broadening your filters.</Text>}
-      {results.map((idea, i) => (
-        <View key={i} style={id.card}>
-          <View style={id.cardTop}>
-            <View style={{ flex: 1 }}>
-              <Text style={id.cardName}>{idea.name}</Text>
-              <Text style={id.cardCat}>{idea.cat}</Text>
-            </View>
-            {idea.trend && <View style={id.trendBadge}><Text style={id.trendText}>↑ TRENDING</Text></View>}
-          </View>
-          <Text style={id.cardWhy}>{idea.why}</Text>
-          <View style={id.cardStats}>
-            {[
-              { val: idea.price,  label: 'PRICE',      color: undefined },
-              { val: idea.margin, label: 'MARGIN',     color: colors.green },
-              { val: idea.comp,   label: 'COMP.',      color: idea.comp === 'Low' ? colors.green : idea.comp === 'High' ? colors.red : colors.amber },
-              { val: `$${idea.budget.toLocaleString()}`, label: 'MIN. BUDGET', color: undefined },
-            ].map((s, idx, arr) => (
-              <React.Fragment key={idx}>
-                {idx > 0 && <View style={id.statDiv} />}
-                <View style={id.stat}>
-                  <Text style={[id.statVal, s.color ? { color: s.color } : {}]}>{s.val}</Text>
-                  <Text style={id.statLabel}>{s.label}</Text>
-                </View>
-              </React.Fragment>
-            ))}
-          </View>
-        </View>
-      ))}
-    </ScrollView>
-  );
-}
-
-// ─── Main Screen ──────────────────────────────────────────────────────────────
-
-export default function LaunchScreen() {
-  const [tab, setTab] = useState<LaunchTab>('checklist');
-  return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#F5F7FF' }}>
-      <View style={s.seg}>
-        {([
-          { key: 'checklist', label: '↑  Launch Checklist' },
-          { key: 'ideas',     label: '◉  Product Ideas'    },
-        ] as const).map(t => (
-          <TouchableOpacity key={t.key} style={[s.segTab, tab === t.key && s.segActive]} onPress={() => setTab(t.key)} activeOpacity={0.75}>
-            <Text style={[s.segText, tab === t.key && s.segTextActive]}>{t.label}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-      <View style={{ flex: 1 }}>
-        {tab === 'checklist' ? <ChecklistMode /> : <IdeasMode />}
-      </View>
     </SafeAreaView>
   );
 }
@@ -620,137 +887,30 @@ export default function LaunchScreen() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const s = StyleSheet.create({
-  seg:         { flexDirection: 'row', marginHorizontal: spacing.md, marginTop: spacing.xs, marginBottom: spacing.xs, backgroundColor: '#E8EDF5', borderRadius: radius.lg, padding: 3, borderWidth: 1, borderColor: '#D0DAF0' },
-  segTab:      { flex: 1, paddingVertical: spacing.sm + 1, alignItems: 'center', borderRadius: radius.md - 2 },
-  segActive:   { backgroundColor: '#fff', ...shadow.sm },
-  segText:     { fontSize: 12, fontWeight: '700', color: colors.textMuted },
-  segTextActive:{ color: '#0D1B4B', fontWeight: '800' },
-});
+  safe:  { flex: 1, backgroundColor: DS.bgCanvas },
 
-const cl = StyleSheet.create({
-  scroll: { paddingBottom: 120, paddingHorizontal: spacing.md, gap: spacing.sm, paddingTop: spacing.xs },
-
-  // ── Hero card
-  hero: { backgroundColor: '#fff', borderRadius: radius.xxl, borderWidth: 1, borderColor: '#E0E8F5', padding: spacing.lg, gap: spacing.sm, ...shadow.md },
-  heroHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  heroWordmark: { fontSize: 22, fontWeight: '900', color: '#0D1B4B', letterSpacing: -0.8 },
-  heroEyebrow:  { fontSize: 8, fontWeight: '800', color: '#4361EE', letterSpacing: 2.5, marginTop: 1 },
-  tierPill:     { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderRadius: radius.full, paddingHorizontal: 10, paddingVertical: 5, backgroundColor: '#fff' },
-  tierDot:      { width: 6, height: 6, borderRadius: 3 },
-  tierLabel:    { fontSize: 9, fontWeight: '800', letterSpacing: 1.2 },
-  tierChevron:  { fontSize: 8, fontWeight: '700' },
-
-  heroBody:     { flexDirection: 'row', gap: spacing.sm },
-  heroTitle:    { fontSize: 24, fontWeight: '900', color: '#0D1B4B', letterSpacing: -1, lineHeight: 30 },
-  heroTitleAccent: { color: '#4361EE' },
-  heroSub:      { fontSize: 13, color: colors.textSecondary, lineHeight: 19, marginTop: 6 },
-  ctaBtn:       { backgroundColor: '#4361EE', borderRadius: radius.md, paddingVertical: spacing.md - 2, alignItems: 'center', marginTop: spacing.sm },
-  ctaBtnText:   { fontSize: 14, fontWeight: '800', color: '#fff', letterSpacing: -0.2 },
-  heroClock:    { fontSize: 11, color: colors.textMuted, marginTop: 5 },
-
-  rocketWrap:  { width: 100, alignItems: 'center', justifyContent: 'flex-end', paddingBottom: 4 },
-  rocketGlow:  { position: 'absolute', width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(67,97,238,0.08)', top: 0 },
-  rocketEmoji: { fontSize: 44, marginBottom: 4 },
-  rocketChart: { flexDirection: 'row', alignItems: 'flex-end', gap: 3 },
-  bar:         { width: 12, borderRadius: 3 },
-
-  goalCard: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
-    backgroundColor: '#FFF8EE', borderRadius: radius.lg,
-    borderWidth: 1, borderColor: '#FFE4B0', padding: spacing.sm + 4,
+  header: {
+    paddingHorizontal: DS.pagePadding,
+    paddingTop: 10,
+    paddingBottom: 12,
+    backgroundColor: DS.bgCard,
+    borderBottomWidth: 1,
+    borderBottomColor: DS.border,
   },
-  goalIcon:    { fontSize: 22 },
-  goalEyebrow: { fontSize: 8, fontWeight: '800', color: '#D97706', letterSpacing: 1.5 },
-  goalValue:   { fontSize: 16, fontWeight: '900', color: '#0D1B4B', letterSpacing: -0.5, marginTop: 1 },
-  goalSub:     { fontSize: 11, color: colors.textSecondary, marginTop: 1 },
+  eyebrow: { fontSize: 9, fontWeight: '800', color: DS.accent, letterSpacing: 2.5, marginBottom: 2 },
+  title:   { fontSize: 20, fontWeight: '900', color: DS.textPrimary, letterSpacing: -0.7 },
 
-  // ── Progress card (horizontal split)
-  card: {
-    backgroundColor: '#fff', borderRadius: radius.xl,
-    borderWidth: 1, borderColor: '#E0E8F5',
-    flexDirection: 'row', ...shadow.sm,
+  chipsWrap: {
+    paddingVertical: 12,
+    backgroundColor: DS.bgCard,
+    borderBottomWidth: 1,
+    borderBottomColor: DS.border,
   },
-  progressLeft:   { flex: 1, padding: spacing.md, gap: spacing.sm },
-  progressTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  progressTitle:  { fontSize: 13, fontWeight: '800', color: '#0D1B4B', letterSpacing: -0.3 },
-  levelBadge:     { borderRadius: radius.full, paddingHorizontal: 8, paddingVertical: 3 },
-  ringRow:        { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  ringBig:        { fontSize: 26, fontWeight: '900', color: '#0D1B4B', letterSpacing: -1 },
-  ringCount:      { fontSize: 13, color: colors.textSecondary, fontWeight: '600' },
-  ringLabel:      { fontSize: 11, color: colors.textMuted },
-  progressBar:    { height: 6, backgroundColor: '#E8EDF5', borderRadius: 3, overflow: 'hidden' },
-  progressFill:   { height: '100%', borderRadius: 3 },
-  progressHint:   { fontSize: 11, color: colors.textSecondary, lineHeight: 16 },
-  cardDivider:    { width: 1, backgroundColor: '#E8EDF5', marginVertical: spacing.md },
 
-  statsGrid: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', padding: spacing.sm },
-  statCell:  { width: '50%', padding: spacing.xs + 2, gap: 1 },
-  statIcon:  { fontSize: 16 },
-  statLabel: { fontSize: 9, fontWeight: '700', color: colors.textMuted, lineHeight: 13 },
-  statVal:   { fontSize: 20, fontWeight: '900', color: '#0D1B4B', letterSpacing: -0.8 },
-  statSub:   { fontSize: 9, color: colors.textMuted },
-
-  // ── Achievements
-  achieveHeader: { paddingHorizontal: spacing.md, paddingTop: spacing.md, paddingBottom: spacing.sm, borderBottomWidth: 1, borderBottomColor: '#F0F4FC', gap: 2 },
-  achieveTitle:  { fontSize: 15, fontWeight: '800', color: '#0D1B4B', letterSpacing: -0.3 },
-  achieveSub:    { fontSize: 11, color: colors.textMuted },
-  badgeRow:      { flexDirection: 'row', justifyContent: 'space-around', paddingHorizontal: spacing.sm, paddingVertical: spacing.md, flexWrap: 'wrap' },
-  badgeWrap:     { alignItems: 'center', width: 54, gap: 5 },
-  badgeCircle:   { width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5 },
-  badgeUnlocked: { backgroundColor: '#EEF4FF', borderColor: '#4361EE' },
-  badgeLocked:   { backgroundColor: '#F5F7FB', borderColor: '#DDE4F0' },
-  badgeIcon:     { fontSize: 20 },
-  badgeLabel:    { fontSize: 9, fontWeight: '700', color: colors.textSecondary, textAlign: 'center', lineHeight: 13 },
-
-  // ── Blueprint header
-  blueprintHeader: { gap: 6 },
-  blueprintTitle:  { fontSize: 18, fontWeight: '900', color: '#0D1B4B', letterSpacing: -0.7 },
-  pathRow:         { flexDirection: 'row', alignItems: 'center' },
-  pathDot:         { width: 8, height: 8, borderRadius: 4 },
-  pathLine:        { flex: 1, height: 1.5, borderStyle: 'dashed', borderWidth: 1, borderColor: '#C5D3EC', marginHorizontal: 1 },
-  pathPin:         { fontSize: 14, marginLeft: 2 },
-
-  // ── Phases
-  phases: { gap: spacing.sm },
-
-  // ── Motivation card
-  motivCard: {
-    backgroundColor: '#fff', borderRadius: radius.xl,
-    borderWidth: 1, borderColor: '#E0E8F5',
-    padding: spacing.md, flexDirection: 'row',
-    alignItems: 'center', gap: spacing.sm, ...shadow.sm,
+  scroll: {
+    paddingHorizontal: DS.pagePadding,
+    paddingTop: 16,
+    paddingBottom: 120,
+    gap: 12,
   },
-  motivLeft:   { gap: -6, alignItems: 'center' },
-  motivGraphic:{ fontSize: 26 },
-  motivCoins:  { fontSize: 22, marginTop: -8 },
-  motivTitle:  { fontSize: 13, fontWeight: '800', color: '#0D1B4B', lineHeight: 19, letterSpacing: -0.3, flex: 1 },
-  motivSub:    { fontSize: 11, color: colors.textMuted, marginTop: 3 },
-  motivBtn:    { borderWidth: 1, borderColor: '#4361EE', borderRadius: radius.full, paddingHorizontal: 10, paddingVertical: 6, marginTop: 6 },
-  motivBtnText:{ fontSize: 10, fontWeight: '700', color: '#4361EE' },
-});
-
-const id = StyleSheet.create({
-  scroll:    { paddingHorizontal: spacing.md, paddingBottom: 120, gap: spacing.sm, paddingTop: spacing.xs },
-  filters:   { backgroundColor: '#fff', borderRadius: radius.lg, padding: spacing.md, gap: spacing.sm, borderWidth: 1, borderColor: '#E0E8F5' },
-  filterLabel: { fontSize: 9, fontWeight: '800', color: colors.textMuted, letterSpacing: 1.5 },
-  chipRow:   { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs + 2 },
-  chip:      { paddingHorizontal: spacing.md, paddingVertical: spacing.xs + 2, borderWidth: 1, borderColor: '#D0DAF0', borderRadius: radius.full, backgroundColor: '#F5F7FF' },
-  chipActive:{ backgroundColor: '#4361EE', borderColor: '#4361EE' },
-  chipText:  { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
-  chipTextActive: { color: '#fff' },
-  btn:       { backgroundColor: '#4361EE', borderRadius: radius.md, paddingVertical: spacing.md, alignItems: 'center' },
-  btnText:   { fontSize: 16, fontWeight: '800', color: '#fff' },
-  noResults: { fontSize: 14, color: colors.textMuted, textAlign: 'center', paddingVertical: spacing.lg },
-  card:      { backgroundColor: '#fff', borderRadius: radius.lg, padding: spacing.md, gap: spacing.sm, borderWidth: 1, borderColor: '#E0E8F5' },
-  cardTop:   { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
-  cardName:  { fontSize: 15, fontWeight: '800', color: '#0D1B4B', letterSpacing: -0.5 },
-  cardCat:   { fontSize: 12, color: colors.textMuted },
-  trendBadge:{ backgroundColor: colors.greenLight, borderRadius: radius.full, paddingHorizontal: 8, paddingVertical: 3 },
-  trendText: { fontSize: 9, fontWeight: '800', color: colors.green, letterSpacing: 0.5 },
-  cardWhy:   { fontSize: 13, color: colors.textSecondary, lineHeight: 19 },
-  cardStats: { flexDirection: 'row', backgroundColor: '#F5F7FF', borderRadius: radius.sm, paddingVertical: spacing.sm, alignItems: 'center' },
-  stat:      { flex: 1, alignItems: 'center' },
-  statVal:   { fontSize: 13, fontWeight: '800', color: '#0D1B4B' },
-  statLabel: { fontSize: 7, fontWeight: '700', color: colors.textMuted, letterSpacing: 1.5, marginTop: 2 },
-  statDiv:   { width: 1, height: 24, backgroundColor: '#E0E8F5' },
 });

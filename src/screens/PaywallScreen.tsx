@@ -1,19 +1,27 @@
 import React, { useState } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, ScrollView, Switch, Platform, Dimensions,
+  View, Text, StyleSheet, TouchableOpacity,
+  ScrollView, Platform, Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors, spacing, radius, shadow } from '../theme';
+import LaunchPackModal from '../components/LaunchPackModal';
+import { StackNavigationProp } from '@react-navigation/stack';
+import { RootStackParamList } from '../navigation/RootNavigator';
 import {
   useSubscription, Tier, PLANS, PLAN_FEATURES, LAUNCH_PACK_PRICE,
 } from '../hooks/useSubscription';
-import { StackNavigationProp } from '@react-navigation/stack';
-import { RootStackParamList } from '../navigation/RootNavigator';
+import {
+  AppCard, SectionHeader, StatusBadge, PrimaryButton, SecondaryButton, DS,
+} from '../components/ds';
+
+// ── Props ─────────────────────────────────────────────────────────────────────
 
 type Props = {
   navigation: StackNavigationProp<RootStackParamList, 'Paywall'>;
   route?: { params?: { forced?: boolean } };
 };
+
+// ── Static data ───────────────────────────────────────────────────────────────
 
 const PLAN_ORDER: Tier[] = ['explorer', 'builder', 'operator'];
 
@@ -23,28 +31,484 @@ const PLAN_DESCRIPTIONS: Record<Tier, string> = {
   operator: 'No limits. Built for commerce operators already moving at scale.',
 };
 
-// Feature comparison rows shown in the full table
-const COMPARISON_ROWS: { label: string; explorer: string; builder: string; operator: string }[] = [
-  { label: 'Product searches',  explorer: '3/mo',       builder: '50/mo',      operator: 'Unlimited' },
-  { label: 'Supplier searches', explorer: '1/mo',       builder: '20/mo',      operator: 'Unlimited' },
-  { label: 'Keyword research',  explorer: '—',          builder: '20/mo',      operator: 'Unlimited' },
-  { label: 'AI brand kits',     explorer: '1/mo',       builder: '5/mo',       operator: 'Unlimited' },
-  { label: 'Saved products',    explorer: '—',          builder: 'Up to 10',   operator: 'Unlimited' },
-  { label: 'Profit calculator', explorer: '✓',          builder: '✓',          operator: '✓'         },
-  { label: 'Co-Pilot journey',  explorer: '✓',          builder: '✓',          operator: '✓'         },
-  { label: 'Supplier emails',   explorer: '—',          builder: '✓',          operator: '✓'         },
-  { label: 'All 9 calc modes',  explorer: '—',          builder: '✓',          operator: '✓'         },
-  { label: 'Priority AI',       explorer: '—',          builder: '—',          operator: '✓'         },
-  { label: 'Export to CSV',     explorer: '—',          builder: '—',          operator: '✓'         },
+const PLAN_EYEBROW: Record<Tier, string> = {
+  explorer: 'FREE',
+  builder:  'MOST POPULAR',
+  operator: 'FOR SCALING SELLERS',
+};
+
+const COMPARISON_ROWS: {
+  label: string; icon: string;
+  explorer: string; builder: string; operator: string;
+}[] = [
+  { label: 'Product searches',  icon: '◎', explorer: '3/mo',      builder: '50/mo',    operator: 'Unlimited' },
+  { label: 'Product analyses',  icon: '⊛', explorer: '—',         builder: '20/mo',    operator: 'Unlimited' },
+  { label: 'Profit calculator', icon: '◈', explorer: '✓',         builder: '✓',        operator: '✓'         },
+  { label: 'Brand assets',      icon: '✦', explorer: '1/mo',      builder: '5/mo',     operator: 'Unlimited' },
+  { label: 'Co-Pilot chats',    icon: '⊞', explorer: '—',         builder: '✓',        operator: '✓'         },
+  { label: 'Export tools',      icon: '↓', explorer: '—',         builder: '—',        operator: '✓'         },
 ];
 
+const TRUST_POINTS = [
+  { icon: '🔒', label: 'Secure payments', body: 'Processed by Apple. No card stored by Siftly.' },
+  { icon: '↺',  label: 'Cancel anytime',  body: 'Cancel from iOS Settings — no hoops, no penalties.' },
+  { icon: '🚀', label: 'Built for FBA',   body: 'Designed for Amazon beginners and experienced sellers.' },
+];
+
+const FAQ_ITEMS = [
+  {
+    q: 'Can I cancel anytime?',
+    a: 'Yes — cancel through iOS Settings → Subscriptions. You keep access until the billing period ends.',
+  },
+  {
+    q: 'Are AI generations included?',
+    a: 'Co-Pilot and AI brand tools are included in the Builder and Operator plans with generous monthly limits.',
+  },
+  {
+    q: 'Is this for beginners?',
+    a: 'Absolutely. Siftly is built for new FBA sellers who want clarity, not confusion.',
+  },
+];
+
+// ── Pricing toggle ────────────────────────────────────────────────────────────
+
+function PricingToggle({
+  annual,
+  onChange,
+}: {
+  annual: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <View style={tog.wrap}>
+      <TouchableOpacity
+        style={[tog.tab, !annual && tog.tabActive]}
+        onPress={() => onChange(false)}
+        activeOpacity={0.8}
+        accessibilityRole="tab"
+        accessibilityState={{ selected: !annual }}
+      >
+        <Text style={[tog.label, !annual && tog.labelActive]}>Monthly</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[tog.tab, annual && tog.tabActive]}
+        onPress={() => onChange(true)}
+        activeOpacity={0.8}
+        accessibilityRole="tab"
+        accessibilityState={{ selected: annual }}
+      >
+        <Text style={[tog.label, annual && tog.labelActive]}>Yearly</Text>
+        <View style={tog.savePill}>
+          <Text style={tog.saveText}>SAVE 40%</Text>
+        </View>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+const tog = StyleSheet.create({
+  wrap: {
+    flexDirection:   'row',
+    backgroundColor: DS.bgSubtle,
+    borderRadius:    14,
+    borderWidth:     1,
+    borderColor:     DS.border,
+    padding:         3,
+    gap:             2,
+  },
+  tab: {
+    flex:            1,
+    flexDirection:   'row',
+    alignItems:      'center',
+    justifyContent:  'center',
+    gap:             6,
+    paddingVertical: 10,
+    borderRadius:    11,
+  },
+  tabActive: {
+    backgroundColor: DS.bgCard,
+    shadowColor:     '#0D1B4B',
+    shadowOffset:    { width: 0, height: 1 },
+    shadowOpacity:   0.07,
+    shadowRadius:    4,
+    elevation:       2,
+  },
+  label:       { fontSize: 14, fontWeight: '600', color: DS.textMuted },
+  labelActive: { fontWeight: '800', color: DS.textPrimary },
+  savePill: {
+    backgroundColor: DS.accentLight,
+    borderRadius:    DS.radiusBadge,
+    paddingHorizontal: 7,
+    paddingVertical:   2,
+  },
+  saveText: { fontSize: 8, fontWeight: '900', color: DS.accentDark, letterSpacing: 0.5 },
+});
+
+// ── Plan card ─────────────────────────────────────────────────────────────────
+
+function PlanCard({
+  tier,
+  isSelected,
+  isRecommended,
+  isCurrent,
+  priceLabel,
+  billingNote,
+  onSelect,
+  onPurchase,
+  purchasing,
+}: {
+  tier:         Tier;
+  isSelected:   boolean;
+  isRecommended: boolean;
+  isCurrent:    boolean;
+  priceLabel:   string;
+  billingNote:  string;
+  onSelect:     () => void;
+  onPurchase:   () => void;
+  purchasing:   boolean;
+}) {
+  const plan = PLANS[tier];
+
+  const cardBorderColor = isRecommended
+    ? DS.indigo
+    : tier === 'operator'
+    ? '#7C3AED'
+    : isSelected
+    ? DS.accent
+    : DS.border;
+
+  const cardBg = isRecommended ? DS.indigoLight : DS.bgCard;
+
+  const eyebrow = isCurrent
+    ? 'CURRENT PLAN'
+    : PLAN_EYEBROW[tier];
+
+  const eyebrowColor = isCurrent
+    ? DS.textMuted
+    : isRecommended
+    ? DS.indigo
+    : tier === 'operator'
+    ? '#7C3AED'
+    : DS.textMuted;
+
+  const ctaLabel = tier === 'explorer'
+    ? 'Start Free'
+    : purchasing
+    ? 'Processing…'
+    : `Get ${plan.name}`;
+
+  return (
+    <TouchableOpacity
+      style={[
+        pc.card,
+        { borderColor: cardBorderColor, backgroundColor: cardBg },
+        isRecommended && pc.cardShadow,
+      ]}
+      onPress={onSelect}
+      activeOpacity={0.9}
+      accessibilityRole="radio"
+      accessibilityState={{ checked: isSelected }}
+    >
+      {/* Eyebrow */}
+      <Text style={[pc.eyebrow, { color: eyebrowColor }]}>{eyebrow}</Text>
+
+      {/* Name + price row */}
+      <View style={pc.nameRow}>
+        <View style={pc.nameLeft}>
+          <Text style={pc.name}>{plan.name}</Text>
+          <Text style={pc.desc} numberOfLines={2}>{PLAN_DESCRIPTIONS[tier]}</Text>
+        </View>
+        <View style={pc.priceCol}>
+          <Text style={[pc.price, isRecommended && { color: DS.indigo }]}>
+            {priceLabel}
+          </Text>
+          <Text style={pc.billing}>{billingNote}</Text>
+        </View>
+      </View>
+
+      {/* Feature list */}
+      <View style={pc.divider} />
+      {PLAN_FEATURES[tier].map((f, i) => (
+        <View key={i} style={pc.feature}>
+          <Text style={[pc.featureCheck, isRecommended && { color: DS.indigo }]}>✓</Text>
+          <Text style={pc.featureText}>{f}</Text>
+        </View>
+      ))}
+
+      {/* CTA */}
+      <View style={pc.ctaWrap}>
+        {isRecommended ? (
+          <PrimaryButton
+            label={ctaLabel}
+            onPress={onPurchase}
+            disabled={purchasing}
+            loading={purchasing && isSelected}
+            style={pc.ctaBtn}
+          />
+        ) : (
+          <SecondaryButton
+            label={ctaLabel}
+            onPress={onPurchase}
+            disabled={purchasing}
+            loading={purchasing && isSelected}
+            style={pc.ctaBtn}
+          />
+        )}
+      </View>
+
+      {/* Recommended ribbon */}
+      {isRecommended && (
+        <View style={pc.ribbon}>
+          <StatusBadge label="Recommended" variant="info" />
+        </View>
+      )}
+    </TouchableOpacity>
+  );
+}
+
+const pc = StyleSheet.create({
+  card: {
+    borderWidth:  1.5,
+    borderRadius: DS.radiusCard,
+    padding:      DS.cardPadding,
+    gap:          DS.rowGap,
+    position:     'relative',
+    overflow:     'hidden',
+  },
+  cardShadow: {
+    shadowColor:   '#6366F1',
+    shadowOffset:  { width: 0, height: 4 },
+    shadowOpacity: 0.16,
+    shadowRadius:  16,
+    elevation:     6,
+  },
+  eyebrow: {
+    fontSize: 8, fontWeight: '900', letterSpacing: 1.8,
+  },
+  nameRow:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 },
+  nameLeft:   { flex: 1, gap: 4 },
+  name:       { fontSize: 22, fontWeight: '900', color: DS.textPrimary, letterSpacing: -0.6 },
+  desc:       { fontSize: 12, color: DS.textSecondary, lineHeight: 17 },
+  priceCol:   { alignItems: 'flex-end' },
+  price:      { fontSize: 22, fontWeight: '900', color: DS.textPrimary, letterSpacing: -0.6 },
+  billing:    { fontSize: 10, color: DS.textMuted, marginTop: 2 },
+  divider:    { height: 1, backgroundColor: DS.borderLight, marginVertical: 4 },
+  feature:    { flexDirection: 'row', gap: 8, alignItems: 'flex-start' },
+  featureCheck: { fontSize: 12, fontWeight: '800', color: DS.accent, width: 14, marginTop: 1 },
+  featureText:  { fontSize: 13, color: DS.textSecondary, flex: 1, lineHeight: 19 },
+  ctaWrap:    { marginTop: 6 },
+  ctaBtn:     {},
+  ribbon: {
+    position: 'absolute', top: DS.cardPadding, right: DS.cardPadding,
+  },
+});
+
+// ── Feature comparison card ───────────────────────────────────────────────────
+
+function ComparisonCard() {
+  return (
+    <AppCard padding={0} style={cmp.card}>
+      {/* Header row */}
+      <View style={[cmp.row, cmp.headerRow]}>
+        <Text style={[cmp.cell, cmp.labelCell, cmp.headerText]}>Feature</Text>
+        {PLAN_ORDER.map(t => (
+          <Text key={t} style={[cmp.cell, cmp.headerText]} numberOfLines={1}>
+            {PLANS[t].name}
+          </Text>
+        ))}
+      </View>
+
+      {COMPARISON_ROWS.map((row, i) => (
+        <View key={i} style={[cmp.row, i % 2 === 0 && cmp.rowAlt]}>
+          <View style={cmp.labelCell}>
+            <Text style={cmp.labelIcon}>{row.icon}</Text>
+            <Text style={cmp.labelText}>{row.label}</Text>
+          </View>
+          {PLAN_ORDER.map(t => {
+            const val = row[t];
+            const isCheck = val === '✓';
+            const isEmpty = val === '—';
+            return (
+              <Text
+                key={t}
+                style={[
+                  cmp.cell,
+                  cmp.valCell,
+                  isCheck && cmp.valCheck,
+                  isEmpty && cmp.valEmpty,
+                ]}
+              >
+                {val}
+              </Text>
+            );
+          })}
+        </View>
+      ))}
+    </AppCard>
+  );
+}
+
+const cmp = StyleSheet.create({
+  card:       { overflow: 'hidden' },
+  row:        { flexDirection: 'row', alignItems: 'center' },
+  headerRow:  { backgroundColor: DS.indigoLight, paddingVertical: 12 },
+  rowAlt:     { backgroundColor: DS.bgSubtle },
+  cell: {
+    flex: 1, paddingVertical: 11, paddingHorizontal: 8,
+    fontSize: 11, color: DS.textSecondary,
+    textAlign: 'center', borderRightWidth: 1, borderRightColor: DS.borderLight,
+  },
+  labelCell: {
+    flex: 1.5, flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingVertical: 11, paddingHorizontal: 14,
+    borderRightWidth: 1, borderRightColor: DS.borderLight,
+  },
+  labelIcon:  { fontSize: 11, color: DS.indigo },
+  labelText:  { fontSize: 11, fontWeight: '600', color: DS.textSecondary, flex: 1 },
+  headerText: { fontSize: 10, fontWeight: '800', color: DS.indigo, textAlign: 'center' },
+  valCell:    { fontWeight: '600', color: DS.textPrimary },
+  valCheck:   { color: DS.accent, fontWeight: '800' },
+  valEmpty:   { color: DS.textMuted, fontWeight: '400' },
+});
+
+// ── Trust card ────────────────────────────────────────────────────────────────
+
+function TrustCard() {
+  return (
+    <AppCard style={tr.card}>
+      <Text style={tr.title}>Our Guarantee</Text>
+      {TRUST_POINTS.map((p, i) => (
+        <View key={i} style={[tr.row, i < TRUST_POINTS.length - 1 && tr.rowBorder]}>
+          <View style={tr.iconWrap}>
+            <Text style={tr.icon}>{p.icon}</Text>
+          </View>
+          <View style={tr.text}>
+            <Text style={tr.label}>{p.label}</Text>
+            <Text style={tr.body}>{p.body}</Text>
+          </View>
+        </View>
+      ))}
+    </AppCard>
+  );
+}
+
+const tr = StyleSheet.create({
+  card:      { gap: 4 },
+  title:     { fontSize: 15, fontWeight: '800', color: DS.textPrimary, letterSpacing: -0.3, marginBottom: 8 },
+  row:       { flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingVertical: 12 },
+  rowBorder: { borderBottomWidth: 1, borderBottomColor: DS.borderLight },
+  iconWrap: {
+    width: 36, height: 36, borderRadius: 11,
+    backgroundColor: DS.accentLight,
+    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+  },
+  icon:      { fontSize: 18 },
+  text:      { flex: 1, gap: 2 },
+  label:     { fontSize: 13, fontWeight: '700', color: DS.textPrimary },
+  body:      { fontSize: 12, color: DS.textSecondary, lineHeight: 18 },
+});
+
+// ── Launch Pack upsell ────────────────────────────────────────────────────────
+
+function LaunchPackCard({ onPress }: { onPress: () => void }) {
+  return (
+    <AppCard style={lp.card}>
+      <View style={lp.topRow}>
+        <View>
+          <Text style={lp.eyebrow}>ONE-TIME PURCHASE</Text>
+          <Text style={lp.title}>⚡ Launch Pack</Text>
+        </View>
+        <View style={lp.priceBadge}>
+          <Text style={lp.price}>${LAUNCH_PACK_PRICE}</Text>
+        </View>
+      </View>
+      <Text style={lp.body}>
+        Brand kit, optimized listing, supplier email sequence, PPC template, and a 48-hour activation plan.
+        One-time purchase — yours forever.
+      </Text>
+      <PrimaryButton label="Get the Launch Pack →" onPress={onPress} />
+    </AppCard>
+  );
+}
+
+const lp = StyleSheet.create({
+  card: {
+    gap: 14,
+    borderColor: DS.indigo + '44',
+    borderWidth: 1.5,
+  },
+  topRow:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  eyebrow:    { fontSize: 8, fontWeight: '900', color: DS.indigo, letterSpacing: 1.8, marginBottom: 4 },
+  title:      { fontSize: 20, fontWeight: '900', color: DS.textPrimary, letterSpacing: -0.5 },
+  priceBadge: {
+    backgroundColor: DS.indigoLight,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  price: { fontSize: 24, fontWeight: '900', color: DS.indigo, letterSpacing: -0.8 },
+  body:  { fontSize: 13, color: DS.textSecondary, lineHeight: 19 },
+});
+
+// ── FAQ accordion ─────────────────────────────────────────────────────────────
+
+function FaqCard() {
+  const [open, setOpen] = useState<number | null>(null);
+
+  return (
+    <AppCard style={faq.card}>
+      <Text style={faq.title}>Frequently Asked Questions</Text>
+      {FAQ_ITEMS.map((item, i) => {
+        const isOpen = open === i;
+        return (
+          <View key={i}>
+            {i > 0 && <View style={faq.divider} />}
+            <TouchableOpacity
+              style={faq.row}
+              onPress={() => setOpen(isOpen ? null : i)}
+              activeOpacity={0.75}
+              accessibilityRole="button"
+              accessibilityState={{ expanded: isOpen }}
+            >
+              <Text style={faq.q}>{item.q}</Text>
+              <Text style={[faq.chevron, isOpen && faq.chevronOpen]}>›</Text>
+            </TouchableOpacity>
+            {isOpen && <Text style={faq.a}>{item.a}</Text>}
+          </View>
+        );
+      })}
+    </AppCard>
+  );
+}
+
+const faq = StyleSheet.create({
+  card:        { gap: 0 },
+  title:       { fontSize: 15, fontWeight: '800', color: DS.textPrimary, letterSpacing: -0.3, marginBottom: 8 },
+  divider:     { height: 1, backgroundColor: DS.borderLight },
+  row:         { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14 },
+  q:           { fontSize: 13, fontWeight: '700', color: DS.textPrimary, flex: 1, paddingRight: 8 },
+  chevron:     { fontSize: 20, color: DS.textMuted, transform: [{ rotate: '0deg' }] },
+  chevronOpen: { transform: [{ rotate: '90deg' }] },
+  a: {
+    fontSize: 13, color: DS.textSecondary, lineHeight: 20,
+    paddingBottom: 12, paddingRight: 8,
+  },
+});
+
+// ── Screen ────────────────────────────────────────────────────────────────────
+
 export default function PaywallScreen({ navigation, route }: Props) {
-  const { purchasePlan, restorePurchases, completeOnboarding, tier: currentTier } = useSubscription();
-  const [annual, setAnnual]       = useState(true);
-  const [selected, setSelected]   = useState<Tier>('builder');
-  const [purchasing, setPurchasing] = useState(false);
-  const [restoring, setRestoring]  = useState(false);
-  const [error, setError]          = useState('');
+  const {
+    purchasePlan, restorePurchases, completeOnboarding, tier: currentTier,
+  } = useSubscription();
+
+  const [annual,       setAnnual]       = useState(false);
+  const [selected,     setSelected]     = useState<Tier>('builder');
+  const [purchasing,   setPurchasing]   = useState(false);
+  const [restoring,    setRestoring]    = useState(false);
+  const [error,        setError]        = useState('');
+  const [showLaunchPack, setShowLaunchPack] = useState(false);
+
   const forced = route?.params?.forced;
 
   async function handlePurchase(t: Tier) {
@@ -60,7 +524,6 @@ export default function PaywallScreen({ navigation, route }: Props) {
       await completeOnboarding();
       navigation.replace('Main');
     } catch (e: any) {
-      // User cancelled — no error message needed
       if (!e?.userCancelled) {
         setError(e?.message ?? 'Purchase failed. Please try again.');
       }
@@ -96,207 +559,146 @@ export default function PaywallScreen({ navigation, route }: Props) {
   }
 
   const screenHeight = Dimensions.get('window').height;
+  const selectedPlan = PLANS[selected];
+  const primaryCtaLabel = selected === 'explorer'
+    ? 'Start Free'
+    : `Start Free Trial — ${selectedPlan.name}`;
 
   return (
-    <SafeAreaView style={s.container}>
+    <SafeAreaView style={s.safe} edges={['top']}>
+      <LaunchPackModal visible={showLaunchPack} onClose={() => setShowLaunchPack(false)} />
+
       <ScrollView
         style={Platform.OS === 'web' ? { height: screenHeight } : { flex: 1 }}
-        contentContainerStyle={s.scroll}
+        contentContainerStyle={s.content}
         showsVerticalScrollIndicator={false}
       >
-
-        {/* Header */}
+        {/* ── Header ────────────────────────────────────────── */}
         <View style={s.header}>
-          <View style={s.logoBadge}>
-            <Text style={s.logoText}>◎  SIFTLY</Text>
+          <View style={s.logoPill}>
+            <Text style={s.logoPillIcon}>◎</Text>
+            <Text style={s.logoPillText}>SIFTLY PREMIUM</Text>
           </View>
-          <Text style={s.headline}>One platform.{'\n'}Full independence.</Text>
-          <Text style={s.sub}>
-            From first opportunity to a self-sustaining commerce operation — powered by AI.
+          <Text style={s.heroTitle}>Unlock Your FBA{'\n'}Launch System</Text>
+          <Text style={s.heroSub}>
+            Get more research, analysis, branding tools, and launch guidance.
           </Text>
         </View>
 
-        {/* Annual toggle */}
-        <View style={s.toggleCard}>
-          <View>
-            <Text style={s.toggleTitle}>Annual billing</Text>
-            <Text style={s.toggleSub}>Save 40% vs monthly</Text>
+        {/* ── Premium hero card ─────────────────────────────── */}
+        <AppCard style={s.heroCard}>
+          <View style={s.heroCardTop}>
+            <StatusBadge label="Premium" variant="info" dot />
+            <Text style={s.heroCardTitle}>
+              Launch smarter with unlimited AI-powered FBA tools.
+            </Text>
           </View>
-          <View style={s.toggleRight}>
-            <View style={[s.savePill, annual && s.savePillActive]}>
-              <Text style={[s.savePillText, annual && s.savePillTextActive]}>SAVE 40%</Text>
-            </View>
-            <Switch
-              value={annual}
-              onValueChange={setAnnual}
-              trackColor={{ false: colors.gray200, true: '#4361EE' }}
-              thumbColor={colors.white}
-            />
-          </View>
-        </View>
-
-        {/* Plan cards */}
-        {PLAN_ORDER.map(t => {
-          const p = PLANS[t];
-          const isSelected = selected === t;
-          const isRecommended = t === 'builder';
-          const isOperator = t === 'operator';
-          const isCurrent = t === currentTier;
-
-          return (
-            <TouchableOpacity
-              key={t}
-              style={[
-                s.planCard,
-                isRecommended && s.planCardRecommended,
-                isOperator && s.planCardOperator,
-                isSelected && s.planCardSelected,
-              ]}
-              onPress={() => setSelected(t)}
-              activeOpacity={0.9}
-            >
-              {isRecommended && (
-                <View style={s.recommendedBadge}>
-                  <Text style={s.recommendedText}>⭐  MOST POPULAR</Text>
+          <View style={s.heroBullets}>
+            {[
+              { icon: '◎', text: 'More product research & supplier discovery' },
+              { icon: '◈', text: 'Advanced profit analysis and freight tools' },
+              { icon: '⊛', text: 'AI launch recommendations and SWOT insights' },
+            ].map((b, i) => (
+              <View key={i} style={s.heroBullet}>
+                <View style={s.heroBulletIcon}>
+                  <Text style={s.heroBulletGlyph}>{b.icon}</Text>
                 </View>
-              )}
-              {isOperator && (
-                <View style={s.operatorBadge}>
-                  <Text style={s.operatorBadgeText}>💎  FOR SCALING SELLERS</Text>
-                </View>
-              )}
-              {isCurrent && (
-                <View style={s.currentBadge}>
-                  <Text style={s.currentText}>CURRENT PLAN</Text>
-                </View>
-              )}
-
-              {/* Plan name & price */}
-              <View style={s.planHeader}>
-                <View>
-                  <Text style={s.planName}>{p.name}</Text>
-                  <Text style={s.planDesc}>{PLAN_DESCRIPTIONS[t]}</Text>
-                </View>
-                <View style={s.planPriceWrap}>
-                  <Text style={s.planPrice}>{priceLabel(t)}</Text>
-                  <Text style={s.planBilling}>{billingNote(t)}</Text>
-                </View>
-              </View>
-
-              {/* Feature list */}
-              <View style={s.featureDivider} />
-              {PLAN_FEATURES[t].map((f, i) => (
-                <View key={i} style={s.featureRow}>
-                  <Text style={s.featureCheck}>✓</Text>
-                  <Text style={s.featureText}>{f}</Text>
-                </View>
-              ))}
-
-              {/* CTA */}
-              <TouchableOpacity
-                style={[s.planCta, s.planCtaAccent, purchasing && { opacity: 0.5 }]}
-                onPress={() => handlePurchase(t)}
-                disabled={purchasing}
-                activeOpacity={0.85}
-              >
-                <Text style={[s.planCtaText, s.planCtaTextWhite]}>
-                  {t === 'explorer'
-                    ? 'Start free'
-                    : purchasing && selected === t
-                      ? 'Processing…'
-                      : `Get ${p.name}`
-                  }
-                </Text>
-              </TouchableOpacity>
-            </TouchableOpacity>
-          );
-        })}
-
-        {/* Comparison table */}
-        <View style={s.tableSection}>
-          <Text style={s.tableTitle}>Full comparison</Text>
-          <View style={s.table}>
-            {/* Header row */}
-            <View style={[s.tableRow, s.tableHeaderRow]}>
-              <Text style={[s.tableCell, s.tableCellFeature, s.tableHeaderText]}>Feature</Text>
-              {PLAN_ORDER.map(t => (
-                <Text key={t} style={[s.tableCell, s.tableHeaderText]}>
-                  {PLANS[t].name}
-                </Text>
-              ))}
-            </View>
-            {COMPARISON_ROWS.map((row, i) => (
-              <View key={i} style={[s.tableRow, i % 2 === 0 && s.tableRowAlt]}>
-                <Text style={[s.tableCell, s.tableCellFeature]}>{row.label}</Text>
-                {(['explorer', 'builder', 'operator'] as Tier[]).map(t => (
-                  <Text
-                    key={t}
-                    style={[
-                      s.tableCell,
-                      s.tableCellVal,
-                      row[t] === '—' && { color: colors.textMuted },
-                      row[t] === '✓' && { color: colors.green, fontWeight: '700' },
-                    ]}
-                  >
-                    {row[t]}
-                  </Text>
-                ))}
+                <Text style={s.heroBulletText}>{b.text}</Text>
               </View>
             ))}
           </View>
-        </View>
+        </AppCard>
 
-        {/* Launch Pack upsell */}
-        <View style={s.launchPack}>
-          <View style={s.launchPackHeader}>
-            <View>
-              <Text style={s.launchPackEyebrow}>ONE-TIME PURCHASE</Text>
-              <Text style={s.launchPackTitle}>⚡ Launch Pack</Text>
-            </View>
-            <Text style={s.launchPackPrice}>${LAUNCH_PACK_PRICE}</Text>
-          </View>
-          <Text style={s.launchPackDesc}>
-            Everything for launch week — brand kit, optimised listing, supplier email sequence, PPC template, and 48-hour activation plan. One-time purchase, yours forever.
-          </Text>
-          <TouchableOpacity style={s.launchPackCta} activeOpacity={0.85}>
-            <Text style={s.launchPackCtaText}>Get the Launch Pack →</Text>
-          </TouchableOpacity>
-        </View>
+        {/* ── Pricing toggle ────────────────────────────────── */}
+        <PricingToggle annual={annual} onChange={setAnnual} />
 
-        {/* Error */}
+        {/* ── Plan cards ────────────────────────────────────── */}
+        <SectionHeader title="Choose Your Plan" style={s.sectionHead} />
+        {PLAN_ORDER.map(t => (
+          <PlanCard
+            key={t}
+            tier={t}
+            isSelected={selected === t}
+            isRecommended={t === 'builder'}
+            isCurrent={t === currentTier}
+            priceLabel={priceLabel(t)}
+            billingNote={billingNote(t)}
+            onSelect={() => setSelected(t)}
+            onPurchase={() => handlePurchase(t)}
+            purchasing={purchasing}
+          />
+        ))}
+
+        {/* ── Feature comparison ────────────────────────────── */}
+        <SectionHeader title="Full Comparison" style={s.sectionHead} />
+        <ComparisonCard />
+
+        {/* ── Launch pack ───────────────────────────────────── */}
+        <SectionHeader title="One-Time Add-On" style={s.sectionHead} />
+        <LaunchPackCard onPress={() => setShowLaunchPack(true)} />
+
+        {/* ── Trust ─────────────────────────────────────────── */}
+        <TrustCard />
+
+        {/* ── FAQ ───────────────────────────────────────────── */}
+        <FaqCard />
+
+        {/* ── Error ─────────────────────────────────────────── */}
         {!!error && (
           <View style={s.errorBox}>
             <Text style={s.errorText}>{error}</Text>
           </View>
         )}
 
-        {/* Footer */}
-        <Text style={s.footer}>
-          Payments processed securely by Apple. Subscriptions auto-renew monthly or annually. Cancel anytime in iOS Settings.
-        </Text>
+        {/* ── Bottom CTA ────────────────────────────────────── */}
+        <View style={s.bottomCta}>
+          <PrimaryButton
+            label={purchasing ? 'Processing…' : primaryCtaLabel}
+            onPress={() => handlePurchase(selected)}
+            disabled={purchasing}
+            loading={purchasing}
+            size="lg"
+          />
 
-        <TouchableOpacity
-          style={s.restore}
-          onPress={handleRestore}
-          disabled={restoring}
-          activeOpacity={0.7}
-        >
-          <Text style={s.restoreText}>{restoring ? 'Restoring…' : 'Restore purchases'}</Text>
-        </TouchableOpacity>
-
-        {!forced && (
-          <TouchableOpacity style={s.skip} onPress={() => handlePurchase('explorer')}>
-            <Text style={s.skipText}>Continue with free plan</Text>
+          <TouchableOpacity
+            style={s.restoreBtn}
+            onPress={handleRestore}
+            disabled={restoring}
+            activeOpacity={0.7}
+          >
+            <Text style={s.restoreText}>
+              {restoring ? 'Restoring…' : 'Restore Purchases'}
+            </Text>
           </TouchableOpacity>
-        )}
 
-        {/* Legal links */}
+          {!forced && (
+            <TouchableOpacity
+              style={s.skipBtn}
+              onPress={() => handlePurchase('explorer')}
+              activeOpacity={0.7}
+            >
+              <Text style={s.skipText}>Continue with free plan</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* ── Legal footer ──────────────────────────────────── */}
+        <Text style={s.legalText}>
+          Payments processed securely by Apple. Subscriptions auto-renew monthly or annually.
+          Cancel anytime in iOS Settings.
+        </Text>
         <View style={s.legalRow}>
-          <TouchableOpacity onPress={() => navigation.navigate('Legal', { type: 'privacy' })} activeOpacity={0.7}>
+          <TouchableOpacity
+            onPress={() => navigation.navigate('Legal', { type: 'privacy' })}
+            activeOpacity={0.7}
+          >
             <Text style={s.legalLink}>Privacy Policy</Text>
           </TouchableOpacity>
           <Text style={s.legalDot}>·</Text>
-          <TouchableOpacity onPress={() => navigation.navigate('Legal', { type: 'terms' })} activeOpacity={0.7}>
+          <TouchableOpacity
+            onPress={() => navigation.navigate('Legal', { type: 'terms' })}
+            activeOpacity={0.7}
+          >
             <Text style={s.legalLink}>Terms of Use</Text>
           </TouchableOpacity>
         </View>
@@ -305,152 +707,82 @@ export default function PaywallScreen({ navigation, route }: Props) {
   );
 }
 
+// ── Styles ────────────────────────────────────────────────────────────────────
+
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F5F7FF' },
-  scroll: { flexGrow: 1, paddingBottom: 48 },
+  safe:    { flex: 1, backgroundColor: DS.bgCanvas },
+  content: {
+    paddingHorizontal: DS.pagePadding,
+    paddingTop:        0,
+    paddingBottom:     48,
+    gap:               DS.sectionGap,
+  },
 
+  // Header
   header: {
-    paddingHorizontal: spacing.lg, paddingTop: spacing.xl, paddingBottom: spacing.lg,
-    backgroundColor: '#F5F7FF',
-    borderBottomWidth: 1, borderBottomColor: '#E0E8F5',
+    paddingTop:    32,
+    paddingBottom: DS.sectionGap,
+    gap:           10,
   },
-  logoBadge: {
-    alignSelf: 'flex-start', backgroundColor: '#EEF4FF',
-    borderRadius: radius.full, paddingHorizontal: spacing.md, paddingVertical: spacing.xs,
-    marginBottom: spacing.md, borderWidth: 1, borderColor: 'rgba(67,97,238,0.22)',
+  logoPill: {
+    flexDirection:     'row',
+    alignItems:        'center',
+    gap:               6,
+    alignSelf:         'flex-start',
+    backgroundColor:   DS.indigoLight,
+    borderRadius:      DS.radiusBadge,
+    paddingHorizontal: 12,
+    paddingVertical:   6,
+    borderWidth:       1,
+    borderColor:       DS.indigo + '40',
   },
-  logoText: { fontSize: 11, fontWeight: '700', color: '#4361EE', letterSpacing: 0.5 },
-  headline: {
-    fontSize: 36, fontWeight: '900', color: '#0D1B4B',
-    letterSpacing: -1.5, lineHeight: 42, marginBottom: spacing.sm,
+  logoPillIcon: { fontSize: 11, color: DS.indigo },
+  logoPillText: { fontSize: 10, fontWeight: '900', color: DS.indigo, letterSpacing: 1 },
+  heroTitle: {
+    fontSize: 32, fontWeight: '900', color: DS.textPrimary,
+    letterSpacing: -1, lineHeight: 38,
   },
-  sub: { fontSize: 15, color: colors.textSecondary, lineHeight: 22 },
+  heroSub: { fontSize: 14, color: DS.textSecondary, lineHeight: 21 },
 
-  toggleCard: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: '#fff', padding: spacing.md,
-    marginHorizontal: spacing.lg, marginTop: spacing.md,
-    borderRadius: radius.xl, ...shadow.sm,
-    borderWidth: 1, borderColor: '#E0E8F5',
+  // Premium hero card
+  heroCard: { gap: 18 },
+  heroCardTop: { gap: 10 },
+  heroCardTitle: {
+    fontSize: 17, fontWeight: '800', color: DS.textPrimary, letterSpacing: -0.4, lineHeight: 24,
   },
-  toggleTitle: { fontSize: 15, fontWeight: '700', color: '#0D1B4B' },
-  toggleSub: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
-  toggleRight: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  savePill: {
-    borderRadius: radius.full, paddingHorizontal: spacing.sm, paddingVertical: 3,
-    borderWidth: 1, borderColor: '#E0E8F5',
+  heroBullets: { gap: 10 },
+  heroBullet:  { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  heroBulletIcon: {
+    width: 32, height: 32, borderRadius: 10,
+    backgroundColor: DS.indigoLight,
+    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
-  savePillActive: { backgroundColor: colors.greenLight, borderColor: colors.green },
-  savePillText: { fontSize: 9, fontWeight: '800', color: colors.textMuted, letterSpacing: 0.5 },
-  savePillTextActive: { color: colors.green },
+  heroBulletGlyph: { fontSize: 14, color: DS.indigo, fontWeight: '700' },
+  heroBulletText:  { fontSize: 13, color: DS.textSecondary, flex: 1, lineHeight: 19 },
 
-  planCard: {
-    backgroundColor: '#fff', borderRadius: radius.xxl,
-    marginHorizontal: spacing.lg, marginTop: spacing.md,
-    padding: spacing.lg, borderWidth: 1.5, borderColor: '#E0E8F5',
-    ...shadow.sm,
-  },
-  planCardRecommended: { borderColor: '#4361EE', ...shadow.md },
-  planCardOperator: { borderColor: '#7C3AED' },
-  planCardSelected: { borderColor: '#4361EE' },
+  sectionHead: { marginBottom: -8 },
 
-  recommendedBadge: {
-    alignSelf: 'flex-start', backgroundColor: '#EEF4FF',
-    borderRadius: radius.full, paddingHorizontal: spacing.sm, paddingVertical: 4,
-    marginBottom: spacing.sm,
-  },
-  recommendedText: { fontSize: 9, fontWeight: '800', color: '#4361EE', letterSpacing: 0.5 },
-  operatorBadge: {
-    alignSelf: 'flex-start', backgroundColor: 'rgba(124,58,237,0.10)',
-    borderRadius: radius.full, paddingHorizontal: spacing.sm, paddingVertical: 4,
-    marginBottom: spacing.sm,
-  },
-  operatorBadgeText: { fontSize: 9, fontWeight: '800', color: '#7C3AED', letterSpacing: 0.5 },
-  currentBadge: {
-    alignSelf: 'flex-start', backgroundColor: '#EEF2FA',
-    borderRadius: radius.full, paddingHorizontal: spacing.sm, paddingVertical: 4,
-    marginBottom: spacing.sm,
-  },
-  currentText: { fontSize: 9, fontWeight: '800', color: colors.textMuted, letterSpacing: 0.5 },
-
-  planHeader: {
-    flexDirection: 'row', justifyContent: 'space-between',
-    alignItems: 'flex-start', marginBottom: spacing.md,
-  },
-  planName: { fontSize: 20, fontWeight: '900', color: '#0D1B4B', letterSpacing: -0.5 },
-  planDesc: { fontSize: 12, color: colors.textSecondary, lineHeight: 16, marginTop: 4, maxWidth: 160 },
-  planPriceWrap: { alignItems: 'flex-end' },
-  planPrice: { fontSize: 22, fontWeight: '900', color: '#0D1B4B', letterSpacing: -0.5 },
-  planBilling: { fontSize: 11, color: colors.textMuted, marginTop: 2 },
-
-  featureDivider: { height: 1, backgroundColor: '#EEF2FA', marginBottom: spacing.md },
-
-  featureRow: { flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start', marginBottom: 6 },
-  featureCheck: { fontSize: 13, fontWeight: '700', color: colors.green, width: 16 },
-  featureText: { fontSize: 13, color: colors.textSecondary, flex: 1, lineHeight: 18 },
-
-  planCta: {
-    borderWidth: 1.5, borderRadius: radius.lg,
-    paddingVertical: spacing.md, alignItems: 'center', marginTop: spacing.md,
-  },
-  planCtaAccent: { backgroundColor: '#4361EE', borderColor: '#4361EE' },
-  planCtaText: { fontSize: 15, fontWeight: '700' },
-  planCtaTextWhite: { color: colors.white },
-
-  tableSection: { paddingHorizontal: spacing.lg, marginTop: spacing.lg },
-  tableTitle: { fontSize: 18, fontWeight: '800', color: '#0D1B4B', letterSpacing: -0.5, marginBottom: spacing.sm },
-  table: {
-    backgroundColor: '#fff', borderRadius: radius.xl,
-    overflow: 'hidden', borderWidth: 1, borderColor: '#E0E8F5',
-  },
-  tableRow: { flexDirection: 'row' },
-  tableHeaderRow: { backgroundColor: '#F5F7FF' },
-  tableRowAlt: { backgroundColor: '#FAFBFF' },
-  tableCell: {
-    flex: 1, paddingVertical: spacing.sm, paddingHorizontal: spacing.sm,
-    fontSize: 11, color: colors.textSecondary, textAlign: 'center',
-    borderRightWidth: 1, borderRightColor: '#E0E8F5',
-  },
-  tableCellFeature: { flex: 1.4, textAlign: 'left', fontWeight: '600', color: colors.textSecondary },
-  tableCellVal: { fontWeight: '600' },
-  tableHeaderText: { color: '#4361EE', fontWeight: '800', fontSize: 10 },
-
-  launchPack: {
-    marginHorizontal: spacing.lg, marginTop: spacing.lg,
-    backgroundColor: '#fff', borderRadius: radius.xxl, padding: spacing.lg,
-    borderWidth: 1.5, borderColor: 'rgba(67,97,238,0.22)',
-  },
-  launchPackHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: spacing.sm },
-  launchPackEyebrow: { fontSize: 8, fontWeight: '800', color: '#4361EE', letterSpacing: 1.5, marginBottom: 4 },
-  launchPackTitle: { fontSize: 20, fontWeight: '900', color: '#0D1B4B', letterSpacing: -0.5 },
-  launchPackPrice: { fontSize: 28, fontWeight: '900', color: '#4361EE', letterSpacing: -1 },
-  launchPackDesc: { fontSize: 13, color: colors.textSecondary, lineHeight: 19, marginBottom: spacing.md },
-  launchPackCta: {
-    backgroundColor: '#4361EE', borderRadius: radius.lg,
-    paddingVertical: spacing.sm + 4, alignItems: 'center',
-  },
-  launchPackCtaText: { fontSize: 14, fontWeight: '700', color: colors.white },
-
-  footer: {
-    fontSize: 12, color: colors.textMuted, textAlign: 'center',
-    paddingHorizontal: spacing.xl, marginTop: spacing.lg, lineHeight: 18,
-  },
-  skip: { alignItems: 'center', paddingVertical: spacing.md },
-  skipText: { fontSize: 14, color: colors.gray400, fontWeight: '500' },
-
+  // Error
   errorBox: {
-    marginHorizontal: spacing.lg, marginTop: spacing.md,
-    backgroundColor: colors.redLight, borderRadius: radius.md, padding: spacing.sm + 2,
+    backgroundColor: DS.dangerBg, borderRadius: 14,
+    padding: 14, borderWidth: 1, borderColor: DS.danger + '30',
   },
-  errorText: { fontSize: 13, color: colors.red, textAlign: 'center', fontWeight: '500' },
+  errorText: { fontSize: 13, color: DS.dangerText, textAlign: 'center', fontWeight: '600' },
 
-  restore: { alignItems: 'center', paddingVertical: spacing.sm },
-  restoreText: { fontSize: 13, color: colors.textMuted, fontWeight: '500' },
+  // Bottom CTA
+  bottomCta: { gap: 12, paddingTop: 4 },
+  restoreBtn: { alignItems: 'center', paddingVertical: 8 },
+  restoreText: { fontSize: 14, color: DS.textMuted, fontWeight: '600' },
+  skipBtn:     { alignItems: 'center', paddingVertical: 6 },
+  skipText:    { fontSize: 13, color: DS.textMuted, fontWeight: '500' },
 
+  // Legal
+  legalText: {
+    fontSize: 11, color: DS.textMuted, textAlign: 'center', lineHeight: 17,
+  },
   legalRow: {
-    flexDirection: 'row', justifyContent: 'center', alignItems: 'center',
-    gap: spacing.sm, paddingBottom: spacing.lg, paddingTop: spacing.xs,
+    flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8,
   },
-  legalLink: { fontSize: 12, color: colors.textMuted, fontWeight: '500' },
-  legalDot:  { fontSize: 12, color: colors.border },
+  legalLink: { fontSize: 12, color: DS.textMuted, fontWeight: '500' },
+  legalDot:  { fontSize: 12, color: DS.border },
 });

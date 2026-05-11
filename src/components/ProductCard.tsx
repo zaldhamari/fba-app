@@ -75,7 +75,7 @@ const sc = StyleSheet.create({
 // ─── ProductCard ─────────────────────────────────────────────────────────────
 
 export default function ProductCard({
-  item, isSaved, onSave, onInsight, onAnalyze, expanded, analyzing, usageMeter, showHint, cardIndex,
+  item, isSaved, onSave, onInsight, onAnalyze, expanded, analyzing, usageMeter, showHint, cardIndex, opportunityScore,
 }: {
   item: Product;
   isSaved: boolean;
@@ -87,6 +87,7 @@ export default function ProductCard({
   usageMeter?: string | null;
   showHint?: boolean;
   cardIndex?: number;
+  opportunityScore?: number;
 }) {
   const { fmt } = useCurrency();
   const opp      = item.opportunity;
@@ -120,6 +121,20 @@ export default function ProductCard({
           <View style={[s.oppBadge, { backgroundColor: oppBg }]}>
             <Text style={[s.oppBadgeText, { color: oppColor }]}>{oppLabel}</Text>
           </View>
+          {opportunityScore != null && (
+            <View style={[s.aiBadge, {
+              backgroundColor: opportunityScore >= 70
+                ? colors.greenLight
+                : opportunityScore >= 45 ? colors.orangeLight : colors.redLight,
+            }]}>
+              <Text style={[s.aiBadgeNum, {
+                color: opportunityScore >= 70
+                  ? colors.green
+                  : opportunityScore >= 45 ? colors.amber : colors.red,
+              }]}>{opportunityScore}</Text>
+              <Text style={s.aiBadgeLabel}>AI</Text>
+            </View>
+          )}
         </View>
 
         {/* Body */}
@@ -211,8 +226,11 @@ const s = StyleSheet.create({
   },
   img:            { width: 78, height: 78, borderRadius: radius.md, backgroundColor: colors.bgElevated },
   imgPlaceholder: { justifyContent: 'center', alignItems: 'center' },
-  oppBadge:       { borderRadius: radius.full, paddingHorizontal: 8, paddingVertical: 3, alignSelf: 'center' },
-  oppBadgeText:   { fontSize: 9, fontWeight: '800', letterSpacing: 0.8 },
+  oppBadge:     { borderRadius: radius.full, paddingHorizontal: 8, paddingVertical: 3, alignSelf: 'center' },
+  oppBadgeText: { fontSize: 9, fontWeight: '800', letterSpacing: 0.8 },
+  aiBadge:      { borderRadius: radius.sm, paddingHorizontal: 5, paddingVertical: 2, alignItems: 'center', alignSelf: 'center', minWidth: 32 },
+  aiBadgeNum:   { fontSize: 12, fontWeight: '900', letterSpacing: -0.3, lineHeight: 15 },
+  aiBadgeLabel: { fontSize: 7, fontWeight: '800', color: colors.textMuted, letterSpacing: 0.5 },
   cardBody:       { flex: 1, paddingTop: 12, paddingBottom: 14, paddingRight: 12, gap: 5 },
   cardTopRow:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   cardPrice:      { fontSize: 22, fontWeight: '900', color: colors.textPrimary, letterSpacing: -0.8 },

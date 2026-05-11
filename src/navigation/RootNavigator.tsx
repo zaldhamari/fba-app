@@ -5,6 +5,7 @@ import PaywallScreen from '../screens/PaywallScreen';
 import SplashScreen from '../screens/SplashScreen';
 import AuthScreen from '../screens/AuthScreen';
 import LegalScreen from '../screens/LegalScreen';
+import LaunchScreen from '../screens/LaunchScreen';
 import TabNavigator from './TabNavigator';
 import { LegalDocumentType } from '../constants/legalContent';
 
@@ -14,6 +15,8 @@ export type RootStackParamList = {
   Onboarding: undefined;
   Paywall: undefined;
   Main: undefined;
+  Premium: undefined;
+  Checklist: undefined;
   Legal: { type: LegalDocumentType };
 };
 
@@ -29,6 +32,8 @@ export default function RootNavigator() {
       <Stack.Screen name="Auth"       component={AuthScreen} options={{ animationEnabled: true }} />
       <Stack.Screen name="Onboarding" component={OnboardingScreen} />
       <Stack.Screen name="Paywall"    component={PaywallScreen} />
+      <Stack.Screen name="Premium"    component={PaywallScreen} options={{ animationEnabled: true }} />
+      <Stack.Screen name="Checklist"  component={LaunchScreen}  options={{ animationEnabled: true }} />
       <Stack.Screen name="Main"       component={TabNavigator} />
       <Stack.Screen name="Legal"      component={LegalScreen} options={{ animationEnabled: true }} />
     </Stack.Navigator>

@@ -9,6 +9,7 @@ import { api, FBAResult } from '../services/api';
 import { SimulateResult } from '../types';
 import { useCurrency } from '../context/CurrencyContext';
 import { CurrencySelector } from '../components/CurrencySelector';
+import { InsightCard } from '../components/ui';
 
 const CATEGORIES = ['all', 'electronics', 'home', 'kitchen', 'sports', 'beauty', 'clothing', 'tools'];
 type Mode = 'fees' | 'landed' | 'freight' | 'cashflow' | 'ppc' | 'breakeven' | 'scenario' | 'ranking' | 'reorder' | 'simulate' | 'bsr';
@@ -1131,7 +1132,7 @@ function SimulateTab() {
         category: cat,
         monthly_units_est: parseInt(units) || 150,
       });
-      setResult(data);
+      setResult(data as any);
     } catch (e: any) { setError(e.message || 'Simulation failed.'); }
     finally { setLoading(false); }
   }
@@ -1382,106 +1383,135 @@ const bsrS = StyleSheet.create({
 });
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
-const MODES: { key: Mode; label: string; desc: string }[] = [
-  { key: 'fees',      label: 'FBA Fees',    desc: 'Know your profit, margin & ROI before placing any order' },
-  { key: 'simulate',  label: 'Simulate',   desc: 'Find your sweet-spot price across 8 scenarios + shipping costs' },
-  { key: 'landed',    label: 'Landed Cost', desc: 'Your supplier quote is just the start — see your true cost per unit' },
-  { key: 'cashflow',  label: 'Cash Flow',   desc: 'Spot when you\'ll need more capital before it becomes a crisis' },
-  { key: 'freight',   label: 'Freight',     desc: 'Compare sea, air & express shipping costs from China' },
-  { key: 'ppc',       label: 'PPC',         desc: 'Estimate your daily ad budget — target ACoS under 30%' },
-  { key: 'ranking',   label: 'Ranking',     desc: 'Daily sales & PPC investment needed to reach page 1' },
-  { key: 'breakeven', label: 'Break-even',  desc: 'Find how many sales it takes until your investment pays off' },
-  { key: 'scenario',  label: 'What-if',     desc: 'Model price drops & cost spikes before they happen' },
-  { key: 'reorder',   label: 'Reorder',     desc: 'Never stock out — a stockout permanently damages your ranking' },
-  { key: 'bsr',       label: 'BSR',         desc: 'Estimate monthly sales volume from any product\'s bestseller rank' },
+
+import { AppHeader } from '../components/AppHeader';
+
+type CalcView = 'hub' | Mode;
+
+const CALC_TOOLS: { id: Mode; icon: string; label: string; sub: string; color: string; bg: string }[] = [
+  { id: 'fees',      icon: '◈', label: 'FBA Fees',     sub: 'Profit, margin & ROI',          color: '#7C3AED', bg: '#F5F0FF' },
+  { id: 'simulate',  icon: '⊛', label: 'Simulate',     sub: 'Price sweet-spot scenarios',     color: '#0284C7', bg: '#EFF8FF' },
+  { id: 'landed',    icon: '⊞', label: 'Landed Cost',  sub: 'True cost per unit',             color: '#D97706', bg: '#FFFBEB' },
+  { id: 'cashflow',  icon: '⊟', label: 'Cash Flow',    sub: 'Capital timing insights',        color: '#059669', bg: '#F0FDF4' },
+  { id: 'ppc',       icon: '◎', label: 'PPC Budget',   sub: 'Daily ad spend estimate',        color: '#DB2777', bg: '#FDF2F8' },
+  { id: 'breakeven', icon: '⊕', label: 'Break-even',   sub: 'Sales to pay off investment',    color: '#0284C7', bg: '#EFF8FF' },
+  { id: 'freight',   icon: '⛵', label: 'Freight',      sub: 'Sea, air & express compare',     color: '#7C3AED', bg: '#F5F0FF' },
+  { id: 'ranking',   icon: '◉', label: 'Ranking',      sub: 'Sales needed for page 1',        color: '#D97706', bg: '#FFFBEB' },
+  { id: 'scenario',  icon: '◈', label: 'What-if',      sub: 'Model price & cost changes',     color: '#059669', bg: '#F0FDF4' },
+  { id: 'reorder',   icon: '⊞', label: 'Reorder',      sub: 'Never stock out again',          color: '#DB2777', bg: '#FDF2F8' },
+  { id: 'bsr',       icon: '⊛', label: 'BSR',          sub: 'Estimate sales from rank',       color: '#0284C7', bg: '#EFF8FF' },
 ];
 
+function CalcBackBar({ title, onBack }: { title: string; onBack: () => void }) {
+  return (
+    <View style={cb.bar}>
+      <TouchableOpacity style={cb.backBtn} onPress={onBack} activeOpacity={0.7}>
+        <Text style={cb.backArrow}>←</Text>
+        <Text style={cb.backLabel}>Calculate</Text>
+      </TouchableOpacity>
+      <Text style={cb.title} numberOfLines={1}>{title}</Text>
+      <CurrencySelector />
+    </View>
+  );
+}
+const cb = StyleSheet.create({
+  bar: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 16, paddingVertical: 10,
+    backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#ECF0FB',
+    gap: 8,
+  },
+  backBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  backArrow: { fontSize: 16, color: '#4361EE', fontWeight: '700' as const },
+  backLabel: { fontSize: 13, color: '#4361EE', fontWeight: '600' as const },
+  title: { flex: 1, fontSize: 14, fontWeight: '700' as const, color: '#0D1B4B', textAlign: 'center' as const },
+});
+
+function CalcHub({ onSelect }: { onSelect: (id: Mode) => void }) {
+  return (
+    <ScrollView style={{ flex: 1, backgroundColor: '#F5F7FF' }} contentContainerStyle={ch.content} showsVerticalScrollIndicator={false}>
+      <View style={ch.titleBlock}>
+        <Text style={ch.eyebrow}>PROFIT CALCULATOR</Text>
+        <Text style={ch.title}>Calculate &{'\n'}Analyze.</Text>
+        <Text style={ch.sub}>Run the numbers before you commit a single dollar.</Text>
+      </View>
+
+      <Text style={ch.sectionLabel}>CALCULATORS</Text>
+      {CALC_TOOLS.map(tool => (
+        <TouchableOpacity key={tool.id} style={ch.card} onPress={() => onSelect(tool.id)} activeOpacity={0.85}>
+          <View style={[ch.iconWrap, { backgroundColor: tool.bg }]}>
+            <Text style={[ch.icon, { color: tool.color }]}>{tool.icon}</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={ch.cardLabel}>{tool.label}</Text>
+            <Text style={ch.cardSub}>{tool.sub}</Text>
+          </View>
+          <Text style={[ch.arrow, { color: tool.color }]}>→</Text>
+        </TouchableOpacity>
+      ))}
+    </ScrollView>
+  );
+}
+const ch = StyleSheet.create({
+  content: { paddingBottom: 40 },
+  titleBlock: {
+    paddingHorizontal: 20, paddingTop: 28, paddingBottom: 20,
+  },
+  eyebrow: { fontSize: 9, fontWeight: '800' as const, color: '#7C3AED', letterSpacing: 2.5, marginBottom: 6 },
+  title: { fontSize: 32, fontWeight: '900' as const, color: '#0D1B4B', letterSpacing: -1.2, lineHeight: 38, marginBottom: 8 },
+  sub: { fontSize: 14, color: '#5C6B8A', lineHeight: 20 },
+  sectionLabel: {
+    fontSize: 9, fontWeight: '800' as const, color: '#8196B0', letterSpacing: 2,
+    marginHorizontal: 20, marginBottom: 10,
+  },
+  card: {
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    marginHorizontal: 16, marginBottom: 8,
+    backgroundColor: '#FFFFFF', borderRadius: 16,
+    borderWidth: 1, borderColor: '#ECF0FB',
+    padding: 14,
+  },
+  iconWrap: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  icon: { fontSize: 20 },
+  cardLabel: { fontSize: 14, fontWeight: '700' as const, color: '#0D1B4B', marginBottom: 2 },
+  cardSub: { fontSize: 12, color: '#8196B0' },
+  arrow: { fontSize: 16, fontWeight: '700' as const },
+});
+
 export default function CalculatorScreen() {
-  const [mode, setMode] = useState<Mode>('fees');
+  const [view, setView] = useState<CalcView>('hub');
+
+  const currentTool = CALC_TOOLS.find(t => t.id === view);
 
   return (
-    <SafeAreaView style={s.container}>
-      <View style={s.header}>
-        <View style={s.headerTop}>
-          <View>
-            <Text style={s.brandWord}>Siftly</Text>
-            <Text style={s.eyebrow}>PROFIT CALCULATOR</Text>
-            <Text style={s.title}>Know your{'\n'}numbers.</Text>
+    <SafeAreaView style={s.safe} edges={['top']}>
+      <AppHeader />
+      {view === 'hub' ? (
+        <CalcHub onSelect={m => setView(m)} />
+      ) : (
+        <>
+          <CalcBackBar title={currentTool?.label ?? ''} onBack={() => setView('hub')} />
+          <View style={{ flex: 1, backgroundColor: '#F5F7FF' }}>
+            {view === 'fees'      && <FeesTab />}
+            {view === 'simulate'  && <SimulateTab />}
+            {view === 'landed'    && <LandedTab />}
+            {view === 'cashflow'  && <CashFlowTab />}
+            {view === 'freight'   && <FreightTab />}
+            {view === 'ppc'       && <PPCTab />}
+            {view === 'ranking'   && <RankingTab />}
+            {view === 'breakeven' && <BreakevenTab />}
+            {view === 'scenario'  && <ScenarioTab />}
+            {view === 'reorder'   && <ReorderTab />}
+            {view === 'bsr'       && <BSRTab />}
           </View>
-          <CurrencySelector />
-        </View>
-      </View>
-
-      <View style={s.tabsWrap}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.tabsContent}>
-          {MODES.map(m => (
-            <TouchableOpacity
-              key={m.key}
-              style={[s.tab, mode === m.key && s.tabActive]}
-              onPress={() => setMode(m.key)}
-              activeOpacity={0.7}
-            >
-              <Text style={[s.tabText, mode === m.key && s.tabTextActive]}>{m.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </View>
-      <View style={s.tabInfo}>
-        <Text style={s.tabInfoLabel}>{MODES.find(m => m.key === mode)?.label.toUpperCase()}</Text>
-        <Text style={s.tabInfoDesc}>{MODES.find(m => m.key === mode)?.desc}</Text>
-      </View>
-
-      <View style={{ flex: 1 }}>
-        {mode === 'fees'      && <FeesTab />}
-        {mode === 'simulate'  && <SimulateTab />}
-        {mode === 'landed'    && <LandedTab />}
-        {mode === 'cashflow'  && <CashFlowTab />}
-        {mode === 'freight'   && <FreightTab />}
-        {mode === 'ppc'       && <PPCTab />}
-        {mode === 'ranking'   && <RankingTab />}
-        {mode === 'breakeven' && <BreakevenTab />}
-        {mode === 'scenario'  && <ScenarioTab />}
-        {mode === 'reorder'   && <ReorderTab />}
-        {mode === 'bsr'       && <BSRTab />}
-      </View>
+        </>
+      )}
     </SafeAreaView>
   );
 }
 
-const CALC_COLOR = '#7C3AED';
-
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F5F7FF' },
-  header: {
-    paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.sm,
-    borderBottomWidth: 1, borderBottomColor: '#E0E8F5',
-    backgroundColor: '#fff',
-  },
-  headerTop: {
-    flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between',
-  },
-  brandWord: { fontSize: 20, fontWeight: '900' as const, color: '#0D1B4B', letterSpacing: -0.8, marginBottom: 2 },
-  eyebrow: { fontSize: 9, fontWeight: '800' as const, color: CALC_COLOR, letterSpacing: 2.5, marginBottom: 6, textTransform: 'uppercase' as const },
-  title: { fontSize: 24, fontWeight: '900' as const, color: '#0D1B4B', letterSpacing: -1, lineHeight: 30 },
-  tabsWrap: { height: 48, marginBottom: 2, backgroundColor: '#fff' },
-  tabsContent: { paddingHorizontal: spacing.lg, gap: 8, alignItems: 'center', flexDirection: 'row' },
-  tab: {
-    height: 34, paddingHorizontal: 14,
-    borderWidth: 1, borderColor: '#E0E8F5', borderRadius: radius.full,
-    justifyContent: 'center', alignItems: 'center',
-    backgroundColor: '#F5F7FF',
-  },
-  tabActive: { backgroundColor: CALC_COLOR, borderColor: CALC_COLOR },
-  tabText: { fontSize: 12, fontWeight: '600' as const, color: colors.textMuted },
-  tabTextActive: { color: '#fff', fontWeight: '700' as const },
-  tabInfo: {
-    marginHorizontal: spacing.lg, marginBottom: spacing.sm,
-    backgroundColor: 'rgba(124,58,237,0.06)', borderRadius: radius.lg,
-    borderLeftWidth: 3, borderLeftColor: CALC_COLOR,
-    paddingHorizontal: spacing.md, paddingVertical: 10,
-  },
-  tabInfoLabel: { fontSize: 9, fontWeight: '800' as const, color: CALC_COLOR, letterSpacing: 1.5, marginBottom: 2 },
-  tabInfoDesc: { fontSize: 13, fontWeight: '500' as const, color: '#0D1B4B', lineHeight: 18 },
+  safe: { flex: 1, backgroundColor: '#FFFFFF' },
 });
 
 const t = StyleSheet.create({

@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing, radius, shadow } from '../theme';
+import { InsightCard, EmptyState } from '../components/ui';
 import { api } from '../services/api';
 import { useSubscription } from '../hooks/useSubscription';
 import { useCurrency } from '../context/CurrencyContext';
@@ -309,7 +310,13 @@ export default function KeywordsScreen({ edges }: { edges?: readonly ('top'|'rig
           </View>
 
           {/* Score reason */}
-          <Text style={s.scoreReason}>{result.seo_score_reason}</Text>
+          <InsightCard
+            variant={result.seo_score >= 70 ? 'success' : result.seo_score >= 45 ? 'tip' : 'warning'}
+            icon="◎"
+            label="SEO ANALYSIS"
+            text={result.seo_score_reason}
+            style={{ marginHorizontal: spacing.lg, marginBottom: spacing.md }}
+          />
 
           {/* SEO Signals / Insights */}
           <InsightsSection insights={result.insights} />
@@ -328,14 +335,14 @@ export default function KeywordsScreen({ edges }: { edges?: readonly ('top'|'rig
 
       {/* ─── Empty state ─── */}
       {!result && !loading && (
-        <View style={s.empty}>
-          <Text style={s.emptyIcon}>≋</Text>
-          <Text style={s.emptyTitle}>Discover buyer keywords</Text>
-          <Text style={s.emptyText}>
-            See what people search on Amazon,{'\n'}
-            with competition, intent & opportunity scores.
-          </Text>
-        </View>
+        <EmptyState
+          icon="≋"
+          title="Discover buyer keywords"
+          subtitle={`See what people search on Amazon,\nwith competition, intent & opportunity scores.`}
+          iconBg="rgba(217,119,6,0.09)"
+          iconSize={72}
+          style={{ paddingTop: 80 }}
+        />
       )}
     </SafeAreaView>
   );
@@ -424,16 +431,6 @@ const s = StyleSheet.create({
   },
   statNum:   { fontSize: 28, fontWeight: '900', color: colors.textPrimary, letterSpacing: -1 },
   statLabel: { fontSize: 8, fontWeight: '800', color: colors.textMuted, letterSpacing: 1.5, marginTop: 2 },
-
-  // ── Score reason
-  scoreReason: {
-    fontSize: 11.5, color: colors.textMuted,
-    textAlign: 'center', lineHeight: 17,
-    letterSpacing: 0.1,
-    paddingHorizontal: spacing.lg,
-    marginTop: -spacing.xs,
-    marginBottom: spacing.md,
-  },
 
   // ── Insights card
   insightsCard: {
@@ -537,9 +534,5 @@ const s = StyleSheet.create({
   usageBadgeText: { fontSize: 8, fontWeight: '700', letterSpacing: 0.3 },
   compLabel: { fontSize: 9, fontWeight: '700' },
 
-  // ── Empty state
-  empty: { alignItems: 'center', paddingTop: 80, gap: spacing.xs, paddingHorizontal: spacing.lg },
-  emptyIcon:  { fontSize: 48, color: colors.textMuted, marginBottom: spacing.sm },
-  emptyTitle: { fontSize: 20, fontWeight: '800', color: colors.textPrimary, letterSpacing: -0.5 },
-  emptyText:  { fontSize: 14, color: colors.textSecondary, textAlign: 'center', lineHeight: 22, marginTop: 4 },
+  // ── Score reason replaced by InsightCard (see InsightCard import)
 });

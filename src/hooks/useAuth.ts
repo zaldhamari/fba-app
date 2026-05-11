@@ -40,4 +40,13 @@ export const authActions = {
 
   resetPassword: (email: string) =>
     supabase.auth.resetPasswordForEmail(email),
+
+  // TODO: To complete OAuth on device, install expo-auth-session and set up
+  //       a deep-link redirect URI (e.g. myapp://auth/callback) in your
+  //       Supabase project's Allowed Redirect URLs and app.json scheme.
+  signInWithGoogle: () =>
+    supabase.auth.signInWithOAuth({ provider: 'google' }),
+
+  signInWithApple: () =>
+    supabase.auth.signInWithOAuth({ provider: 'apple' }),
 };

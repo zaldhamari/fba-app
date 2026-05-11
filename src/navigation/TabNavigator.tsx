@@ -2,22 +2,22 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
-import { colors, radius, spacing } from '../theme';
-import CopilotScreen    from '../screens/CopilotScreen';
-import SearchScreen     from '../screens/SearchScreen';
-import BrandScreen      from '../screens/BrandScreen';
-import CalculatorScreen from '../screens/CalculatorScreen';
-import LaunchScreen     from '../screens/LaunchScreen';
+import { DS } from '../theme/ds';
+import LaunchControlScreen    from '../screens/LaunchControlScreen';
+import ResearchWorkspaceScreen from '../screens/ResearchWorkspaceScreen';
+import ProfitLabScreen        from '../screens/ProfitLabScreen';
+import BrandStudioScreen      from '../screens/BrandStudioScreen';
+import CoPilotScreen          from '../screens/CoPilotScreen';
 
 const Tab = createBottomTabNavigator();
 
 const TABS = [
-  { name: 'Co-Pilot',  icon: '⚡', label: 'Pilot',     color: '#4361EE', component: CopilotScreen    },
-  { name: 'Search',    icon: '◎',  label: 'Search',    color: '#0284C7', component: SearchScreen     },
-  { name: 'Calculate', icon: '◈',  label: 'Calculate', color: '#7C3AED', component: CalculatorScreen },
-  { name: 'Brand',     icon: '✦',  label: 'Brand',     color: '#DB2777', component: BrandScreen      },
-  { name: 'Launch',    icon: '↑',  label: 'Launch',    color: '#059669', component: LaunchScreen     },
-];
+  { name: 'Launch',   icon: '↑',  label: 'Launch',   component: LaunchControlScreen    },
+  { name: 'Search',   icon: '◎',  label: 'Research',  component: ResearchWorkspaceScreen },
+  { name: 'Calculate', icon: '◈', label: 'Profit',   component: ProfitLabScreen        },
+  { name: 'Brand',    icon: '✦',  label: 'Brand',    component: BrandStudioScreen      },
+  { name: 'CoPilot',  icon: '⊛',  label: 'Co-Pilot', component: CoPilotScreen          },
+] as const;
 
 function CustomTabBar({ state, navigation }: BottomTabBarProps) {
   return (
@@ -32,16 +32,18 @@ function CustomTabBar({ state, navigation }: BottomTabBarProps) {
               style={s.tabBtn}
               onPress={() => navigation.navigate(route.name)}
               activeOpacity={0.7}
+              accessibilityRole="tab"
+              accessibilityLabel={tab.label}
+              accessibilityState={{ selected: active }}
             >
-              <View style={[s.iconWrap, active && { backgroundColor: `${tab.color}18` }]}>
-                <Text style={[s.tabIcon, { color: active ? tab.color : colors.textMuted }]}>
+              <View style={[s.iconWrap, active && s.iconWrapActive]}>
+                <Text style={[s.tabIcon, active && s.tabIconActive]}>
                   {tab.icon}
                 </Text>
               </View>
-              <Text style={[s.tabLabel, { color: active ? tab.color : colors.textMuted, fontWeight: active ? '700' : '500' }]}>
+              <Text style={[s.tabLabel, active && s.tabLabelActive]}>
                 {tab.label}
               </Text>
-              {active && <View style={[s.activeDot, { backgroundColor: tab.color }]} />}
             </TouchableOpacity>
           );
         })}
@@ -65,41 +67,53 @@ export default function TabNavigator() {
 
 const s = StyleSheet.create({
   wrapper: {
-    backgroundColor: '#FFFFFF',
-    borderTopWidth: 1,
-    borderTopColor: '#E0E8F5',
-    paddingHorizontal: spacing.xs,
-    paddingTop: 6,
-    paddingBottom: Platform.OS === 'ios' ? 24 : 6,
+    backgroundColor: DS.bgCard,
+    borderTopWidth:  1,
+    borderTopColor:  DS.border,
+    paddingHorizontal: 4,
+    paddingTop:      6,
+    paddingBottom:   Platform.OS === 'ios' ? 24 : 8,
+    shadowColor:     '#0D1B4B',
+    shadowOffset:    { width: 0, height: -2 },
+    shadowOpacity:   0.06,
+    shadowRadius:    12,
+    elevation:       12,
   },
   bar: {
     flexDirection: 'row',
   },
   tabBtn: {
-    flex: 1,
-    alignItems: 'center',
-    gap: 3,
+    flex:        1,
+    alignItems:  'center',
+    gap:         2,
     paddingVertical: 2,
   },
   iconWrap: {
-    width: 44,
-    height: 26,
-    borderRadius: 13,
-    alignItems: 'center',
+    width:          40,
+    height:         26,
+    borderRadius:   13,
+    alignItems:     'center',
     justifyContent: 'center',
   },
+  iconWrapActive: {
+    backgroundColor: DS.accentLight,
+  },
   tabIcon: {
-    fontSize: 15,
-    fontWeight: '700' as const,
+    fontSize:   15,
+    fontWeight: '700',
+    color:      DS.textMuted,
+  },
+  tabIconActive: {
+    color: DS.accent,
   },
   tabLabel: {
-    fontSize: 10,
-    letterSpacing: 0.1,
+    fontSize:   9,
+    fontWeight: '500',
+    color:      DS.textMuted,
+    letterSpacing: 0.2,
   },
-  activeDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    marginTop: 1,
+  tabLabelActive: {
+    fontWeight: '700',
+    color:      DS.accent,
   },
 });

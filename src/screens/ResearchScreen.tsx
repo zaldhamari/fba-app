@@ -25,6 +25,7 @@ import PulseDots from '../components/PulseDots';
 import { AnalyzeResult } from '../types/research';
 import { pushAnalysis } from '../services/sync';
 import { supabase } from '../lib/supabase';
+import { EmptyState } from '../components/ui';
 
 const ANALYZE_USAGE_KEY = 'fba_analyze_usage_v1';
 const ANALYZE_CACHE_KEY = 'fba_analyze_cache_v2';
@@ -132,10 +133,10 @@ function ReviewInsightsModal({ product, onClose }: { product: Product; onClose: 
                   <Text style={ri.rowText}>{o}</Text>
                 </View>
               ))}
-              {reviews?.bundling_ideas?.length > 0 && (
+              {(reviews?.bundling_ideas?.length ?? 0) > 0 && (
                 <>
                   <Text style={[ri.sectionLabel, { marginTop: spacing.md }]}>BUNDLE IDEAS</Text>
-                  {reviews.bundling_ideas.map((b: string, i: number) => (
+                  {reviews!.bundling_ideas.map((b: string, i: number) => (
                     <View key={i} style={ri.row}>
                       <Text style={[ri.greenDot, { color: '#0284C7' }]}>◎</Text>
                       <Text style={ri.rowText}>{b}</Text>
@@ -598,18 +599,21 @@ export default function ResearchScreen({ edges }: { edges?: readonly ('top'|'rig
             showsVerticalScrollIndicator={false}
             ListEmptyComponent={
               vault.entries.length === 0 ? (
-                <View style={s.empty}>
-                  <View style={s.emptyOrb}>
-                    <Text style={s.emptyOrbIcon}>♡</Text>
-                  </View>
-                  <Text style={s.emptyTitle}>Winner Vault is empty</Text>
-                  <Text style={s.emptyText}>Analyze a product and tap{'\n'}"Save to Vault" to track it here.</Text>
-                </View>
+                <EmptyState
+                  icon="♡"
+                  title="Winner Vault is empty"
+                  subtitle={'Analyze a product and tap "Save to Vault" to track it here.'}
+                  iconBg="rgba(2,132,199,0.09)"
+                  iconSize={72}
+                />
               ) : (
-                <View style={s.empty}>
-                  <Text style={s.emptyTitle}>No matches</Text>
-                  <Text style={s.emptyText}>Try a different search or filter.</Text>
-                </View>
+                <EmptyState
+                  icon="◎"
+                  title="No matches"
+                  subtitle="Try a different search or filter."
+                  iconBg="rgba(2,132,199,0.09)"
+                  iconSize={60}
+                />
               )
             }
             ItemSeparatorComponent={() => <View style={{ height: spacing.sm }} />}
@@ -677,13 +681,15 @@ export default function ResearchScreen({ edges }: { edges?: readonly ('top'|'rig
           ItemSeparatorComponent={() => <View style={{ height: spacing.sm }} />}
           ListEmptyComponent={
             !loading ? (
-              <View style={s.empty}>
-                <View style={s.emptyOrb}>
-                  <Text style={s.emptyOrbIcon}>◎</Text>
-                </View>
-                <Text style={s.emptyTitle}>What will you hunt today?</Text>
-                <Text style={s.emptyText}>Real Amazon prices · AI verdict · Margin estimate</Text>
-                <Text style={s.emptySubtext}>Enter any product keyword to begin</Text>
+              <View>
+                <EmptyState
+                  icon="◎"
+                  title="What will you hunt today?"
+                  subtitle="Real Amazon prices · AI verdict · Margin estimate — enter any keyword to begin"
+                  iconBg="rgba(2,132,199,0.09)"
+                  iconSize={72}
+                  style={s.emptyState}
+                />
                 <View style={s.demoRow}>
                   {['bamboo cutting board', 'resistance bands', 'yoga mat bag'].map(demo => (
                     <TouchableOpacity key={demo} style={s.demoChip} onPress={() => quickSearch(demo)}>
@@ -706,6 +712,7 @@ export default function ResearchScreen({ edges }: { edges?: readonly ('top'|'rig
                 analyzing={loadingAsin === item.asin}
                 showHint={index === 0 && analyzeUsed === 0}
                 cardIndex={index}
+                opportunityScore={analyzeCache[item.asin]?.confidence}
                 usageMeter={
                   isFree && analyzeUsed > 0 && analyzeUsed < ANALYZE_LIMIT
                     ? `${analyzeUsed} of ${ANALYZE_LIMIT} free analyses used`
@@ -872,18 +879,7 @@ const s = StyleSheet.create({
   compareBarClearDim: { color: colors.textMuted },
 
   // ── Empty state
-  empty: { alignItems: 'center', paddingTop: 72, gap: spacing.xs + 2, paddingHorizontal: spacing.lg },
-  emptyOrb: {
-    width: 72, height: 72, borderRadius: 36,
-    backgroundColor: 'rgba(2,132,199,0.09)',
-    borderWidth: 1.5, borderColor: 'rgba(2,132,199,0.22)',
-    justifyContent: 'center', alignItems: 'center',
-    marginBottom: spacing.sm,
-  },
-  emptyOrbIcon:  { fontSize: 32, color: '#0284C7' },
-  emptyTitle:    { fontSize: 20, fontWeight: '800', color: colors.textPrimary, letterSpacing: -0.5, textAlign: 'center' },
-  emptyText:     { fontSize: 13, color: colors.textSecondary, textAlign: 'center', letterSpacing: 0.2, marginTop: 2 },
-  emptySubtext:  { fontSize: 12, color: colors.textMuted, textAlign: 'center', marginTop: -2 },
+  emptyState: { paddingTop: spacing.xxl },
 
   // ── Demo chips (empty state)
   demoRow: {

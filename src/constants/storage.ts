@@ -17,6 +17,9 @@ export const STORAGE_KEYS = {
   analyzeUsage:   'fba_analyze_usage_v1',
   analyzeCache:   'fba_analyze_cache_v1',
 
+  // Saved calculations (Profit Lab)
+  savedCalculations: 'fba_saved_calculations_v1',
+
   // Co-Pilot
   journey: 'fba_journey_v5',
 
