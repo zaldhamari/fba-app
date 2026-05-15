@@ -226,7 +226,7 @@ export function buildQuoteEmail(inputs: ShippingInputs, result: ShippingResult):
   const cartons = result.cartons;
   const cbm = result.cbm.toFixed(2);
   const originLabels: Record<ShipOrigin, string> = { CN: 'China', VN: 'Vietnam', IN: 'India', TR: 'Turkey' };
-  const destLabels: Record<ShipMarket, string> = { US: 'USA', UK: 'United Kingdom', DE: 'Germany', CA: 'Canada' };
+  const destLabels: Record<ShipMarket, string> = { US: 'USA', UK: 'United Kingdom', DE: 'Europe (EU)', CA: 'Canada' };
 
   return `Subject: Freight Quote Request — ${originLabels[inputs.origin]} to ${destLabels[inputs.marketplace]}
 

@@ -1,0 +1,742 @@
+import React, { useState } from 'react';
+import {
+  View, Text, Modal, ScrollView, StyleSheet, TouchableOpacity, Image,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { AppCard, DS } from '../../components/ds';
+import { useCurrency } from '../../context/CurrencyContext';
+import { ProductDisplay, SupplierDisplay } from './types';
+import { SmartBadgeStrip, ProductTopRow, ProductStatsRow, am } from './SharedComponents';
+import { openURL } from './utils';
+
+// ── Compare helpers ───────────────────────────────────────────────────────────
+
+export function scoreProductForCompare(p: ProductDisplay): number {
+  let s = (p.revenueUSD ?? 0) * 0.01;
+  s += p.competition === 'Low' ? 30 : p.competition === 'Medium' ? 15 : 0;
+  s += p.badge === 'Promising' ? 20 : p.badge === 'Moderate' ? 10 : 0;
+  s += (p.rating ?? 0) * 4;
+  return s;
+}
+
+export function scoreSupplierForCompare(s: SupplierDisplay): number {
+  return (s.trust * 10)
+    + (s.priceUSD != null ? Math.max(0, 10 - s.priceUSD) * 8 : 0)
+    + Math.max(0, 500 - s.moqNum) * 0.02;
+}
+
+export function buildSupplierReasons(w: SupplierDisplay, all: SupplierDisplay[]): string[] {
+  const r: string[] = [];
+  if (all.every(s => s.trust <= w.trust)) r.push(`Highest trust score — ${w.trust}/10`);
+  if (all.every(s => (s.priceUSD ?? 999) >= (w.priceUSD ?? 999)) && w.priceUSD)
+    r.push(`Lowest unit price — ${w.price}`);
+  if (all.every(s => s.moqNum >= w.moqNum)) r.push(`Lowest minimum order — ${w.moq}`);
+  if (r.length < 2) r.push('Best overall score across all sourcing metrics');
+  return r.slice(0, 3);
+}
+
+export function buildProductReasons(w: ProductDisplay, all: ProductDisplay[]): string[] {
+  const r: string[] = [];
+  if (all.every(p => (p.revenueUSD ?? 0) <= (w.revenueUSD ?? 0)) && w.revenueUSD)
+    r.push(`Highest estimated revenue — ${w.revenue}`);
+  if (w.competition === 'Low') r.push('Low competition — easier to rank and win the buy box');
+  if (w.badge === 'Promising') r.push('Promising opportunity with strong market demand signal');
+  if (w.rating != null && all.every(p => (p.rating ?? 0) <= (w.rating ?? 0)))
+    r.push(`Top-rated product — ${w.rating.toFixed(1)} ★ customer satisfaction`);
+  if (r.length < 2) r.push('Best combined score across all opportunity metrics');
+  return r.slice(0, 4);
+}
+
+export type HL = 'best' | 'worst' | 'neutral';
+
+export function numHL(vals: (number | null)[], higher: boolean): HL[] {
+  const ns = vals.filter((v): v is number => v != null);
+  if (ns.length < 2) return vals.map(() => 'neutral');
+  const b = higher ? Math.max(...ns) : Math.min(...ns);
+  const w = higher ? Math.min(...ns) : Math.max(...ns);
+  return vals.map(v =>
+    v == null ? 'neutral' : v === b && b !== w ? 'best' : v === w && b !== w ? 'worst' : 'neutral');
+}
+
+export function hlBg(h: HL): string {
+  return h === 'best' ? DS.accentLight : h === 'worst' ? DS.dangerBg : 'transparent';
+}
+export function hlTxt(h: HL): string {
+  return h === 'best' ? DS.accentDark : h === 'worst' ? DS.dangerText : DS.textPrimary;
+}
+
+export const CMP_LABEL_W = 90;
+export const CMP_CELL_W  = 110;
+
+// ── Product card — Market mode ────────────────────────────────────────────────
+
+export function ProductMarketCard({
+  item, onSelect, isSelected, onSaveForFeasibility, isFeasSaved,
+  inCompare, canCompare, onToggleCompare, onAnalyze, analyzeLoading,
+}: {
+  item: ProductDisplay;
+  onSelect: () => void;
+  isSelected: boolean;
+  onSaveForFeasibility?: () => void;
+  isFeasSaved?: boolean;
+  inCompare?: boolean;
+  canCompare?: boolean;
+  onToggleCompare?: () => void;
+  onAnalyze?: () => void;
+  analyzeLoading?: boolean;
+}) {
+  const { fmt } = useCurrency();
+  const hasLink = !!item.url;
+
+  const oppLabel = item.badge === 'Promising' ? 'LAUNCH' : item.badge === 'Saturated' ? 'AVOID' : 'TEST';
+  const oppColor = item.badge === 'Promising' ? DS.successText : item.badge === 'Saturated' ? DS.dangerText : DS.warningText;
+  const oppBg    = item.badge === 'Promising' ? DS.successBg   : item.badge === 'Saturated' ? DS.dangerBg  : DS.warningBg;
+  const compColor = item.competition === 'Low' ? DS.successText : item.competition === 'High' ? DS.dangerText : DS.warningText;
+  const compBg    = item.competition === 'Low' ? DS.successBg   : item.competition === 'High' ? DS.dangerBg  : DS.warningBg;
+
+  return (
+    <AppCard padding={14} radius={18} style={[pmc.card, isSelected && pmc.cardSelected]}>
+
+      {/* ── Header ─── */}
+      <View style={pmc.header}>
+        <View style={pmc.imgBox}>
+          {item.image
+            ? <Image source={{ uri: item.image }} style={pmc.img} resizeMode="contain" />
+            : <Text style={pmc.imgPlaceholder}>🛒</Text>}
+        </View>
+        <View style={{ flex: 1, gap: 4 }}>
+          <Text style={pmc.productName} numberOfLines={2}>{item.name}</Text>
+          <View style={pmc.badgesRow}>
+            <View style={[pmc.oppPill, { backgroundColor: oppBg }]}>
+              <Text style={[pmc.oppTxt, { color: oppColor }]}>{oppLabel}</Text>
+            </View>
+            <View style={[pmc.compPill, { backgroundColor: compBg }]}>
+              <Text style={[pmc.compTxt, { color: compColor }]}>{item.competition} Comp</Text>
+            </View>
+          </View>
+        </View>
+      </View>
+
+      {/* ── Stats row ─── */}
+      <View style={pmc.stats}>
+        <View style={pmc.stat}>
+          <Text style={[pmc.statVal, { color: DS.accent }]}>
+            {item.price != null ? fmt(item.price) : '—'}
+          </Text>
+          <Text style={pmc.statLbl}>Price</Text>
+        </View>
+        <View style={pmc.div} />
+        <View style={pmc.stat}>
+          <Text style={pmc.statVal}>
+            {item.rating != null ? `${item.rating.toFixed(1)} ★` : '—'}
+          </Text>
+          <Text style={pmc.statLbl}>Rating</Text>
+        </View>
+        <View style={pmc.div} />
+        <View style={pmc.stat}>
+          <Text style={pmc.statVal}>
+            {item.reviewCount != null ? item.reviewCount.toLocaleString() : '—'}
+          </Text>
+          <Text style={pmc.statLbl}>Reviews</Text>
+        </View>
+        <View style={pmc.div} />
+        <View style={pmc.stat}>
+          <Text style={pmc.statVal}>
+            {item.revenueUSD != null ? `${fmt(item.revenueUSD, 0)}/mo` : '—'}
+          </Text>
+          <Text style={pmc.statLbl}>Est. Rev.</Text>
+        </View>
+      </View>
+
+      <SmartBadgeStrip badges={item.badges} finalScore={item.finalScore} />
+
+      {/* ── Primary action ─── */}
+      <TouchableOpacity
+        style={[pmc.amazonBtn, !hasLink && pmc.amazonBtnDisabled]}
+        onPress={() => openURL(item.url)}
+        activeOpacity={hasLink ? 0.8 : 1}
+        disabled={!hasLink}
+      >
+        <Text style={[pmc.amazonTxt, !hasLink && pmc.amazonTxtDisabled]}>
+          {hasLink ? '↗  View on Amazon' : 'Link unavailable'}
+        </Text>
+      </TouchableOpacity>
+
+      {/* ── Secondary actions ─── */}
+      <View style={pmc.actionsRow}>
+        <TouchableOpacity
+          style={[pmc.actionBtn, pmc.analyzeBtn, analyzeLoading && { opacity: 0.6 }]}
+          onPress={onAnalyze}
+          activeOpacity={0.8}
+          disabled={analyzeLoading || !onAnalyze}
+        >
+          <Text style={pmc.analyzeTxt}>{analyzeLoading ? '…' : '⊛  Analyse'}</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[pmc.actionBtn, inCompare ? pmc.compareActive : pmc.compareBtn]}
+          onPress={canCompare ? onToggleCompare : undefined}
+          activeOpacity={canCompare ? 0.8 : 1}
+          disabled={!canCompare}
+        >
+          <Text style={[pmc.compareTxt, inCompare && pmc.compareTxtActive]}>
+            {inCompare ? '✓  Added' : '⊞  Compare'}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[pmc.actionBtn, isSelected ? pmc.selectedBtn : pmc.selectBtn]}
+          onPress={onSelect}
+          activeOpacity={0.8}
+        >
+          <Text style={[pmc.selectTxt, isSelected && pmc.selectedTxt]}>
+            {isSelected ? '★  Selected' : '☆  Select'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* ── Feasibility ─── */}
+      {hasLink && onSaveForFeasibility && (
+        <TouchableOpacity
+          style={[pmc.feasBtn, isFeasSaved && pmc.feasBtnSaved]}
+          onPress={onSaveForFeasibility}
+          activeOpacity={0.8}
+        >
+          <Text style={[pmc.feasTxt, isFeasSaved && pmc.feasTxtSaved]}>
+            {isFeasSaved ? '✕  Remove' : '→  Run Feasibility Check'}
+          </Text>
+        </TouchableOpacity>
+      )}
+    </AppCard>
+  );
+}
+
+const pmc = StyleSheet.create({
+  card:             { gap: 12 },
+  cardSelected:     { borderWidth: 2, borderColor: DS.accent },
+  // Header
+  header:           { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
+  imgBox:           { width: 52, height: 52, borderRadius: 12, backgroundColor: DS.bgSubtle, borderWidth: 1, borderColor: DS.border, alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' },
+  img:              { width: 50, height: 50, borderRadius: 11 },
+  imgPlaceholder:   { fontSize: 22 },
+  productName:      { fontSize: 13, fontWeight: '700', color: DS.textPrimary, letterSpacing: -0.2, lineHeight: 18 },
+  badgesRow:        { flexDirection: 'row', gap: 5, flexWrap: 'wrap' },
+  oppPill:          { borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 },
+  oppTxt:           { fontSize: 10, fontWeight: '800', letterSpacing: 0.3 },
+  compPill:         { borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 },
+  compTxt:          { fontSize: 10, fontWeight: '700' },
+  // Stats
+  stats:            { flexDirection: 'row', alignItems: 'center', backgroundColor: DS.bgSubtle, borderRadius: 12, paddingVertical: 10 },
+  stat:             { flex: 1, alignItems: 'center', gap: 2 },
+  div:              { width: 1, height: 28, backgroundColor: DS.border },
+  statVal:          { fontSize: 12, fontWeight: '800', color: DS.textPrimary, letterSpacing: -0.2 },
+  statLbl:          { fontSize: 9, color: DS.textMuted, textTransform: 'uppercase' as const, letterSpacing: 0.3 },
+  // Primary button
+  amazonBtn:        { backgroundColor: '#FF9900', borderRadius: 12, paddingVertical: 10, alignItems: 'center' as const },
+  amazonBtnDisabled:{ backgroundColor: DS.bgSubtle, borderWidth: 1, borderColor: DS.border },
+  amazonTxt:        { fontSize: 13, fontWeight: '800', color: '#fff', letterSpacing: -0.2 },
+  amazonTxtDisabled:{ color: DS.textMuted },
+  // Actions row
+  actionsRow:       { flexDirection: 'row', gap: 6 },
+  actionBtn:        { flex: 1, borderRadius: 10, paddingVertical: 9, alignItems: 'center' as const },
+  analyzeBtn:       { backgroundColor: DS.indigoLight, borderWidth: 1, borderColor: DS.indigo + '44' },
+  analyzeTxt:       { fontSize: 12, fontWeight: '700', color: DS.indigo },
+  compareBtn:       { backgroundColor: DS.bgSubtle, borderWidth: 1, borderColor: DS.border },
+  compareActive:    { backgroundColor: DS.accentLight, borderWidth: 1, borderColor: DS.accent },
+  compareTxt:       { fontSize: 12, fontWeight: '700', color: DS.textSecondary },
+  compareTxtActive: { color: DS.accent },
+  selectBtn:        { backgroundColor: DS.bgSubtle, borderWidth: 1, borderColor: DS.border },
+  selectedBtn:      { backgroundColor: DS.accentLight, borderWidth: 1, borderColor: DS.accent },
+  selectTxt:        { fontSize: 12, fontWeight: '700', color: DS.textSecondary },
+  selectedTxt:      { color: DS.accent },
+  // Feasibility
+  feasBtn:          { borderRadius: 10, paddingVertical: 7, alignItems: 'center' as const, backgroundColor: DS.indigoLight, borderWidth: 1, borderColor: DS.indigo + '44' },
+  feasBtnSaved:     { backgroundColor: DS.bgSubtle, borderColor: DS.border },
+  feasTxt:          { fontSize: 11, fontWeight: '700' as const, color: DS.indigo },
+  feasTxtSaved:     { color: DS.textMuted },
+});
+
+// ── Product card — Lookup mode (full actions) ─────────────────────────────────
+
+interface ProductLookupCardProps {
+  item:                     ProductDisplay;
+  inCompare:                boolean;
+  isSaved:                  boolean;
+  analyzeLoading:           boolean;
+  canCompare:               boolean;
+  onViewAmazon:             () => void;
+  onAnalyze:                () => void;
+  onToggleCompare:          () => void;
+  onSave:                   () => void;
+  onSelect:                 () => void;
+  isSelected:               boolean;
+  onSaveForFeasibility?:    () => void;
+  isFeasSaved?:             boolean;
+  onAnalyzeOpportunity?:    () => void;
+  opportunityLoading?:      boolean;
+}
+
+export function ProductLookupCard({
+  item, inCompare, isSaved, analyzeLoading, canCompare,
+  onViewAmazon, onAnalyze, onToggleCompare, onSave, onSelect, isSelected,
+  onSaveForFeasibility, isFeasSaved, onAnalyzeOpportunity, opportunityLoading,
+}: ProductLookupCardProps) {
+  const hasLink = !!item.url;
+  return (
+    <AppCard
+      padding={14}
+      radius={18}
+      style={[plc.card, isSelected && plc.cardSelected]}
+    >
+      <ProductTopRow item={item} />
+      <ProductStatsRow item={item} />
+      <SmartBadgeStrip badges={item.badges} finalScore={item.finalScore} />
+
+      {/* Primary action */}
+      <TouchableOpacity
+        style={[plc.amazonBtn, !hasLink && plc.disabledBtn]}
+        onPress={onViewAmazon}
+        activeOpacity={hasLink ? 0.8 : 1}
+        disabled={!hasLink}
+      >
+        <Text style={[plc.amazonTxt, !hasLink && plc.disabledTxt]}>
+          {hasLink ? '↗  View on Amazon' : 'Link unavailable'}
+        </Text>
+      </TouchableOpacity>
+
+      {/* Secondary actions row */}
+      <View style={plc.actionsRow}>
+        <TouchableOpacity
+          style={[plc.actionBtn, plc.analyzeBtn, analyzeLoading && { opacity: 0.6 }]}
+          onPress={onAnalyze}
+          activeOpacity={0.8}
+          disabled={analyzeLoading}
+        >
+          <Text style={plc.analyzeTxt}>{analyzeLoading ? '…' : '⊛  Analyze'}</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[plc.actionBtn, !canCompare ? plc.compareDisabled : inCompare ? plc.compareActive : plc.compareBtn]}
+          onPress={canCompare ? onToggleCompare : undefined}
+          activeOpacity={canCompare ? 0.8 : 1}
+          disabled={!canCompare}
+        >
+          <Text style={[plc.compareTxt, !canCompare && plc.compareTxtDisabled, canCompare && inCompare && plc.compareTxtActive]}>
+            {!canCompare ? '⊞ No data' : inCompare ? '✓  Added' : '⊞  Compare'}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[plc.actionBtn, isSaved ? plc.savedBtn : plc.saveBtn]}
+          onPress={onSave}
+          activeOpacity={0.8}
+        >
+          <Text style={[plc.saveTxt, isSaved && plc.savedTxt]}>
+            {isSaved ? '✕ Unsave' : '✦ Save'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Select as context */}
+      <TouchableOpacity
+        style={[plc.selectBtn, isSelected && plc.selectBtnActive]}
+        onPress={onSelect}
+        activeOpacity={0.8}
+      >
+        <Text style={[plc.selectTxt, isSelected && plc.selectTxtActive]}>
+          {isSelected ? '★  Selected as context' : '☆  Select for suppliers & Co-Pilot'}
+        </Text>
+      </TouchableOpacity>
+
+      {!!item.url && onSaveForFeasibility && (
+        <TouchableOpacity
+          style={[plc.feasBtn, isFeasSaved && plc.feasBtnSaved]}
+          onPress={onSaveForFeasibility}
+          activeOpacity={0.8}
+        >
+          <Text style={[plc.feasTxt, isFeasSaved && plc.feasTxtSaved]}>
+            {isFeasSaved ? '✕  Remove' : '→  Run Feasibility Check'}
+          </Text>
+        </TouchableOpacity>
+      )}
+
+      {onAnalyzeOpportunity && (
+        <TouchableOpacity
+          style={[plc.opportunityBtn, opportunityLoading && { opacity: 0.6 }]}
+          onPress={onAnalyzeOpportunity}
+          activeOpacity={0.8}
+          disabled={opportunityLoading}
+        >
+          <Text style={plc.opportunityTxt}>
+            {opportunityLoading ? '◎  Analyzing reviews...' : '◎  Find Improvement Opportunities'}
+          </Text>
+        </TouchableOpacity>
+      )}
+    </AppCard>
+  );
+}
+const plc = StyleSheet.create({
+  card:            { gap: 10 },
+  cardSelected:    { borderWidth: 2, borderColor: DS.accent },
+  amazonBtn:       { backgroundColor: '#FF9900', borderRadius: 12, paddingVertical: 10, alignItems: 'center' },
+  disabledBtn:     { backgroundColor: DS.bgSubtle, borderWidth: 1, borderColor: DS.border },
+  amazonTxt:       { fontSize: 13, fontWeight: '800', color: '#fff', letterSpacing: -0.2 },
+  disabledTxt:     { color: DS.textMuted },
+  actionsRow:      { flexDirection: 'row', gap: 7 },
+  actionBtn:       { flex: 1, borderRadius: 10, paddingVertical: 8, alignItems: 'center' },
+  analyzeBtn:      { backgroundColor: DS.indigoLight },
+  analyzeTxt:      { fontSize: 11, fontWeight: '700', color: DS.indigo },
+  compareBtn:       { backgroundColor: DS.bgSubtle, borderWidth: 1, borderColor: DS.border },
+  compareActive:    { backgroundColor: DS.accentLight, borderWidth: 1, borderColor: DS.accent },
+  compareDisabled:  { backgroundColor: DS.bgSubtle, borderWidth: 1, borderColor: DS.borderLight, opacity: 0.5 },
+  compareTxt:       { fontSize: 11, fontWeight: '700', color: DS.textSecondary },
+  compareTxtActive: { color: DS.accent },
+  compareTxtDisabled:{ color: DS.textMuted },
+  saveBtn:         { backgroundColor: DS.indigoLight, borderWidth: 1, borderColor: DS.indigoLight },
+  savedBtn:        { backgroundColor: DS.accentLight, borderWidth: 1, borderColor: DS.accent },
+  saveTxt:         { fontSize: 11, fontWeight: '700', color: DS.indigo },
+  savedTxt:        { color: DS.accent },
+  selectBtn:       { backgroundColor: DS.bgSubtle, borderRadius: 10, paddingVertical: 7, alignItems: 'center', borderWidth: 1, borderColor: DS.border },
+  selectBtnActive: { backgroundColor: DS.accentLight, borderColor: DS.accent },
+  selectTxt:       { fontSize: 11, fontWeight: '600', color: DS.textMuted },
+  selectTxtActive: { color: DS.accent, fontWeight: '700' },
+  feasBtn:         { borderRadius: 10, paddingVertical: 7, alignItems: 'center' as const, backgroundColor: DS.indigoLight, borderWidth: 1, borderColor: DS.indigo + '44' },
+  feasBtnSaved:    { backgroundColor: DS.bgSubtle, borderColor: DS.border },
+  feasTxt:         { fontSize: 11, fontWeight: '700' as const, color: DS.indigo },
+  feasTxtSaved:    { color: DS.textMuted },
+  opportunityBtn:  { borderRadius: 12, paddingVertical: 11, alignItems: 'center' as const, backgroundColor: DS.accent, marginTop: 2 },
+  opportunityTxt:  { fontSize: 13, fontWeight: '800' as const, color: '#fff', letterSpacing: -0.2 },
+});
+
+// ── Premium Compare products modal ───────────────────────────────────────────
+
+export function CompareProductsModal({
+  visible, items, onClose, onSaveWinner,
+}: {
+  visible:       boolean;
+  items:         ProductDisplay[];
+  onClose:       () => void;
+  onSaveWinner?: (item: ProductDisplay) => void;
+}) {
+  const { fmt } = useCurrency();
+  const scores  = items.length > 0 ? items.map(scoreProductForCompare) : [];
+  const autoIdx = scores.length > 0 ? scores.indexOf(Math.max(...scores)) : 0;
+  const [selectedIdx, setSelectedIdx] = useState(autoIdx);
+
+  // Keep selectedIdx in bounds if items change while modal is open
+  const safeIdx = Math.min(selectedIdx, Math.max(0, items.length - 1));
+
+  if (items.length === 0) return null;
+
+  const winner  = items[safeIdx];
+  const second  = [...scores].sort((a, b) => b - a)[1] ?? 0;
+  const rawConf = scores[safeIdx] > 0 ? ((scores[safeIdx] - second) / scores[safeIdx]) * 100 : 50;
+  const conf    = Math.round(Math.min(97, Math.max(54, 65 + rawConf * 0.3)));
+  const reasons = buildProductReasons(winner, items);
+  const vLabel  = winner.badge === 'Promising' ? 'LAUNCH' : winner.badge === 'Saturated' ? 'AVOID' : 'TEST';
+  const vColor  = winner.badge === 'Promising' ? DS.successText : winner.badge === 'Saturated' ? DS.dangerText : DS.warningText;
+  const vBg     = winner.badge === 'Promising' ? DS.successBg   : winner.badge === 'Saturated' ? DS.dangerBg  : DS.warningBg;
+
+  const priceHL   = numHL(items.map(p => p.price), false);
+  const ratingHL  = numHL(items.map(p => p.rating), true);
+  const reviewHL  = numHL(items.map(p => p.reviewCount), true);
+  const revenueHL = numHL(items.map(p => p.revenueUSD), true);
+  const compHL: HL[]  = items.map(p => p.competition === 'Low' ? 'best' : p.competition === 'High' ? 'worst' : 'neutral');
+  const badgeHL: HL[] = items.map(p => p.badge === 'Promising' ? 'best' : p.badge === 'Saturated' ? 'worst' : 'neutral');
+
+  const sections = [
+    {
+      title: 'MARKET METRICS',
+      rows: [
+        { label: 'Price',        vals: items.map(p => p.price != null ? fmt(p.price) : '—'),                              hls: priceHL   },
+        { label: 'Rating',       vals: items.map(p => p.rating != null ? `${p.rating.toFixed(1)} ★` : '—'),               hls: ratingHL  },
+        { label: 'Reviews',      vals: items.map(p => p.reviewCount != null ? p.reviewCount.toLocaleString() : '—'),       hls: reviewHL  },
+        { label: 'Est. Revenue', vals: items.map(p => p.revenueUSD != null ? `${fmt(p.revenueUSD, 0)}/mo` : '—'),         hls: revenueHL },
+      ],
+    },
+    {
+      title: 'OPPORTUNITY METRICS',
+      rows: [
+        { label: 'Competition', vals: items.map(p => p.competition), hls: compHL  },
+        { label: 'Opportunity', vals: items.map(p => p.badge),       hls: badgeHL },
+      ],
+    },
+  ];
+
+  const tableW = CMP_LABEL_W + CMP_CELL_W * items.length;
+
+  return (
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+      <SafeAreaView style={am.sheet}>
+        <View style={am.toolbar}>
+          <Text style={am.title}>Product Comparison</Text>
+          <TouchableOpacity style={am.closeBtn} onPress={onClose} activeOpacity={0.7}>
+            <Text style={am.closeTxt}>Done</Text>
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView contentContainerStyle={prm.scroll} showsVerticalScrollIndicator={false}>
+
+          {/* ── Hero ─────────────────────────────────────────────── */}
+          <View style={prm.hero}>
+            <View style={prm.heroBall1} />
+            <View style={prm.heroBall2} />
+            <Text style={prm.heroEye}>AI COMPARISON ENGINE</Text>
+            <Text style={prm.heroH}>Product Comparison</Text>
+            <Text style={prm.heroSub}>Side-by-side analysis of your selected opportunities</Text>
+            <View style={prm.heroChip}>
+              <Text style={prm.heroChipTxt}>{items.length} Products Selected</Text>
+            </View>
+          </View>
+
+          {/* ── AI Recommendation ─────────────────────────────────── */}
+          <View style={prm.recCard}>
+            <View style={prm.recTopRow}>
+              <View style={prm.crownWrap}>
+                <Text style={prm.crownIcon}>{safeIdx === autoIdx ? '🏆' : '✦'}</Text>
+              </View>
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text style={prm.recEye}>{safeIdx === autoIdx ? 'AI RECOMMENDED' : 'YOUR SELECTION'}</Text>
+                <Text style={prm.recName} numberOfLines={2}>{winner.name}</Text>
+              </View>
+              <View style={[prm.vPill, { backgroundColor: vBg }]}>
+                <Text style={[prm.vTxt, { color: vColor }]}>{vLabel}</Text>
+              </View>
+            </View>
+
+            <View style={prm.confWrap}>
+              <View style={prm.confBg}>
+                <View style={[prm.confFill, { width: `${conf}%` as any }]} />
+              </View>
+              <Text style={prm.confTxt}>{conf}% confidence</Text>
+            </View>
+
+            {reasons.map((r, i) => (
+              <View key={i} style={prm.reason}>
+                <Text style={prm.reasonDot}>✦</Text>
+                <Text style={prm.reasonTxt}>{r}</Text>
+              </View>
+            ))}
+
+            {onSaveWinner && (
+              <TouchableOpacity style={prm.saveWinBtn} onPress={() => onSaveWinner(winner)} activeOpacity={0.8}>
+                <Text style={prm.saveWinTxt}>✦  Save to Vault</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* ── Column headers ────────────────────────────────────── */}
+          <AppCard padding={14} radius={18}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text style={prm.secEye}>PRODUCTS COMPARED</Text>
+              <Text style={prm.tapHint}>Tap to select</Text>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 10 }}>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                {items.map((p, i) => {
+                  const isSel  = i === safeIdx;
+                  const isAuto = i === autoIdx;
+                  const bLabel = p.badge === 'Promising' ? 'LAUNCH' : p.badge === 'Saturated' ? 'AVOID' : 'TEST';
+                  const bColor = p.badge === 'Promising' ? DS.successText : p.badge === 'Saturated' ? DS.dangerText : DS.warningText;
+                  const bBg    = p.badge === 'Promising' ? DS.successBg   : p.badge === 'Saturated' ? DS.dangerBg  : DS.warningBg;
+                  return (
+                    <TouchableOpacity
+                      key={p.id}
+                      style={[prm.colCard, isSel && prm.colCardWin]}
+                      onPress={() => setSelectedIdx(i)}
+                      activeOpacity={0.75}
+                    >
+                      {p.image ? (
+                        <Image source={{ uri: p.image }} style={prm.colImg} />
+                      ) : (
+                        <View style={prm.colImgFallback}>
+                          <Text style={prm.colImgIcon}>◎</Text>
+                        </View>
+                      )}
+                      <Text style={prm.colTitle} numberOfLines={2}>{p.name}</Text>
+                      <View style={prm.colFooter}>
+                        <View style={[prm.colBadge, { backgroundColor: bBg }]}>
+                          <Text style={[prm.colBadgeTxt, { color: bColor }]}>{bLabel}</Text>
+                        </View>
+                        {isSel  && <Text style={prm.winTag}>SELECTED</Text>}
+                        {!isSel && isAuto && <Text style={prm.aiTag}>AI PICK</Text>}
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </ScrollView>
+          </AppCard>
+
+          {/* ── Metric sections ───────────────────────────────────── */}
+          {sections.map(sec => (
+            <AppCard key={sec.title} padding={14} radius={18} style={{ gap: 0 }}>
+              <Text style={prm.secEye}>{sec.title}</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 10 }}>
+                <View style={{ width: tableW }}>
+                  {sec.rows.map((row, ri) => (
+                    <View key={row.label} style={[prm.mRow, ri % 2 === 0 && prm.mRowAlt]}>
+                      <View style={[prm.mLabel, { width: CMP_LABEL_W }]}>
+                        <Text style={prm.mLabelTxt}>{row.label}</Text>
+                      </View>
+                      {row.vals.map((v, vi) => (
+                        <View
+                          key={vi}
+                          style={[prm.mCell, { width: CMP_CELL_W, backgroundColor: hlBg(row.hls[vi]) }]}
+                        >
+                          <Text style={[prm.mCellTxt, { color: hlTxt(row.hls[vi]) }]} numberOfLines={1}>{v}</Text>
+                          {row.hls[vi] === 'best' && <Text style={prm.trophy}>🏆</Text>}
+                        </View>
+                      ))}
+                    </View>
+                  ))}
+                </View>
+              </ScrollView>
+            </AppCard>
+          ))}
+
+          {/* ── Action bar ────────────────────────────────────────── */}
+          <View style={prm.actions}>
+            {onSaveWinner && (
+              <TouchableOpacity
+                style={prm.actionPrimary}
+                onPress={() => { onSaveWinner(winner); onClose(); }}
+                activeOpacity={0.85}
+              >
+                <Text style={prm.actionPrimaryTxt}>✦  Save Winner</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity style={prm.actionGhost} onPress={onClose} activeOpacity={0.8}>
+              <Text style={prm.actionGhostTxt}>Close Comparison</Text>
+            </TouchableOpacity>
+          </View>
+
+        </ScrollView>
+      </SafeAreaView>
+    </Modal>
+  );
+}
+
+// ── Premium compare styles (shared with SupplierCards) ───────────────────────
+
+export const prm = StyleSheet.create({
+  scroll: { paddingHorizontal: 16, paddingBottom: 60, gap: 14 },
+
+  // Hero
+  hero: {
+    backgroundColor: DS.indigoLight, borderRadius: DS.radiusCard,
+    padding: 22, overflow: 'hidden', gap: 5,
+    borderWidth: 1, borderColor: `${DS.indigo}22`,
+  },
+  heroSupplier: { backgroundColor: DS.accentLight, borderColor: `${DS.accent}22` },
+  heroBall1: {
+    position: 'absolute', top: -30, right: -30,
+    width: 120, height: 120, borderRadius: 60, backgroundColor: `${DS.indigo}18`,
+  },
+  heroBall2: {
+    position: 'absolute', bottom: -20, left: -20,
+    width: 80, height: 80, borderRadius: 40, backgroundColor: `${DS.indigo}10`,
+  },
+  heroBall1Sup: {
+    position: 'absolute', top: -30, right: -30,
+    width: 120, height: 120, borderRadius: 60, backgroundColor: `${DS.accent}18`,
+  },
+  heroBall2Sup: {
+    position: 'absolute', bottom: -20, left: -20,
+    width: 80, height: 80, borderRadius: 40, backgroundColor: `${DS.accent}10`,
+  },
+  heroEye:     { fontSize: 9, fontWeight: '800', color: DS.indigo, letterSpacing: 2.5 },
+  heroH:       { fontSize: 22, fontWeight: '900', color: DS.textPrimary, letterSpacing: -0.8 },
+  heroSub:     { fontSize: 13, color: DS.textSecondary, lineHeight: 19 },
+  heroChip:    {
+    alignSelf: 'flex-start', marginTop: 4,
+    backgroundColor: DS.indigo, borderRadius: DS.radiusBadge,
+    paddingHorizontal: 12, paddingVertical: 5,
+  },
+  heroChipTxt: { fontSize: 11, fontWeight: '800', color: '#fff', letterSpacing: 0.3 },
+
+  // AI Recommendation card
+  recCard: {
+    backgroundColor: DS.bgCard, borderRadius: DS.radiusCard,
+    borderWidth: 1.5, borderColor: `${DS.accent}44`,
+    padding: 18, gap: 10,
+    shadowColor: DS.accent, shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12, shadowRadius: 16, elevation: 5,
+  },
+  recTopRow:   { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+  crownWrap:   { width: 40, height: 40, borderRadius: 12, backgroundColor: DS.goldLight, alignItems: 'center', justifyContent: 'center' },
+  crownIcon:   { fontSize: 20 },
+  recEye:      { fontSize: 9, fontWeight: '800', color: DS.accentDark, letterSpacing: 2 },
+  recName:     { fontSize: 14, fontWeight: '800', color: DS.textPrimary, letterSpacing: -0.3 },
+  vPill:       { borderRadius: DS.radiusBadge, paddingHorizontal: 10, paddingVertical: 4, alignSelf: 'flex-start' },
+  vTxt:        { fontSize: 11, fontWeight: '900', letterSpacing: 0.5 },
+  platformPill: { backgroundColor: DS.accentLight, borderRadius: DS.radiusBadge, paddingHorizontal: 10, paddingVertical: 4, alignSelf: 'flex-start' },
+  platformTxt:  { fontSize: 11, fontWeight: '700', color: DS.accentDark },
+
+  // Confidence bar
+  confWrap: { gap: 5 },
+  confBg:   { height: 6, backgroundColor: DS.bgElevated, borderRadius: 3, overflow: 'hidden' },
+  confFill: { height: 6, backgroundColor: DS.accent, borderRadius: 3 },
+  confTxt:  { fontSize: 11, fontWeight: '600', color: DS.textMuted },
+
+  // Reasons
+  reason:    { flexDirection: 'row', alignItems: 'flex-start', gap: 7 },
+  reasonDot: { fontSize: 10, color: DS.accent, marginTop: 3 },
+  reasonTxt: { flex: 1, fontSize: 13, color: DS.textSecondary, lineHeight: 19 },
+
+  // Save winner CTA
+  saveWinBtn: {
+    backgroundColor: DS.accent, borderRadius: DS.radiusButton,
+    paddingVertical: 11, alignItems: 'center', marginTop: 4,
+  },
+  saveWinTxt: { fontSize: 13, fontWeight: '800', color: '#fff', letterSpacing: -0.2 },
+
+  // Section eyebrow
+  secEye: { fontSize: 9, fontWeight: '800', color: DS.textMuted, letterSpacing: 2, textTransform: 'uppercase' },
+
+  // Column header cards
+  colCard: {
+    width: CMP_CELL_W + 16,
+    backgroundColor: DS.bgSubtle, borderRadius: 14,
+    borderWidth: 1, borderColor: DS.border, padding: 10, gap: 6,
+  },
+  colCardWin: {
+    borderColor: DS.accent, borderWidth: 2, backgroundColor: DS.accentLight,
+    shadowColor: DS.accent, shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.15, shadowRadius: 10, elevation: 4,
+  },
+  colImg:        { width: 44, height: 44, borderRadius: 8, backgroundColor: DS.bgElevated },
+  colImgFallback:{ width: 44, height: 44, borderRadius: 8, backgroundColor: DS.bgElevated, alignItems: 'center', justifyContent: 'center' },
+  colImgIcon:    { fontSize: 20, color: DS.textMuted },
+  colTitle:      { fontSize: 11, fontWeight: '700', color: DS.textPrimary, lineHeight: 15 },
+  colFooter:     { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 5 },
+  colBadge:      { borderRadius: DS.radiusBadge, paddingHorizontal: 7, paddingVertical: 3 },
+  colBadgeTxt:   { fontSize: 9, fontWeight: '800', letterSpacing: 0.5 },
+  winTag:        { fontSize: 9, fontWeight: '900', color: DS.accentDark, letterSpacing: 0.5 },
+  aiTag:         { fontSize: 9, fontWeight: '800', color: DS.indigo, letterSpacing: 0.5 },
+  tapHint:       { fontSize: 10, fontWeight: '600', color: DS.textMuted },
+  supCountry:    { fontSize: 22 },
+  platformBadge:    { backgroundColor: DS.indigoLight, borderRadius: DS.radiusBadge, paddingHorizontal: 7, paddingVertical: 3 },
+  platformBadgeTxt: { fontSize: 9, fontWeight: '800', color: DS.indigo, letterSpacing: 0.3 },
+
+  // Metric table rows
+  mRow:     { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: DS.borderLight },
+  mRowAlt:  { backgroundColor: DS.bgSubtle },
+  mLabel:   { paddingRight: 8, justifyContent: 'center' },
+  mLabelTxt:{ fontSize: 11, fontWeight: '700', color: DS.textMuted },
+  mCell:    { paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  mCellTxt: { fontSize: 12, fontWeight: '700' },
+  trophy:   { fontSize: 10 },
+
+  // Action bar
+  actions:         { gap: 10, marginTop: 4 },
+  actionPrimary:   {
+    backgroundColor: DS.accent, borderRadius: DS.radiusButton,
+    paddingVertical: 14, alignItems: 'center',
+    shadowColor: DS.accent, shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.28, shadowRadius: 10, elevation: 5,
+  },
+  actionPrimaryTxt:{ fontSize: 15, fontWeight: '800', color: '#fff', letterSpacing: -0.3 },
+  actionGhost:     { backgroundColor: DS.bgSubtle, borderRadius: DS.radiusButton, paddingVertical: 13, alignItems: 'center', borderWidth: 1, borderColor: DS.border },
+  actionGhostTxt:  { fontSize: 14, fontWeight: '700', color: DS.textSecondary },
+});

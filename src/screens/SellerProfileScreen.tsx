@@ -14,7 +14,7 @@ type Props = { navigation: StackNavigationProp<RootStackParamList, 'SellerProfil
 
 // ── Question data ─────────────────────────────────────────────────────────────
 
-const MARKETPLACES: Marketplace[] = ['US', 'UK', 'DE', 'CA', 'AU'];
+const MARKETPLACES: Marketplace[] = ['US', 'UK', 'DE', 'CA', 'AE', 'SA'];
 
 const EXPERIENCE_OPTIONS: { value: ExperienceLevel; label: string; sub: string }[] = [
   { value: 'beginner', label: 'Complete beginner',  sub: 'Haven\'t sold on Amazon yet' },

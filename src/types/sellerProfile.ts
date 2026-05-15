@@ -1,4 +1,6 @@
-export type Marketplace = 'US' | 'UK' | 'DE' | 'CA' | 'AU';
+import type { MarketplaceId } from '../context/CurrencyContext';
+
+export type Marketplace = MarketplaceId;
 export type ExperienceLevel = 'beginner' | 'some' | 'selling';
 export type CompetitionThreshold = 100 | 300 | 500 | 1000;
 
@@ -26,11 +28,12 @@ export interface ResearchFilters {
 }
 
 export const MARKETPLACE_LABELS: Record<Marketplace, { flag: string; label: string; currency: string }> = {
-  US: { flag: '🇺🇸', label: 'United States', currency: 'USD' },
-  UK: { flag: '🇬🇧', label: 'United Kingdom', currency: 'GBP' },
-  DE: { flag: '🇩🇪', label: 'Germany',        currency: 'EUR' },
-  CA: { flag: '🇨🇦', label: 'Canada',         currency: 'CAD' },
-  AU: { flag: '🇦🇺', label: 'Australia',      currency: 'AUD' },
+  US: { flag: '🇺🇸', label: 'United States',  currency: 'USD' },
+  UK: { flag: '🇬🇧', label: 'United Kingdom',  currency: 'GBP' },
+  DE: { flag: '🇪🇺', label: 'Europe (EU)',      currency: 'EUR' },
+  CA: { flag: '🇨🇦', label: 'Canada',           currency: 'CAD' },
+  AE: { flag: '🇦🇪', label: 'UAE',              currency: 'AED' },
+  SA: { flag: '🇸🇦', label: 'Saudi Arabia',     currency: 'SAR' },
 };
 
 export function profileToFilters(p: SellerProfile): ResearchFilters {

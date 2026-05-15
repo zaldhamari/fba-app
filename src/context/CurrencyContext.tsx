@@ -30,7 +30,7 @@ export const CURRENCIES: Record<CurrencyCode, CurrencyInfo> = {
   USD: { code: 'USD', symbol: '$',     selectorSymbol: '$',    flag: '🇺🇸', name: 'US Dollar'       },
   CAD: { code: 'CAD', symbol: 'C$',    selectorSymbol: 'C$',   flag: '🇨🇦', name: 'Canadian Dollar' },
   GBP: { code: 'GBP', symbol: '£',     selectorSymbol: '£',    flag: '🇬🇧', name: 'British Pound'   },
-  EUR: { code: 'EUR', symbol: '€',     selectorSymbol: '€',    flag: '🇩🇪', name: 'Euro'            },
+  EUR: { code: 'EUR', symbol: '€',     selectorSymbol: '€',    flag: '🇪🇺', name: 'Euro'            },
   AED: { code: 'AED', symbol: 'AED ',  selectorSymbol: 'د.إ',  flag: '🇦🇪', name: 'UAE Dirham'      },
   SAR: { code: 'SAR', symbol: 'SAR ',  selectorSymbol: 'ر.س',  flag: '🇸🇦', name: 'Saudi Riyal'     },
 };
@@ -39,7 +39,7 @@ export const MARKETPLACES: Marketplace[] = [
   { id: 'US', name: 'Amazon US',      flag: '🇺🇸', currency: 'USD' },
   { id: 'CA', name: 'Amazon Canada',  flag: '🇨🇦', currency: 'CAD' },
   { id: 'UK', name: 'Amazon UK',      flag: '🇬🇧', currency: 'GBP' },
-  { id: 'DE', name: 'Amazon Germany', flag: '🇩🇪', currency: 'EUR' },
+  { id: 'DE', name: 'Amazon EU',      flag: '🇪🇺', currency: 'EUR' },
   { id: 'AE', name: 'Amazon UAE',     flag: '🇦🇪', currency: 'AED' },
   { id: 'SA', name: 'Amazon Saudi',   flag: '🇸🇦', currency: 'SAR' },
 ];

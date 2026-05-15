@@ -127,11 +127,11 @@ export const api = {
   lookupProduct: (input: string) =>
     post<{ asin: string; title: string | null; category: string | null; url: string; source: string; error?: string }>('/research/product', { input }),
 
-  searchAmazon: (keyword: string, category = 'all') =>
-    post<{ products: Product[]; trends: TrendData; keyword: string }>('/research/amazon', { keyword, category }),
+  searchAmazon: (keyword: string, marketplace = 'US', category = 'all') =>
+    post<{ products: Product[]; trends: TrendData; keyword: string }>('/research/amazon', { keyword, category, marketplace }),
 
-  searchSuppliers: (product: string, max_price?: number) =>
-    post<{ suppliers: Supplier[]; product: string }>('/research/suppliers', { product, max_price }),
+  searchSuppliers: (product: string, marketplace = 'US', max_price?: number) =>
+    post<{ suppliers: Supplier[]; product: string }>('/research/suppliers', { product, max_price, marketplace }),
 
   calculateFBA: (body: {
     product_name: string;

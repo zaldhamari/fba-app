@@ -1157,7 +1157,7 @@ const di = StyleSheet.create({
 
 // ─── Profile Strip ────────────────────────────────────────────────────────────
 
-const MARKETPLACE_FLAG: Record<string, string> = { US: '🇺🇸', UK: '🇬🇧', DE: '🇩🇪', CA: '🇨🇦', AU: '🇦🇺' };
+const MARKETPLACE_FLAG: Record<string, string> = { US: '🇺🇸', UK: '🇬🇧', DE: '🇪🇺', CA: '🇨🇦', AE: '🇦🇪', SA: '🇸🇦' };
 const EXPERIENCE_LABEL: Record<string, string> = { beginner: 'Beginner', some: 'Some exp.', selling: 'Active seller' };
 
 function ProfileStrip() {

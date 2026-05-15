@@ -132,7 +132,7 @@ function ScreenHeader({ onBack }: { onBack: () => void }) {
 
 export default function CalculatorScreen() {
   const navigation = useNavigation<NavProp>();
-  const { fmt } = useCurrency();
+  const { fmt, marketplace } = useCurrency();
   const { can } = useSubscription();
   const { activeProduct, setActiveProduct, refreshActiveProduct } = useActiveProduct();
 
@@ -209,7 +209,7 @@ export default function CalculatorScreen() {
   const hasData = savedProduct != null && savedSupplier != null;
 
   const result = hasData
-    ? computeFeasibility(savedProduct!, savedSupplier!, inputs)
+    ? computeFeasibility(savedProduct!, savedSupplier!, inputs, marketplace)
     : null;
 
   const riskResult: RiskAssessmentResult | null = (result && savedProduct && savedSupplier)

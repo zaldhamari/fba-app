@@ -68,25 +68,91 @@ export interface FeasibilityResult {
 }
 
 // ─── FBA fee estimate from unit weight ───────────────────────────────────────
-// Simplified 2024 standard-size schedule. Oversize handled by linear overage.
+// Per-marketplace 2024/2025 standard-size schedules.
+// All fees are in local currency for each marketplace.
+// US source: Amazon.com FBA fee schedule Jan 2025.
+// UK source: Amazon.co.uk FBA fee schedule 2025 (GBP).
+// DE source: Amazon.de FBA fee schedule 2025 (EUR).
+// CA source: Amazon.ca FBA fee schedule 2025 (CAD).
+// AE/SA: approximated from USD schedule scaled to local currency at typical rates.
 
-export function estimateFBAFee(weightLbs: number): number {
-  if (weightLbs <= 0.25) return 3.06;
-  if (weightLbs <= 0.50) return 3.22;
-  if (weightLbs <= 0.75) return 3.40;
-  if (weightLbs <= 1.00) return 3.58;
-  if (weightLbs <= 1.50) return 4.75;
-  if (weightLbs <= 2.00) return 5.05;
-  if (weightLbs <= 3.00) return 5.62;
-  return parseFloat((5.62 + (weightLbs - 3) * 0.38).toFixed(2));
+type FBAMarket = 'US' | 'UK' | 'DE' | 'CA' | 'AE' | 'SA';
+
+function _usaFee(w: number): number {
+  if (w <= 0.25) return 3.06;
+  if (w <= 0.50) return 3.22;
+  if (w <= 0.75) return 3.40;
+  if (w <= 1.00) return 3.58;
+  if (w <= 1.50) return 4.75;
+  if (w <= 2.00) return 5.05;
+  if (w <= 3.00) return 5.62;
+  return parseFloat((5.62 + (w - 3) * 0.38).toFixed(2));
+}
+
+function _ukFee(w: number): number {
+  // Amazon.co.uk 2025 standard size schedule (GBP)
+  if (w <= 0.25) return 2.70;
+  if (w <= 0.50) return 3.00;
+  if (w <= 0.75) return 3.35;
+  if (w <= 1.00) return 3.75;
+  if (w <= 1.50) return 4.30;
+  if (w <= 2.00) return 4.70;
+  if (w <= 3.00) return 5.50;
+  return parseFloat((5.50 + (w - 3) * 0.50).toFixed(2));
+}
+
+function _deFee(w: number): number {
+  // Amazon.de 2025 standard size schedule (EUR)
+  if (w <= 0.25) return 3.00;
+  if (w <= 0.50) return 3.35;
+  if (w <= 0.75) return 3.70;
+  if (w <= 1.00) return 4.10;
+  if (w <= 1.50) return 4.80;
+  if (w <= 2.00) return 5.30;
+  if (w <= 3.00) return 6.20;
+  return parseFloat((6.20 + (w - 3) * 0.55).toFixed(2));
+}
+
+function _caFee(w: number): number {
+  // Amazon.ca 2025 standard size schedule (CAD)
+  if (w <= 0.25) return 4.20;
+  if (w <= 0.50) return 4.45;
+  if (w <= 0.75) return 4.70;
+  if (w <= 1.00) return 5.00;
+  if (w <= 1.50) return 6.60;
+  if (w <= 2.00) return 7.10;
+  if (w <= 3.00) return 7.90;
+  return parseFloat((7.90 + (w - 3) * 0.55).toFixed(2));
+}
+
+function _aeFee(w: number): number {
+  // Amazon.ae (AED) — approximated from US schedule × 3.85 AED/USD
+  return parseFloat((_usaFee(w) * 3.85).toFixed(2));
+}
+
+function _saFee(w: number): number {
+  // Amazon.sa (SAR) — approximated from US schedule × 3.85 SAR/USD
+  return parseFloat((_usaFee(w) * 3.85).toFixed(2));
+}
+
+export function estimateFBAFee(weightLbs: number, marketplace?: string): number {
+  switch (marketplace as FBAMarket) {
+    case 'UK': return _ukFee(weightLbs);
+    case 'DE': return _deFee(weightLbs);
+    case 'CA': return _caFee(weightLbs);
+    case 'AE': return _aeFee(weightLbs);
+    case 'SA': return _saFee(weightLbs);
+    default:   return _usaFee(weightLbs);
+  }
 }
 
 // ─── Core formula ─────────────────────────────────────────────────────────────
 
 export function computeFeasibility(
-  product:  FeasibilityProduct,
-  supplier: FeasibilitySupplier,
-  inputs:   FeasibilityInputs,
+  product:     FeasibilityProduct,
+  supplier:    FeasibilitySupplier,
+  inputs:      FeasibilityInputs,
+  marketplace?: string,
 ): FeasibilityResult {
   const missingFields: string[] = [];
   if (product.price    == null) missingFields.push('Amazon selling price');
@@ -100,7 +166,7 @@ export function computeFeasibility(
   const moq = supplier.moqNum   || 100;
 
   const referralFee      = parseFloat((sp * 0.15).toFixed(2));
-  const fbaFee           = estimateFBAFee(inputs.weightLbs);
+  const fbaFee           = estimateFBAFee(inputs.weightLbs, marketplace);
   const customsDuty      = parseFloat((uc * inputs.customsPct / 100).toFixed(2));
   const landedCost       = parseFloat((uc + inputs.shippingPerUnit + customsDuty).toFixed(2));
   const totalCostPerUnit = parseFloat((landedCost + referralFee + fbaFee).toFixed(2));

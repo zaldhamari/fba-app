@@ -29,7 +29,7 @@ import { CurrencySelector } from '../components/CurrencySelector';
 import { HelpButton } from '../components/HelpModal';
 import { AppHeader } from '../components/AppHeader';
 import type { FeatureKey } from '../lib/featureHelp';
-import { getMarketplaceProfile } from '../constants/marketplaceProfiles';
+import { getMarketplaceProfile, getDutyRates } from '../constants/marketplaceProfiles';
 import FeasibilityHeart from '../components/FeasibilityHeart';
 import { useVault } from '../hooks/useVault';
 import type { VaultEntry } from '../types/vault';
@@ -530,6 +530,11 @@ function FBAWorkspace({
             <Text style={ws.disclaimer}>Estimates only. Verify actual fees in Seller Central — fees change periodically and vary by category.</Text>
           </View>
         )}
+        {n(inputs.sellingPrice) > 0 && (
+          <Text style={ws.hint}>
+            Referral fee hint: 15% of {symbol}{n(inputs.sellingPrice).toFixed(2)} = {symbol}{(n(inputs.sellingPrice) * 0.15).toFixed(2)} (most categories)
+          </Text>
+        )}
         <Pair>
           <Field label={`Referral fee (${symbol})`} value={inputs.referralFee} onChange={v => set('referralFee', v)} placeholder="3.67" />
           <Field label={`Import duties (${symbol})`} value={inputs.duties} onChange={v => set('duties', v)} placeholder="0.73" />
@@ -788,13 +793,7 @@ function FBAWorkspace({
 
 // ─── 2. Landed Cost ───────────────────────────────────────────────────────────
 
-const DUTY_RATES = [
-  { label: 'General',       rate: 0.075 }, { label: 'Kitchen',  rate: 0.075 },
-  { label: 'Electronics',   rate: 0.150 }, { label: 'Clothing', rate: 0.270 },
-  { label: 'Sporting',      rate: 0.100 }, { label: 'Tools',    rate: 0.090 },
-  { label: 'Beauty',        rate: 0.100 }, { label: 'Pet',      rate: 0.075 },
-  { label: 'Toys',          rate: 0.000 }, { label: 'Baby',     rate: 0.000 },
-];
+// Duty rates are now per-marketplace — loaded via getDutyRates(marketplace) inside each workspace.
 const FREIGHT_OPTS = [
   { label: 'Sea (25–35d)', key: 'sea'     as const },
   { label: 'Air (5–7d)',   key: 'air'     as const },
@@ -803,7 +802,8 @@ const FREIGHT_OPTS = [
 
 function LandedWorkspace() {
   const { symbol, fromUSD, marketplace } = useCurrency();
-  const profile = getMarketplaceProfile(marketplace);
+  const profile    = getMarketplaceProfile(marketplace);
+  const dutyRates  = getDutyRates(marketplace);
   const [unitCost,        setUnitCost]        = useState('5.00');
   const [qty,             setQty]             = useState('500');
   const [weight,          setWeight]          = useState('0.5');
@@ -827,7 +827,7 @@ function LandedWorkspace() {
   const freightPerUnit = useCustomFreight && savedFreight
     ? fromUSD(savedFreight.costPerUnit)
     : calcFreightPerUnit;
-  const dutyPerUnit = cpu * DUTY_RATES[di].rate;
+  const dutyPerUnit = cpu * (dutyRates[di]?.rate ?? 0);
   const prepV = n(prep);
   const photoPerUnit = qty_ > 0 ? n(photo) / qty_ : 0;
   const trueCost = cpu + freightPerUnit + dutyPerUnit + prepV + photoPerUnit;
@@ -876,9 +876,9 @@ function LandedWorkspace() {
             </TouchableOpacity>
           ))}
         </View>
-        <Text style={ws.chipLabel}>DUTY CATEGORY</Text>
+        <Text style={ws.chipLabel}>DUTY CATEGORY — {profile.importDutyLabel.toUpperCase()}</Text>
         <View style={ws.chips}>
-          {DUTY_RATES.map((d, i) => (
+          {dutyRates.map((d, i) => (
             <TouchableOpacity key={i} style={[ws.chip, di === i && ws.chipActive]} onPress={() => setDi(i)}>
               <Text style={[ws.chipTxt, di === i && ws.chipTxtActive]}>{d.label} {(d.rate*100).toFixed(0)}%</Text>
             </TouchableOpacity>
@@ -906,7 +906,7 @@ function LandedWorkspace() {
             {[
               [`Supplier cost (FOB)`,                                   `${symbol}${cpu.toFixed(2)}`],
               [`Freight — ${FREIGHT_OPTS[fi].label}`,                   `${symbol}${freightPerUnit.toFixed(2)}`],
-              [`Import duty (${(DUTY_RATES[di].rate*100).toFixed(0)}%)`,`${symbol}${dutyPerUnit.toFixed(2)}`],
+              [`Import duty (${((dutyRates[di]?.rate ?? 0)*100).toFixed(0)}%)`,`${symbol}${dutyPerUnit.toFixed(2)}`],
               [`FBA prep`,                                               `${symbol}${prepV.toFixed(2)}`],
               [`Photography (amortized)`,                                `${symbol}${photoPerUnit.toFixed(2)}`],
               [`Total investment (${qty_} units)`,                       `${symbol}${totalInvestment.toFixed(0)}`],
@@ -1876,7 +1876,8 @@ function FreightWorkspace() {
 
 function DutiesWorkspace() {
   const { symbol, marketplace } = useCurrency();
-  const profile = getMarketplaceProfile(marketplace);
+  const profile    = getMarketplaceProfile(marketplace);
+  const dutyRates  = getDutyRates(marketplace);
   const [fob,        setFob]        = useState('');
   const [qty,        setQty]        = useState('');
   const [di,         setDi]         = useState(0);
@@ -1886,7 +1887,7 @@ function DutiesWorkspace() {
   const [show,        setShow]        = useState(false);
 
   const fobV = n(fob); const q = n(qty);
-  const rate = DUTY_RATES[di].rate;
+  const rate = dutyRates[di]?.rate ?? 0;
   const dutyPerUnit = fobV * rate;
   const totalDuty = dutyPerUnit * q;
   const vatRate = profile.vatRate ?? 0;
@@ -1932,7 +1933,7 @@ function DutiesWorkspace() {
         )}
         <Text style={ws.chipLabel}>PRODUCT CATEGORY — {profile.importDutyLabel.toUpperCase()}</Text>
         <View style={ws.chips}>
-          {DUTY_RATES.map((d, i) => (
+          {dutyRates.map((d, i) => (
             <TouchableOpacity key={i} style={[ws.chip, di === i && ws.chipActive]} onPress={() => setDi(i)}>
               <Text style={[ws.chipTxt, di === i && ws.chipTxtActive]}>{d.label} {(d.rate*100).toFixed(0)}%</Text>
             </TouchableOpacity>
@@ -1966,7 +1967,7 @@ function DutiesWorkspace() {
             </View>
           </View>
           {[
-            ['Category',        `${DUTY_RATES[di].label}`],
+            ['Category',        `${dutyRates[di]?.label ?? ''}`],
             ['Duty rate',       `${(rate*100).toFixed(0)}%`],
             ['Duty per unit',   `${symbol}${dutyPerUnit.toFixed(2)}`],
             includeVat && vatPerUnit > 0 ? [`${profile.taxLabel}`, `${symbol}${vatPerUnit.toFixed(2)}`] : null,
