@@ -27,6 +27,7 @@ import type { CurrencyCode, MarketplaceId } from '../context/CurrencyContext';
 import { useActiveProduct } from '../context/ActiveProductContext';
 import { CurrencySelector } from '../components/CurrencySelector';
 import { HelpButton } from '../components/HelpModal';
+import { AppHeader } from '../components/AppHeader';
 import type { FeatureKey } from '../lib/featureHelp';
 import { getMarketplaceProfile } from '../constants/marketplaceProfiles';
 import FeasibilityHeart from '../components/FeasibilityHeart';
@@ -2585,20 +2586,7 @@ export default function ProfitLabScreen() {
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
-      {/* Pinned header */}
-      <View style={s.header}>
-        <Text style={s.eyebrow}>PROFIT LAB</Text>
-        <View style={s.headerRow}>
-          <View style={{ flex: 1, gap: 1 }}>
-            <Text style={s.heroTitle}>{activeCalc.icon}  {activeCalc.name}</Text>
-            <Text style={s.heroSub}>{activeCalc.desc}</Text>
-          </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <CurrencySelector />
-            <HelpButton featureKey={CALC_HELP[calcType]} size="sm" />
-          </View>
-        </View>
-      </View>
+      <AppHeader helpKey={CALC_HELP[calcType]} />
 
       <ScrollView
         style={s.scroll}

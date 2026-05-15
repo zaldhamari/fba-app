@@ -23,6 +23,7 @@ import { api, BrandResult } from '../services/api';
 import { useSubscription } from '../hooks/useSubscription';
 import PaywallModal from '../components/PaywallModal';
 import { HelpButton } from '../components/HelpModal';
+import { AppHeader } from '../components/AppHeader';
 import type { FeatureKey } from '../lib/featureHelp';
 import FeasibilityHeart from '../components/FeasibilityHeart';
 
@@ -909,17 +910,7 @@ export default function BrandStudioScreen() {
     <SafeAreaView style={s.safe} edges={['top']}>
       <PaywallModal visible={showPaywall} onClose={() => setShowPaywall(false)} featureContext="brand" />
 
-      {/* ── Pinned header ─────────────────────────────────── */}
-      <View style={s.header}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Text style={s.eyebrow}>BRAND STUDIO</Text>
-          <HelpButton featureKey={ASSET_HELP[assetTab]} size="sm" />
-        </View>
-        <Text style={s.heroTitle}>Build Your Product Brand</Text>
-        <Text style={s.heroSub}>
-          Generate logos, labels, inserts, and packaging concepts before launch.
-        </Text>
-      </View>
+      <AppHeader helpKey={ASSET_HELP[assetTab]} />
 
       <ScrollView
         style={s.scroll}

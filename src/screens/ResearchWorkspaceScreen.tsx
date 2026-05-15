@@ -2,7 +2,7 @@ import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   ScrollView, StyleSheet, View, Text, Modal,
   TouchableOpacity, ActivityIndicator, Linking, Image, Alert,
-  TextInput, KeyboardAvoidingView, Platform,
+  TextInput, KeyboardAvoidingView, Platform, Clipboard,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -30,6 +30,7 @@ import { useSubscription, SAVE_LIMITS } from '../hooks/useSubscription';
 import { useVault } from '../hooks/useVault';
 import PaywallModal from '../components/PaywallModal';
 import { HelpButton } from '../components/HelpModal';
+import { AppHeader } from '../components/AppHeader';
 import FeasibilityHeart from '../components/FeasibilityHeart';
 import { SkeletonProductCard } from '../components/ds/LoadingSkeleton';
 import { useCurrency } from '../context/CurrencyContext';
@@ -151,7 +152,7 @@ interface AnalyzeSupplierResult {
   negotiation_strategy: { opening_offer: string; target_price: string; moq_ask: string; leverage_points: string[] };
 }
 
-interface OutreachEmail { subject: string; body: string; tips: string[]; }
+interface OutreachEmail { subject: string; body: string; tips: string[]; supplierUrl?: string; supplierName?: string; }
 
 // ── Static mocks (pre-search) ─────────────────────────────────────────────────
 
@@ -408,8 +409,8 @@ const recent = StyleSheet.create({
 // ── Mode segmented control (3 tabs) ──────────────────────────────────────────
 
 const MODE_TABS: { id: Mode; label: string; color: string }[] = [
-  { id: 'market',    label: 'Amazon',    color: DS.info    },
-  { id: 'lookup',    label: 'Analyst',   color: DS.indigo  },
+  { id: 'lookup',    label: 'Recon',     color: DS.indigo  },
+  { id: 'market',   label: 'Amazon',    color: DS.info    },
   { id: 'suppliers', label: 'Suppliers', color: DS.accent  },
   { id: 'freight',   label: 'Freight',   color: DS.warning },
 ];
@@ -451,7 +452,7 @@ const seg = StyleSheet.create({
 
 const MODE_DESC: Record<Mode, string> = {
   market:    'Search any keyword to discover product opportunities ranked by demand and competition.',
-  lookup:    'Search any product to find its flaws — AI reads the reviews so you can source an improved version to resell.',
+  lookup:    'Enter any product, ASIN, or Amazon URL — AI reads the reviews and surfaces every flaw you can fix in your version.',
   suppliers: 'Find matching suppliers on Alibaba, DHgate, and 1688. Select a product in Market first for better results.',
   freight:   'Estimate shipping costs from China to your FBA warehouse. Select units, weight, and dimensions to compare air vs sea.',
 };
@@ -1161,7 +1162,7 @@ function ProductMarketCard({
           activeOpacity={0.8}
         >
           <Text style={[pmc.feasTxt, isFeasSaved && pmc.feasTxtSaved]}>
-            {isFeasSaved ? '✕  Remove from Feasibility Check' : '⊛  Save for Feasibility Check'}
+            {isFeasSaved ? '✕  Remove' : '→  Run Feasibility Check'}
           </Text>
         </TouchableOpacity>
       )}
@@ -1313,7 +1314,7 @@ function ProductLookupCard({
           activeOpacity={0.8}
         >
           <Text style={[plc.feasTxt, isFeasSaved && plc.feasTxtSaved]}>
-            {isFeasSaved ? '✕  Remove from Feasibility Check' : '⊛  Save for Feasibility Check'}
+            {isFeasSaved ? '✕  Remove' : '→  Run Feasibility Check'}
           </Text>
         </TouchableOpacity>
       )}
@@ -1553,7 +1554,7 @@ function SupplierCard({
           activeOpacity={0.8}
         >
           <Text style={[sc.feasTxt, isFeasAttached && sc.feasTxtSaved]}>
-            {isFeasAttached ? '✕  Remove from Feasibility Check' : '⊛  Attach to Feasibility Check'}
+            {isFeasAttached ? '✕  Remove' : '→  Run Feasibility Check'}
           </Text>
         </TouchableOpacity>
       )}
@@ -2322,9 +2323,24 @@ const prm = StyleSheet.create({
 // ── Outreach email card ───────────────────────────────────────────────────────
 
 function OutreachEmailCard({ email }: { email: OutreachEmail }) {
+  const [copied, setCopied] = React.useState(false);
+
+  function handleCopy() {
+    const full = `Subject: ${email.subject}\n\n${email.body}`;
+    Clipboard.setString(full);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
   return (
     <AppCard padding={16} radius={18} style={oe.card}>
-      <View style={oe.header}><Text style={oe.headerTxt}>✉  Outreach Email Preview</Text></View>
+      <View style={oe.header}>
+        <Text style={oe.headerTxt}>✉  Outreach Script</Text>
+        {email.supplierName && (
+          <Text style={oe.supplierName}>{email.supplierName}</Text>
+        )}
+      </View>
+      <Text style={oe.hint}>Use this as your message when contacting the supplier on their platform.</Text>
       <View style={oe.subjectRow}>
         <Text style={oe.label}>Subject</Text>
         <Text style={oe.subject}>{email.subject}</Text>
@@ -2332,34 +2348,46 @@ function OutreachEmailCard({ email }: { email: OutreachEmail }) {
       <View style={oe.bodyBox}><Text style={oe.body}>{email.body}</Text></View>
       {email.tips.length > 0 && (
         <View style={oe.tips}>
-          <Text style={oe.tipsTitle}>Sending Tips</Text>
+          <Text style={oe.tipsTitle}>Tips</Text>
           {email.tips.map((t, i) => <Text key={i} style={oe.tip}>· {t}</Text>)}
         </View>
       )}
-      <PrimaryButton
-        label="Open in Mail App"
-        onPress={() => {
-          const encoded = encodeURIComponent(email.body);
-          const subject = encodeURIComponent(email.subject);
-          Linking.openURL(`mailto:?subject=${subject}&body=${encoded}`);
-        }}
-        icon="↗"
-      />
+      <View style={oe.btnRow}>
+        <TouchableOpacity style={oe.copyBtn} onPress={handleCopy} activeOpacity={0.8}>
+          <Text style={oe.copyTxt}>{copied ? '✓  Copied!' : '⎘  Copy Message'}</Text>
+        </TouchableOpacity>
+        {email.supplierUrl && (
+          <TouchableOpacity
+            style={oe.messageBtn}
+            onPress={() => Linking.openURL(email.supplierUrl!)}
+            activeOpacity={0.8}
+          >
+            <Text style={oe.messageTxt}>Message Supplier  →</Text>
+          </TouchableOpacity>
+        )}
+      </View>
     </AppCard>
   );
 }
 const oe = StyleSheet.create({
-  card:       { gap: 14 },
-  header:     { backgroundColor: DS.indigoLight, borderRadius: 10, padding: 10 },
-  headerTxt:  { fontSize: 12, fontWeight: '800', color: DS.indigo, letterSpacing: 0.2 },
-  subjectRow: { gap: 4 },
-  label:      { fontSize: 9, fontWeight: '800', color: DS.textMuted, textTransform: 'uppercase', letterSpacing: 0.8 },
-  subject:    { fontSize: 13, fontWeight: '700', color: DS.textPrimary, letterSpacing: -0.2 },
-  bodyBox:    { backgroundColor: DS.bgSubtle, borderRadius: 12, padding: 12 },
-  body:       { fontSize: 12, color: DS.textSecondary, lineHeight: 19 },
-  tips:       { gap: 5 },
-  tipsTitle:  { fontSize: 10, fontWeight: '800', color: DS.textMuted, textTransform: 'uppercase', letterSpacing: 0.6 },
-  tip:        { fontSize: 12, color: DS.textSecondary, lineHeight: 18 },
+  card:         { gap: 14 },
+  header:       { backgroundColor: DS.indigoLight, borderRadius: 10, padding: 10, gap: 2 },
+  headerTxt:    { fontSize: 12, fontWeight: '800', color: DS.indigo, letterSpacing: 0.2 },
+  supplierName: { fontSize: 11, color: DS.indigo + 'aa', fontWeight: '600' },
+  hint:         { fontSize: 12, color: DS.textMuted, lineHeight: 17 },
+  subjectRow:   { gap: 4 },
+  label:        { fontSize: 9, fontWeight: '800', color: DS.textMuted, textTransform: 'uppercase', letterSpacing: 0.8 },
+  subject:      { fontSize: 13, fontWeight: '700', color: DS.textPrimary, letterSpacing: -0.2 },
+  bodyBox:      { backgroundColor: DS.bgSubtle, borderRadius: 12, padding: 12 },
+  body:         { fontSize: 12, color: DS.textSecondary, lineHeight: 19 },
+  tips:         { gap: 5 },
+  tipsTitle:    { fontSize: 10, fontWeight: '800', color: DS.textMuted, textTransform: 'uppercase', letterSpacing: 0.6 },
+  tip:          { fontSize: 12, color: DS.textSecondary, lineHeight: 18 },
+  btnRow:       { flexDirection: 'row', gap: 10 },
+  copyBtn:      { flex: 1, borderRadius: 12, paddingVertical: 13, alignItems: 'center', borderWidth: 1, borderColor: DS.border, backgroundColor: DS.bgSubtle },
+  copyTxt:      { fontSize: 13, fontWeight: '700', color: DS.textSecondary },
+  messageBtn:   { flex: 1, borderRadius: 12, paddingVertical: 13, alignItems: 'center', backgroundColor: DS.indigo },
+  messageTxt:   { fontSize: 13, fontWeight: '700', color: '#fff' },
 });
 
 // ── Empty state ───────────────────────────────────────────────────────────────
@@ -2984,7 +3012,7 @@ export default function ResearchWorkspaceScreen() {
     setOutreachError('');
     try {
       const result = await api.getSupplierEmail(productName, 'Your Brand');
-      setOutreachEmail(result);
+      setOutreachEmail({ ...result, supplierUrl: item.url, supplierName: item.name });
     } catch (err: any) {
       setOutreachError(err?.message ?? 'Failed to generate email.');
     } finally {
@@ -3138,7 +3166,7 @@ export default function ResearchWorkspaceScreen() {
     };
     setActiveProduct(snapshot); // updates context + AsyncStorage atomically
     setFeasProductId(item.id);
-    navigation.navigate('LaunchPad' as any);
+    navigation.navigate('FeasibilityCheck' as any);
   }, [feasProductId, navigation, setActiveProduct]);
 
   const handleAttachSupplierFeasibility = useCallback(async (item: SupplierDisplay) => {
@@ -3158,7 +3186,7 @@ export default function ResearchWorkspaceScreen() {
     };
     await AsyncStorage.setItem(STORAGE_KEYS.feasibilitySupplier, JSON.stringify(snapshot));
     setFeasSupplierName(item.name);
-    navigation.navigate('LaunchPad' as any);
+    navigation.navigate('FeasibilityCheck' as any);
   }, [feasSupplierName, navigation]);
 
   // ── Derived ────────────────────────────────────────────────────────────────
@@ -3293,10 +3321,10 @@ export default function ResearchWorkspaceScreen() {
         {!revLoading && !revResult && revError === '' && (
           <AppCard style={ri.emptyCard}>
             <Text style={ri.emptyIcon}>◎</Text>
-            <Text style={ri.emptyTitle}>Product Improvement Finder</Text>
+            <Text style={ri.emptyTitle}>Recon</Text>
             <Text style={ri.emptyBody}>
               Enter a product name, ASIN, or Amazon URL above and tap <Text style={{ fontWeight: '700', color: DS.accent }}>Analyze</Text>.{'\n\n'}
-              The AI reads the reviews for that specific product and tells you exactly what to fix in your version.
+              AI reads the reviews and tells you exactly what to fix — so your version beats the original.
             </Text>
           </AppCard>
         )}
@@ -3747,18 +3775,7 @@ export default function ResearchWorkspaceScreen() {
         onClose={() => setShowCompareSuppliers(false)}
       />
 
-      {/* ── Pinned header ───────────────────────────────────── */}
-      <View style={s.header}>
-        <View style={s.headerTop}>
-          <Text style={s.eyebrow}>RESEARCH WORKSPACE</Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <CurrencySelector />
-            <HelpButton featureKey={mode === 'suppliers' ? 'suppliers' : mode === 'market' ? 'research' : mode === 'freight' ? 'freight_tab' : 'smart_search'} size="sm" />
-          </View>
-        </View>
-        <Text style={s.heroTitle}>Discover Winning Products</Text>
-        <Text style={s.heroSub}>Research markets, look up products, and find suppliers.</Text>
-      </View>
+      <AppHeader helpKey={mode === 'suppliers' ? 'suppliers' : mode === 'market' ? 'research' : mode === 'freight' ? 'freight_tab' : 'smart_search'} />
 
       <ScrollView
         style={s.scroll}

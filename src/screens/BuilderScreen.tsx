@@ -15,6 +15,7 @@ import type {
 } from '../types/builder';
 import { STAGE_ORDER, STAGE_LABELS, STAGE_ICONS } from '../types/builder';
 import { HelpButton } from '../components/HelpModal';
+import { AppHeader } from '../components/AppHeader';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -1516,15 +1517,7 @@ export default function BuilderScreen() {
   if (!session) {
     return (
       <SafeAreaView style={bs.safe}>
-        {/* Standard pinned header — matches Research / ProfitLab / BrandStudio */}
-        <View style={bs.header}>
-          <View style={bs.headerTop}>
-            <Text style={bs.eyebrow}>LAUNCHPAD</Text>
-            <HelpButton featureKey="launchpad" size="sm" />
-          </View>
-          <Text style={bs.heroTitle}>Your Product Pipeline</Text>
-          <Text style={bs.heroSub}>7 guided stages from idea to a launch-ready brand.</Text>
-        </View>
+        <AppHeader helpKey="launchpad" />
 
         <ScrollView style={{ flex: 1 }} contentContainerStyle={bs.emptyContent} showsVerticalScrollIndicator={false}>
           {/* Hero icon orb */}

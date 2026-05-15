@@ -4,11 +4,10 @@ import {
   ScrollView, Platform, Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import LaunchPackModal from '../components/LaunchPackModal';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/RootNavigator';
 import {
-  useSubscription, Tier, PLANS, PLAN_FEATURES, LAUNCH_PACK_PRICE,
+  useSubscription, Tier, PLANS, PLAN_FEATURES,
 } from '../hooks/useSubscription';
 import {
   AppCard, SectionHeader, StatusBadge, PrimaryButton, SecondaryButton, DS,
@@ -410,45 +409,6 @@ const tr = StyleSheet.create({
 
 // ── Launch Pack upsell ────────────────────────────────────────────────────────
 
-function LaunchPackCard({ onPress }: { onPress: () => void }) {
-  return (
-    <AppCard style={lp.card}>
-      <View style={lp.topRow}>
-        <View>
-          <Text style={lp.eyebrow}>ONE-TIME PURCHASE</Text>
-          <Text style={lp.title}>⚡ Launch Pack</Text>
-        </View>
-        <View style={lp.priceBadge}>
-          <Text style={lp.price}>${LAUNCH_PACK_PRICE}</Text>
-        </View>
-      </View>
-      <Text style={lp.body}>
-        Brand kit, optimized listing, supplier email sequence, PPC template, and a 48-hour activation plan.
-        One-time purchase — yours forever.
-      </Text>
-      <PrimaryButton label="Get the Launch Pack →" onPress={onPress} />
-    </AppCard>
-  );
-}
-
-const lp = StyleSheet.create({
-  card: {
-    gap: 14,
-    borderColor: DS.indigoLight,
-    borderWidth: 1.5,
-  },
-  topRow:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  eyebrow:    { fontSize: 8, fontWeight: '900', color: DS.indigo, letterSpacing: 1.8, marginBottom: 4 },
-  title:      { fontSize: 20, fontWeight: '900', color: DS.textPrimary, letterSpacing: -0.5 },
-  priceBadge: {
-    backgroundColor: DS.indigoLight,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
-  price: { fontSize: 24, fontWeight: '900', color: DS.indigo, letterSpacing: -0.8 },
-  body:  { fontSize: 13, color: DS.textSecondary, lineHeight: 19 },
-});
 
 // ── FAQ accordion ─────────────────────────────────────────────────────────────
 
@@ -507,7 +467,6 @@ export default function PaywallScreen({ navigation, route }: Props) {
   const [purchasing,   setPurchasing]   = useState(false);
   const [restoring,    setRestoring]    = useState(false);
   const [error,        setError]        = useState('');
-  const [showLaunchPack, setShowLaunchPack] = useState(false);
 
   const forced = route?.params?.forced;
 
@@ -566,7 +525,6 @@ export default function PaywallScreen({ navigation, route }: Props) {
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
-      <LaunchPackModal visible={showLaunchPack} onClose={() => setShowLaunchPack(false)} />
 
       <ScrollView
         style={Platform.OS === 'web' ? { height: screenHeight } : { flex: 1 }}
@@ -643,7 +601,6 @@ export default function PaywallScreen({ navigation, route }: Props) {
         <SectionHeader title="Full Comparison" style={s.sectionHead} />
         <ComparisonCard />
 
-        {/* Launch Pack removed — will be re-added once wired to IAP */}
 
         {/* ── Trust ─────────────────────────────────────────── */}
         <TrustCard />

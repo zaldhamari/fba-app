@@ -837,17 +837,17 @@ export default function CalculatorScreen() {
                     {saveMsg || (isFeasSaved ? '✕  Unsave Feasibility Check' : '✦  Save Feasibility Check')}
                   </Text>
                 </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={s.launchPadBtn}
+                  onPress={() => (navigation as any).navigate('Main', { screen: 'LaunchPad' })}
+                  activeOpacity={0.85}
+                >
+                  <Text style={s.launchPadBtnTxt}>Take to LaunchPad  →</Text>
+                </TouchableOpacity>
               </View>
             )}
           </>
-        )}
-
-        {/* ── AI Feasibility Report (step 2 of feasibility flow) ──────── */}
-        {hasData && (
-          <AIReportSection
-            tags={tags}
-            onOpen={() => navigation.navigate('FeasibilityReport')}
-          />
         )}
 
         <View style={{ height: 40 }} />
@@ -855,80 +855,6 @@ export default function CalculatorScreen() {
     </SafeAreaView>
   );
 }
-
-// ─── AI Report Section ────────────────────────────────────────────────────────
-
-const AI_PILLARS: { type: FeasibilityTagType; label: string; icon: string }[] = [
-  { type: 'calculation', label: 'Profit',   icon: '◈' },
-  { type: 'freight',     label: 'Freight',  icon: '🚢' },
-  { type: 'brand',       label: 'Brand',    icon: '✦' },
-  { type: 'keywords',    label: 'Keywords', icon: '🔑' },
-];
-
-function AIReportSection({ tags, onOpen }: { tags: { type: string }[]; onOpen: () => void }) {
-  const savedTypes = new Set(tags.map(t => t.type));
-  const filledCount = AI_PILLARS.filter(p => savedTypes.has(p.type)).length;
-  const hasAny = filledCount > 0;
-
-  return (
-    <View style={ar.wrapper}>
-      <View style={ar.header}>
-        <View style={ar.iconWrap}><Text style={{ fontSize: 18 }}>📋</Text></View>
-        <View style={{ flex: 1 }}>
-          <Text style={ar.eyebrow}>STEP 2 — AI REPORT</Text>
-          <Text style={ar.title}>Deep-dive AI Verdict</Text>
-          <Text style={ar.sub}>
-            {hasAny
-              ? `${filledCount}/4 data sources tagged — generate your full GO / NO-GO report`
-              : 'Tag profit, freight, brand, and keyword data using ♡ on each tool screen'}
-          </Text>
-        </View>
-      </View>
-
-      <View style={ar.pillars}>
-        {AI_PILLARS.map(p => {
-          const done = savedTypes.has(p.type);
-          return (
-            <View key={p.type} style={[ar.pillar, done && ar.pillarDone]}>
-              <Text style={[ar.pillarIcon, done && ar.pillarIconDone]}>{p.icon}</Text>
-              <Text style={[ar.pillarLabel, done && ar.pillarLabelDone]}>{p.label}</Text>
-            </View>
-          );
-        })}
-      </View>
-
-      <TouchableOpacity
-        style={[ar.btn, hasAny && ar.btnActive]}
-        onPress={onOpen}
-        activeOpacity={0.85}
-      >
-        <Text style={[ar.btnTxt, hasAny && ar.btnTxtActive]}>
-          {hasAny ? 'Generate AI Report  →' : 'Tag data on tool screens to unlock'}
-        </Text>
-      </TouchableOpacity>
-    </View>
-  );
-}
-
-const ar = StyleSheet.create({
-  wrapper:      { backgroundColor: DS.bgCard, borderRadius: DS.radiusCard, borderWidth: 1.5, borderColor: DS.accent + '50', padding: 16, gap: 12, marginTop: 4 },
-  header:       { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
-  iconWrap:     { width: 42, height: 42, borderRadius: 12, backgroundColor: DS.indigoLight, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  eyebrow:      { fontSize: 7, fontWeight: '800', color: DS.accent, letterSpacing: 2 },
-  title:        { fontSize: 15, fontWeight: '900', color: DS.textPrimary, letterSpacing: -0.3, marginTop: 2 },
-  sub:          { fontSize: 11, color: DS.textSecondary, lineHeight: 16, marginTop: 3 },
-  pillars:      { flexDirection: 'row', gap: 6 },
-  pillar:       { flex: 1, alignItems: 'center', gap: 3, paddingVertical: 7, borderRadius: 9, borderWidth: 1, borderColor: DS.border, backgroundColor: DS.bgSubtle },
-  pillarDone:   { borderColor: DS.accent + '55', backgroundColor: DS.indigoLight },
-  pillarIcon:   { fontSize: 13, opacity: 0.3 },
-  pillarIconDone:{ opacity: 1 },
-  pillarLabel:  { fontSize: 8, fontWeight: '700', color: DS.textMuted },
-  pillarLabelDone:{ color: DS.accent },
-  btn:          { borderRadius: 11, paddingVertical: 11, alignItems: 'center', backgroundColor: DS.bgSubtle, borderWidth: 1, borderColor: DS.border },
-  btnActive:    { backgroundColor: DS.accent, borderColor: DS.accent },
-  btnTxt:       { fontSize: 13, fontWeight: '800', color: DS.textMuted },
-  btnTxtActive: { color: '#fff' },
-});
 
 // ─── Screen styles ────────────────────────────────────────────────────────────
 
@@ -963,6 +889,20 @@ const s = StyleSheet.create({
 
   row:  { flexDirection: 'row' as const, gap: 10 },
   note: { fontSize: 11, color: DS.textMuted, lineHeight: 16 },
+
+  launchPadBtn: {
+    backgroundColor: DS.indigo,
+    borderRadius: DS.radiusButton,
+    paddingVertical: 14,
+    alignItems: 'center' as const,
+    marginTop: 4,
+  },
+  launchPadBtnTxt: {
+    fontSize: 15,
+    fontWeight: '700' as const,
+    color: '#fff',
+    letterSpacing: 0.2,
+  },
 });
 
 // ─── Card styles ──────────────────────────────────────────────────────────────

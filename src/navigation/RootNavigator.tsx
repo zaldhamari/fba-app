@@ -7,7 +7,6 @@ import AuthScreen from '../screens/AuthScreen';
 import LegalScreen from '../screens/LegalScreen';
 import LaunchScreen from '../screens/LaunchScreen';
 import CalculatorScreen from '../screens/CalculatorScreen';
-import FeasibilityReportScreen from '../screens/FeasibilityReportScreen';
 import SellerProfileScreen from '../screens/SellerProfileScreen';
 import TabNavigator from './TabNavigator';
 import { LegalDocumentType } from '../constants/legalContent';
@@ -22,7 +21,6 @@ export type RootStackParamList = {
   Premium: undefined;
   Checklist: undefined;
   FeasibilityCheck: undefined;
-  FeasibilityReport: undefined;
   Legal: { type: LegalDocumentType };
 };
 
@@ -42,7 +40,6 @@ export default function RootNavigator() {
       <Stack.Screen name="Premium"    component={PaywallScreen} options={{ animationEnabled: true }} />
       <Stack.Screen name="Checklist"       component={LaunchScreen}      options={{ animationEnabled: true }} />
       <Stack.Screen name="FeasibilityCheck"  component={CalculatorScreen}         options={{ animationEnabled: true }} />
-      <Stack.Screen name="FeasibilityReport" component={FeasibilityReportScreen}  options={{ animationEnabled: true }} />
       <Stack.Screen name="Main"              component={TabNavigator} />
       <Stack.Screen name="Legal"            component={LegalScreen}       options={{ animationEnabled: true }} />
     </Stack.Navigator>

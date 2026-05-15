@@ -309,7 +309,10 @@ export const api = {
 
   // ─── General AI Ask ────────────────────────────────────────────────────────
   askAI: (question: string, context?: string | Record<string, unknown>) =>
-    post<{ answer: string; available: boolean }>('/ai/ask', { question, context }),
+    post<{ answer: string; available: boolean }>('/ai/ask', {
+      question,
+      context: typeof context === 'string' ? { note: context } : context,
+    }),
 
   // ─── Niche Intelligence ────────────────────────────────────────────────────
   searchNiche: (body: {

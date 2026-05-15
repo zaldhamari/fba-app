@@ -90,6 +90,12 @@ export function AppHeader({ helpKey }: AppHeaderProps = {}) {
     );
   }
 
+  async function handleResetOnboarding() {
+    await AsyncStorage.removeItem(STORAGE_KEYS.onboardingDone);
+    setShowSettings(false);
+    navigation.dispatch(CommonActions.reset({ index: 0, routes: [{ name: 'Onboarding' }] }));
+  }
+
   function navLegal(type: 'privacy' | 'terms') {
     setShowSettings(false);
     setTimeout(() => navigation.navigate('Legal', { type }), 300);
@@ -207,6 +213,16 @@ export function AppHeader({ helpKey }: AppHeaderProps = {}) {
                   activeOpacity={0.8}
                 >
                   <Text style={h.deleteText}>{deletingAccount ? 'Deleting…' : 'Delete Account'}</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* ── Dev Tools (bypass only) ────────────────────── */}
+            {process.env.EXPO_PUBLIC_DEV_BYPASS === 'true' && (
+              <View style={h.section}>
+                <Text style={[h.sectionLabel, { color: DS.warning }]}>DEV TOOLS</Text>
+                <TouchableOpacity style={h.devBtn} onPress={handleResetOnboarding} activeOpacity={0.8}>
+                  <Text style={h.devBtnText}>↺  Reset Onboarding</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -330,6 +346,12 @@ const h = StyleSheet.create({
     borderWidth: 1, borderColor: '#FEE2E2',
   },
   deleteText: { fontSize: 13, fontWeight: '600', color: '#DC2626' },
+  devBtn: {
+    backgroundColor: '#FFF9EC', borderRadius: 10,
+    paddingVertical: 10, alignItems: 'center' as const,
+    borderWidth: 1, borderColor: '#FDE68A',
+  },
+  devBtnText: { fontSize: 13, fontWeight: '700' as const, color: '#92400E' },
   linkRow:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 4 },
   linkText: { fontSize: 14, color: DS.textSecondary },
   linkArrow:{ fontSize: 14, color: DS.textMuted },
