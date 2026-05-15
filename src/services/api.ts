@@ -1,19 +1,50 @@
 const BASE_URL = 'https://fba-backend-production-6c44.up.railway.app/api';
 const API_KEY  = process.env.EXPO_PUBLIC_API_KEY ?? '';
 
+const REQUEST_TIMEOUT_MS = 15_000;
+
+// Classify a raw fetch/network error into a user-friendly message.
+export function friendlyError(err: unknown): string {
+  if (err instanceof Error) {
+    if (err.name === 'AbortError') return 'Request timed out. Check your connection and try again.';
+    if (
+      err.message.includes('Network request failed') ||
+      err.message.includes('Failed to fetch') ||
+      err.message.includes('net::ERR') ||
+      err.message.includes('network')
+    ) return 'No internet connection. Please check your network and try again.';
+    return err.message;
+  }
+  return 'Something went wrong. Please try again.';
+}
+
 async function post<T>(endpoint: string, body: object): Promise<T> {
-  const res = await fetch(`${BASE_URL}${endpoint}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-API-Key': API_KEY,
-    },
-    body: JSON.stringify(body),
-  });
-  if (res.status === 401) throw new Error('API authentication failed. Please update the app.');
-  if (res.status === 429) throw new Error('Too many requests. Please slow down.');
-  if (!res.ok) throw new Error(`Server error ${res.status}`);
-  return res.json();
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${BASE_URL}${endpoint}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-API-Key': API_KEY,
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    if (res.status === 401) throw new Error('API authentication failed. Please update the app.');
+    if (res.status === 429) throw new Error('Too many requests. Please wait a moment and try again.');
+    if (res.status >= 500) throw new Error('Our servers are having issues. Please try again shortly.');
+    if (!res.ok) throw new Error(`Unexpected error (${res.status}). Please try again.`);
+    return res.json();
+  } catch (err: any) {
+    if (err?.name === 'AbortError') {
+      throw new Error('Request timed out. Check your connection and try again.');
+    }
+    // Re-wrap network errors with friendly messages
+    throw new Error(friendlyError(err));
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export interface Product {
@@ -64,6 +95,17 @@ export interface FBAResult {
   billable_weight_lbs: number;
   viable: boolean;
   verdict: 'Excellent' | 'Good' | 'Marginal' | 'Not viable';
+  shipment?: {
+    quantity: number;
+    total_weight_lbs: number;
+    carton_count: number;
+    carton_dims: { length: number; width: number; height: number };
+    units_per_carton: number;
+    carton_weight_lbs: number;
+    total_inventory_cost: number;
+    total_revenue: number;
+    total_profit: number;
+  };
 }
 
 export interface BrandResult {
@@ -82,6 +124,9 @@ export interface BrandResult {
 }
 
 export const api = {
+  lookupProduct: (input: string) =>
+    post<{ asin: string; title: string | null; category: string | null; url: string; source: string; error?: string }>('/research/product', { input }),
+
   searchAmazon: (keyword: string, category = 'all') =>
     post<{ products: Product[]; trends: TrendData; keyword: string }>('/research/amazon', { keyword, category }),
 
@@ -95,6 +140,7 @@ export const api = {
     weight_lbs: number;
     dimensions: { length: number; width: number; height: number };
     category: string;
+    quantity?: number;
   }) => post<FBAResult>('/calculate/fba', body),
 
   createBrand: (product_type: string, style = 'minimal', brand_name = '') =>
@@ -146,6 +192,7 @@ export const api = {
     monthly_sales_est?: number;
     marketplace?: string;
     currency?: string;
+    financial_context?: Record<string, unknown>;
   }) => post<{
     verdict: 'Launch' | 'Test First' | 'Avoid';
     confidence: number;
@@ -259,4 +306,106 @@ export const api = {
       red_lines?: string[];
     };
   }>('/suppliers/score', body),
+
+  // ─── General AI Ask ────────────────────────────────────────────────────────
+  askAI: (question: string, context?: string | Record<string, unknown>) =>
+    post<{ answer: string; available: boolean }>('/ai/ask', { question, context }),
+
+  // ─── Niche Intelligence ────────────────────────────────────────────────────
+  searchNiche: (body: {
+    keyword: string;
+    marketplace?: string;
+    price_min?: number;
+    price_max?: number;
+    max_top_seller_reviews?: number;
+    budget?: number;
+  }) => post<{
+    keyword: string;
+    marketplace: string;
+    verdict: {
+      label: string;
+      color: string;
+      score: number;
+      reasons: string[];
+      warnings: string[];
+    };
+    market_snapshot: {
+      avg_price: number;
+      avg_reviews: number;
+      avg_rating: number;
+      top_reviews: number;
+      total_products: number;
+      in_price_range: number;
+      low_competition: number;
+    };
+    the_gap: string[];
+    products_to_model: {
+      title: string;
+      price: number;
+      rating: number;
+      review_count: number;
+      asin: string;
+      url: string;
+    }[];
+    can_you_afford_it: {
+      budget: number;
+      target_unit_cost: number;
+      min_order_cost: number;
+      can_afford: boolean;
+      verdict: string;
+    };
+  }>('/research/niche', body),
+
+  // ─── Suppliers v2 (real Alibaba API) ──────────────────────────────────────
+  searchSuppliersV2: (body: {
+    product: string;
+    marketplace?: string;
+    max_unit_price?: number;
+    max_moq?: number;
+  }) => post<{ suppliers: Supplier[]; product: string }>('/research/suppliers-v2', body),
+
+  // ─── Freight Estimates ─────────────────────────────────────────────────────
+  estimateFreight: (body: {
+    product_name: string;
+    marketplace?: string;
+    units?: number;
+    weight_kg_per_unit?: number;
+    length_cm?: number;
+    width_cm?: number;
+    height_cm?: number;
+  }) => post<{
+    product: string;
+    marketplace: string;
+    units: number;
+    total_weight_kg: number;
+    total_cbm: number;
+    modes: {
+      air:     { mode: string; total_cost: number; cost_per_unit: number; transit_days: number; notes: string };
+      sea_lcl: { mode: string; total_cost: number; cost_per_unit: number; transit_days: number; notes: string };
+      sea_fcl: { mode: string; total_cost: number; cost_per_unit: number; transit_days: number; notes: string } | null;
+      express: { mode: string; total_cost: number; cost_per_unit: number; transit_days: number; notes: string };
+    };
+    recommended: 'air' | 'sea_lcl' | 'sea_fcl' | 'express';
+    fba_inbound_est: number;
+    prep_cost: number;
+  }>('/research/freight', body),
+
+  // ─── Feasibility Report ────────────────────────────────────────────────────
+  generateFeasibilityReport: (body: {
+    product_name: string;
+    amazon_price?: number | null;
+    supplier_analysis?: Record<string, unknown> | null;
+    calculation?: Record<string, unknown> | null;
+    brand?: Record<string, unknown> | null;
+    keywords?: Record<string, unknown> | null;
+    freight?: Record<string, unknown> | null;
+    marketplace?: string;
+    currency?: string;
+  }) => post<{
+    verdict: 'GO' | 'CAUTION' | 'NO-GO';
+    confidence: number;
+    headline: string;
+    sections: { title: string; body?: string; items?: string[] }[];
+    data_completeness: 'full' | 'partial' | 'limited';
+  }>('/ai/feasibility-report', body),
 };

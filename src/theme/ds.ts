@@ -19,16 +19,24 @@ export const DS_TEXT_INVERSE   = '#FFFFFF' as const;
 export const DS_BORDER       = '#E6ECFF' as const;
 export const DS_BORDER_LIGHT = '#F0F4FF' as const;
 
-// ── Accent — Emerald green (primary CTA, active tabs, progress) ───────────────
-export const DS_ACCENT       = '#10B981' as const;
-export const DS_ACCENT_LIGHT = '#ECFDF5' as const;
-export const DS_ACCENT_DARK  = '#059669' as const;
+// ── Primary Accent — Blue (#2563EB) ───────────────────────────────────────────
+export const DS_ACCENT       = '#2563EB' as const;
+export const DS_ACCENT_LIGHT = '#DBEAFE' as const;
+export const DS_ACCENT_DARK  = '#1D4ED8' as const;
 
-// ── Indigo — secondary accent (charts, links, AI features) ───────────────────
-export const DS_INDIGO       = '#6366F1' as const;
-export const DS_INDIGO_LIGHT = '#EEF2FF' as const;
+// ── Indigo — alias for primary blue (backward compat for components) ──────────
+export const DS_INDIGO       = '#2563EB' as const;
+export const DS_INDIGO_LIGHT = '#DBEAFE' as const;
 
-// ── Semantic status ───────────────────────────────────────────────────────────
+// ── Pink — aliased to blue (Brand Studio accent, unified) ─────────────────────
+export const DS_PINK       = '#2563EB' as const;
+export const DS_PINK_LIGHT = '#DBEAFE' as const;
+
+// ── Gold — Premium / trust score accent (intentional, not removed) ────────────
+export const DS_GOLD       = '#B45309' as const;
+export const DS_GOLD_LIGHT = '#FFFBEB' as const;
+
+// ── Semantic status — true success / warning / danger / info only ─────────────
 export const DS_SUCCESS      = '#10B981' as const;
 export const DS_SUCCESS_BG   = '#ECFDF5' as const;
 export const DS_SUCCESS_TEXT = '#059669' as const;
@@ -41,8 +49,8 @@ export const DS_DANGER       = '#EF4444' as const;
 export const DS_DANGER_BG    = '#FEF2F2' as const;
 export const DS_DANGER_TEXT  = '#DC2626' as const;
 
-export const DS_INFO         = '#3B82F6' as const;
-export const DS_INFO_BG      = '#EFF6FF' as const;
+export const DS_INFO         = '#2563EB' as const;
+export const DS_INFO_BG      = '#DBEAFE' as const;
 export const DS_INFO_TEXT    = '#1D4ED8' as const;
 
 export const DS_NEUTRAL      = '#8196B0' as const;
@@ -85,7 +93,7 @@ export const DS_SHADOW_FLOAT = {
 } as const;
 
 export const DS_SHADOW_BUTTON = {
-  shadowColor:   '#10B981',
+  shadowColor:   '#2563EB',
   shadowOffset:  { width: 0, height: 4 },
   shadowOpacity: 0.28,
   shadowRadius:  10,
@@ -119,6 +127,12 @@ export const DS = {
 
   indigo:      DS_INDIGO,
   indigoLight: DS_INDIGO_LIGHT,
+
+  pink:        DS_PINK,
+  pinkLight:   DS_PINK_LIGHT,
+
+  gold:        DS_GOLD,
+  goldLight:   DS_GOLD_LIGHT,
 
   success:     DS_SUCCESS,
   successBg:   DS_SUCCESS_BG,

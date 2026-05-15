@@ -6,24 +6,44 @@
   "build": {
     "development": {
       "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_DEV_BYPASS": "true"
+      },
       "ios": {
         "simulator": false
+      },
+      "android": {
+        "buildType": "apk"
       }
     },
     "preview": {
       "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_DEV_BYPASS": "true"
+      },
       "ios": {
         "simulator": false
       },
-      "env": {
-        "EXPO_PUBLIC_DEV_BYPASS": "true"
+      "android": {
+        "buildType": "apk"
       }
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_DEV_BYPASS": "false"
+      },
+      "android": {
+        "buildType": "app-bundle"
+      }
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "android": {
+        "serviceAccountKeyPath": "./google-play-service-account.json",
+        "track": "internal"
+      }
+    }
   }
 }

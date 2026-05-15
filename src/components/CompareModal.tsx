@@ -154,7 +154,7 @@ const cmp = StyleSheet.create({
   riskBox:      { borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 7, marginTop: 2 },
   riskLabel:    { fontSize: 8, fontWeight: '800', color: colors.red, letterSpacing: 1.5, marginBottom: 2 },
   riskText:     { fontSize: 10, color: colors.textMuted, lineHeight: 14 },
-  closeBtn:     { backgroundColor: '#4361EE', borderRadius: radius.full, paddingVertical: spacing.md, alignItems: 'center' },
+  closeBtn:     { backgroundColor: '#2563EB', borderRadius: radius.full, paddingVertical: spacing.md, alignItems: 'center' },
   closeBtnText: { fontSize: 15, fontWeight: '700', color: colors.white },
   emptyState:     { alignItems: 'center', paddingVertical: spacing.lg },
   emptyStateText: { fontSize: 13, color: colors.textMuted, textAlign: 'center', lineHeight: 20 },

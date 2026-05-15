@@ -15,9 +15,9 @@ interface SizeConfig {
 }
 
 const SIZE_CONFIG: Record<DSButtonSize, SizeConfig> = {
-  sm: { paddingVertical: 8,  paddingHorizontal: 16, minHeight: 36, fontSize: 13 },
+  sm: { paddingVertical: 14, paddingHorizontal: 24, minHeight: 50, fontSize: 15 },
   md: { paddingVertical: 14, paddingHorizontal: 24, minHeight: 50, fontSize: 15 },
-  lg: { paddingVertical: 17, paddingHorizontal: 28, minHeight: 56, fontSize: 17 },
+  lg: { paddingVertical: 14, paddingHorizontal: 24, minHeight: 50, fontSize: 15 },
 };
 
 // ── Shared props ──────────────────────────────────────────────────────────────
@@ -35,7 +35,7 @@ export interface ButtonProps {
   accessibilityLabel?: string;
 }
 
-// ── PrimaryButton — solid emerald green ───────────────────────────────────────
+// ── PrimaryButton — solid indigo ─────────────────────────────────────────────
 
 export function PrimaryButton({
   label, onPress,
@@ -159,7 +159,7 @@ export function GhostButton({
       accessibilityState={{ disabled: disabled || loading }}
     >
       {loading ? (
-        <ActivityIndicator color={DS.accent} size="small" />
+        <ActivityIndicator color={DS.indigo} size="small" />
       ) : (
         <View style={s.inner}>
           {icon ? <Text style={[s.iconGhost, { fontSize: sz.fontSize + 1 }]}>{icon}</Text> : null}
@@ -180,9 +180,8 @@ const s = StyleSheet.create({
     borderRadius:   DS.radiusButton,
   },
   primary: {
-    backgroundColor: DS.accent,
-    // Shadow tinted with accent color
-    shadowColor:   DS.accent,
+    backgroundColor: DS.indigo,
+    shadowColor:   DS.indigo,
     shadowOffset:  { width: 0, height: 4 },
     shadowOpacity: 0.28,
     shadowRadius:  10,
@@ -194,7 +193,7 @@ const s = StyleSheet.create({
     borderColor:     DS.border,
   },
   ghost: {
-    backgroundColor: DS.accentLight,
+    backgroundColor: DS.indigoLight,
   },
   disabled: {
     opacity: 0.45,
@@ -206,7 +205,7 @@ const s = StyleSheet.create({
   },
   icon:          { color: DS.textInverse },
   iconSecondary: { color: DS.textPrimary },
-  iconGhost:     { color: DS.accent      },
+  iconGhost:     { color: DS.indigo      },
   primaryLabel:  {
     color:          DS.textInverse,
     fontWeight:     '700',
@@ -218,7 +217,7 @@ const s = StyleSheet.create({
     letterSpacing:  -0.2,
   },
   ghostLabel: {
-    color:          DS.accent,
+    color:          DS.indigo,
     fontWeight:     '700',
     letterSpacing:  -0.2,
   },

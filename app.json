@@ -2,11 +2,12 @@
   "expo": {
     "name": "Siftly",
     "slug": "siftly",
+    "scheme": "siftly",
     "version": "1.0.0",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/appicon.png",
     "newArchEnabled": false,
     "orientation": "portrait",
-    "userInterfaceStyle": "dark",
+    "userInterfaceStyle": "light",
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
@@ -15,6 +16,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.siftly.app",
+      "icon": "./assets/appicon.png",
       "buildNumber": "1",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
@@ -37,11 +39,25 @@
       }
     },
     "android": {
-      "package": "com.siftly.app"
+      "package": "com.siftly.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/appicon.png",
+        "backgroundColor": "#0A1628"
+      }
     },
     "plugins": [
       "expo-secure-store",
-      "expo-sharing"
+      "expo-sharing",
+      "expo-web-browser",
+      "@sentry/react-native",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/appicon.png",
+          "color": "#0A1628",
+          "sounds": []
+        }
+      ]
     ],
     "extra": {
       "eas": {

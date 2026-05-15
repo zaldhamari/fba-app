@@ -41,12 +41,26 @@ export const authActions = {
   resetPassword: (email: string) =>
     supabase.auth.resetPasswordForEmail(email),
 
-  // TODO: To complete OAuth on device, install expo-auth-session and set up
-  //       a deep-link redirect URI (e.g. myapp://auth/callback) in your
-  //       Supabase project's Allowed Redirect URLs and app.json scheme.
+  resendVerification: (email: string) =>
+    supabase.auth.resend({ type: 'signup', email }),
+
+  deleteAccount: () =>
+    supabase.rpc('delete_user'),
+
+  // OAuth uses the app's registered URL scheme (siftly://) so iOS/Android
+  // redirect back after browser auth. The deep link is processed in App.tsx
+  // via Linking + supabase.auth.exchangeCodeForSession().
+  // Supabase dashboard must allow: siftly://auth/callback in Redirect URLs.
   signInWithGoogle: () =>
-    supabase.auth.signInWithOAuth({ provider: 'google' }),
+    supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: 'siftly://auth/callback', skipBrowserRedirect: true },
+    }),
 
   signInWithApple: () =>
-    supabase.auth.signInWithOAuth({ provider: 'apple' }),
+    supabase.auth.signInWithOAuth({
+      provider: 'apple',
+      options: { redirectTo: 'siftly://auth/callback', skipBrowserRedirect: true },
+    }),
+
 };

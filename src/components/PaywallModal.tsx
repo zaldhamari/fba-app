@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   Modal, View, Text, StyleSheet, TouchableOpacity,
-  ScrollView, Switch,
+  ScrollView,
 } from 'react-native';
 import { colors, spacing, radius } from '../theme';
 import { useSubscription, Tier, PLANS, PLAN_FEATURES } from '../hooks/useSubscription';
@@ -93,20 +93,23 @@ export default function PaywallModal({
           <Text style={s.context}>{headline}</Text>
           <Text style={s.title}>Unlock more{'\n'}opportunity.</Text>
 
-          {/* Annual toggle */}
-          <View style={s.toggleRow}>
-            <Text style={s.toggleLabel}>Annual billing</Text>
-            <View style={s.toggleRight}>
-              <View style={s.saveBadge}>
-                <Text style={s.saveBadgeText}>SAVE 40%</Text>
-              </View>
-              <Switch
-                value={annual}
-                onValueChange={setAnnual}
-                trackColor={{ false: colors.gray200, true: '#4361EE' }}
-                thumbColor={colors.white}
-              />
-            </View>
+          {/* Billing period selector */}
+          <View style={s.billingRow}>
+            <TouchableOpacity
+              style={[s.billingBtn, !annual && s.billingBtnActive]}
+              onPress={() => setAnnual(false)}
+              activeOpacity={0.85}
+            >
+              <Text style={[s.billingBtnLabel, !annual && s.billingBtnLabelActive]}>Monthly</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[s.billingBtn, annual && s.billingBtnActive]}
+              onPress={() => setAnnual(true)}
+              activeOpacity={0.85}
+            >
+              <Text style={[s.billingBtnLabel, annual && s.billingBtnLabelActive]}>Annual</Text>
+              <View style={s.saveBadge}><Text style={s.saveBadgeText}>SAVE 40%</Text></View>
+            </TouchableOpacity>
           </View>
 
           {/* Tier selector */}
@@ -155,6 +158,9 @@ export default function PaywallModal({
             onPress={handlePurchase}
             disabled={purchasing}
             activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel={purchasing ? 'Processing purchase' : `Subscribe to ${PLANS[selected].name} plan`}
+            accessibilityState={{ disabled: purchasing, busy: purchasing }}
           >
             <Text style={s.ctaText}>
               {purchasing
@@ -198,7 +204,7 @@ const s = StyleSheet.create({
     backgroundColor: colors.bgCard,
     borderTopLeftRadius: 28, borderTopRightRadius: 28,
     borderTopWidth: 1, borderLeftWidth: 1, borderRightWidth: 1,
-    borderColor: 'rgba(67,97,238,0.22)',
+    borderColor: 'rgba(37,99,235,0.22)',
     paddingHorizontal: spacing.lg,
     paddingBottom: 36,
     paddingTop: spacing.md,
@@ -208,24 +214,30 @@ const s = StyleSheet.create({
     width: 40, height: 4, borderRadius: 2,
     backgroundColor: colors.bgElevated, alignSelf: 'center', marginBottom: spacing.lg,
   },
-  context: { fontSize: 9, fontWeight: '800', color: '#4361EE', letterSpacing: 2, marginBottom: spacing.xs },
+  context: { fontSize: 9, fontWeight: '800', color: '#2563EB', letterSpacing: 2, marginBottom: spacing.xs },
   title: {
     fontSize: 28, fontWeight: '900', color: colors.textPrimary,
     letterSpacing: -1, lineHeight: 34, marginBottom: spacing.md,
   },
 
-  toggleRow: {
-    flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'space-between', marginBottom: spacing.md,
+  billingRow: {
+    flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md,
   },
-  toggleLabel: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
-  toggleRight: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  billingBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: spacing.xs, borderWidth: 1, borderColor: colors.border,
+    borderRadius: radius.md, paddingVertical: spacing.sm + 2,
+    backgroundColor: colors.bgElevated,
+  },
+  billingBtnActive: { borderColor: '#2563EB', backgroundColor: 'rgba(37,99,235,0.08)' },
+  billingBtnLabel: { fontSize: 14, fontWeight: '700', color: colors.textMuted },
+  billingBtnLabelActive: { color: '#2563EB' },
   saveBadge: {
     backgroundColor: 'rgba(52,211,153,0.15)', borderRadius: radius.full,
-    paddingHorizontal: spacing.sm, paddingVertical: 3,
+    paddingHorizontal: spacing.sm, paddingVertical: 2,
     borderWidth: 1, borderColor: 'rgba(52,211,153,0.3)',
   },
-  saveBadgeText: { fontSize: 9, fontWeight: '800', color: colors.green, letterSpacing: 0.5 },
+  saveBadgeText: { fontSize: 8, fontWeight: '800', color: colors.green, letterSpacing: 0.5 },
 
   tierRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
   tierCard: {
@@ -233,28 +245,28 @@ const s = StyleSheet.create({
     borderRadius: radius.md, padding: spacing.md, gap: 4,
     backgroundColor: colors.bgElevated,
   },
-  tierCardActive: { borderColor: '#4361EE', backgroundColor: 'rgba(67,97,238,0.10)' },
+  tierCardActive: { borderColor: '#2563EB', backgroundColor: 'rgba(37,99,235,0.10)' },
   popularBadge: {
-    backgroundColor: '#4361EE', borderRadius: radius.full,
+    backgroundColor: '#2563EB', borderRadius: radius.full,
     paddingHorizontal: 6, paddingVertical: 2, alignSelf: 'flex-start',
     marginBottom: 4,
   },
   popularText: { fontSize: 8, fontWeight: '800', color: colors.white, letterSpacing: 0.5 },
   tierName: { fontSize: 13, fontWeight: '800', color: colors.textMuted },
-  tierNameActive: { color: '#4361EE' },
+  tierNameActive: { color: '#2563EB' },
   tierPrice: { fontSize: 22, fontWeight: '900', color: colors.textPrimary, letterSpacing: -0.5 },
-  tierPriceActive: { color: '#4361EE' },
+  tierPriceActive: { color: '#2563EB' },
   tierPer: { fontSize: 13, fontWeight: '400' },
   tierSub: { fontSize: 11, color: colors.textMuted, lineHeight: 15 },
-  tierSubActive: { color: '#4361EE' },
+  tierSubActive: { color: '#2563EB' },
 
   featureScroll: { maxHeight: 160, marginBottom: spacing.md },
   featureRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: 5 },
-  featureDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#4361EE' },
+  featureDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#2563EB' },
   featureText: { fontSize: 13, color: colors.textSecondary, flex: 1, lineHeight: 18 },
 
   cta: {
-    backgroundColor: '#4361EE', borderRadius: radius.md,
+    backgroundColor: '#2563EB', borderRadius: radius.md,
     paddingVertical: spacing.md + 2, alignItems: 'center', marginBottom: spacing.sm,
   },
   ctaDisabled: { opacity: 0.5 },

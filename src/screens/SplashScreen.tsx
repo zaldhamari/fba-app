@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Animated } from 'react-native';
 import { colors, spacing } from '../theme';
 import { useSubscription } from '../hooks/useSubscription';
 import { useAuth } from '../hooks/useAuth';
+import { useSellerProfile } from '../hooks/useSellerProfile';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/RootNavigator';
 
@@ -13,6 +14,7 @@ const MIN_DISPLAY_MS = 1800;
 export default function SplashScreen({ navigation }: Props) {
   const { loaded, onboardingDone } = useSubscription();
   const { session, loading: authLoading } = useAuth();
+  const { profile, loaded: profileLoaded } = useSellerProfile();
 
   const wordmarkOpacity  = useRef(new Animated.Value(0)).current;
   const taglineOpacity   = useRef(new Animated.Value(0)).current;
@@ -32,7 +34,7 @@ export default function SplashScreen({ navigation }: Props) {
   }, []);
 
   useEffect(() => {
-    if (!loaded || authLoading || navigated.current) return;
+    if (!loaded || authLoading || !profileLoaded || navigated.current) return;
 
     const elapsed   = Date.now() - startTime.current;
     const remaining = Math.max(0, MIN_DISPLAY_MS - elapsed);
@@ -47,12 +49,16 @@ export default function SplashScreen({ navigation }: Props) {
       ]).start(() => {
         if (!session) {
           navigation.replace('Auth');
+        } else if (!onboardingDone) {
+          navigation.replace('Onboarding');
+        } else if (!profile) {
+          navigation.replace('SellerProfile');
         } else {
-          navigation.replace(onboardingDone ? 'Main' : 'Onboarding');
+          navigation.replace('Main');
         }
       });
     }, remaining);
-  }, [loaded, authLoading, session, onboardingDone]);
+  }, [loaded, authLoading, profileLoaded, session, onboardingDone, profile]);
 
   return (
     <View style={s.container}>
@@ -92,12 +98,12 @@ const s = StyleSheet.create({
   orb1: {
     position: 'absolute', top: -100, right: -60,
     width: 300, height: 300, borderRadius: 150,
-    backgroundColor: 'rgba(67,97,238,0.07)',
+    backgroundColor: 'rgba(37,99,235,0.07)',
   },
   orb2: {
     position: 'absolute', bottom: -80, left: -80,
     width: 260, height: 260, borderRadius: 130,
-    backgroundColor: 'rgba(67,97,238,0.05)',
+    backgroundColor: 'rgba(37,99,235,0.05)',
   },
   orb3: {
     position: 'absolute', top: '40%', left: -40,
@@ -114,13 +120,13 @@ const s = StyleSheet.create({
     borderRadius: 16,
     backgroundColor: '#EEF4FF',
     borderWidth: 1,
-    borderColor: 'rgba(67,97,238,0.20)',
+    borderColor: 'rgba(37,99,235,0.20)',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.xs,
   },
   iconSymbol: {
-    fontSize: 22, color: '#4361EE', fontWeight: '700',
+    fontSize: 22, color: '#2563EB', fontWeight: '700',
   },
   wordmark: {
     fontSize: 42,

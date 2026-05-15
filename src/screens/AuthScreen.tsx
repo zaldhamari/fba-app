@@ -1,13 +1,17 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
   KeyboardAvoidingView, Platform, ScrollView, Animated,
 } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/RootNavigator';
 import { authActions } from '../hooks/useAuth';
+import { supabase } from '../lib/supabase';
+import { identifyUser } from '../lib/revenuecat';
+import { STORAGE_KEYS } from '../constants/storage';
 import {
   AppCard, InputField, PrimaryButton, SecondaryButton, DS,
 } from '../components/ds';
@@ -109,12 +113,12 @@ function ErrorBanner({ text }: { text: string }) {
 const fb = StyleSheet.create({
   success: {
     backgroundColor: DS.accentLight, borderRadius: 12, padding: 13,
-    borderWidth: 1, borderColor: DS.accent + '40',
+    borderWidth: 1, borderColor: DS.accentLight,
   },
   successText: { fontSize: 13, color: DS.accentDark, fontWeight: '600', lineHeight: 19 },
   error: {
     backgroundColor: DS.dangerBg, borderRadius: 12, padding: 13,
-    borderWidth: 1, borderColor: DS.danger + '30',
+    borderWidth: 1, borderColor: DS.dangerBg,
   },
   errorText: { fontSize: 13, color: DS.dangerText, fontWeight: '600', lineHeight: 19 },
 });
@@ -132,7 +136,13 @@ export default function AuthScreen({ navigation }: Props) {
   const [oauthLoading, setOauthLoading] = useState(false);
   const [oauthError,   setOauthError]   = useState('');
 
-  const fadeAnim = useRef(new Animated.Value(1)).current;
+  const fadeAnim     = useRef(new Animated.Value(1)).current;
+  const oauthPending = useRef(false);
+
+  useEffect(() => {
+    WebBrowser.warmUpAsync();
+    return () => { WebBrowser.coolDownAsync(); };
+  }, []);
 
   // ── Navigation between views ─────────────────────────────────────────────
 
@@ -148,8 +158,23 @@ export default function AuthScreen({ navigation }: Props) {
   // ── Preserved auth handlers ──────────────────────────────────────────────
 
   async function afterAuth() {
-    const done = await AsyncStorage.getItem('fba_onboarding_v3');
-    navigation.replace(done === 'true' ? 'Main' : 'Onboarding');
+    // Link RevenueCat customer to authenticated Supabase user ID.
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) await identifyUser(session.user.id);
+    } catch { /* RC unavailable — proceed */ }
+
+    const [done, profile] = await Promise.all([
+      AsyncStorage.getItem(STORAGE_KEYS.onboardingDone),
+      AsyncStorage.getItem(STORAGE_KEYS.sellerProfile),
+    ]);
+    if (done !== 'true') {
+      navigation.replace('Onboarding');
+    } else if (!profile) {
+      navigation.replace('SellerProfile');
+    } else {
+      navigation.replace('Main');
+    }
   }
 
   async function handleSignIn() {
@@ -173,6 +198,10 @@ export default function AuthScreen({ navigation }: Props) {
   async function handleSignUp() {
     if (!email.trim() || !password.trim()) {
       setError('Please enter your email and password.');
+      return;
+    }
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters.');
       return;
     }
     setLoading(true);
@@ -200,8 +229,11 @@ export default function AuthScreen({ navigation }: Props) {
     setLoading(true);
     setError('');
     try {
-      authActions.resetPassword(email.trim());
+      const { error: resetError } = await authActions.resetPassword(email.trim());
+      if (resetError) throw resetError;
       setSuccess('Reset link sent — check your inbox!');
+    } catch (e: any) {
+      setError(e.message ?? 'Could not send reset link. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -225,9 +257,15 @@ export default function AuthScreen({ navigation }: Props) {
     }
   }
 
-  function handleResendEmail() {
-    authActions.resetPassword(email.trim());
-    setSuccess('Verification email resent — check your inbox.');
+  async function handleResendEmail() {
+    setError('');
+    try {
+      const { error: resendError } = await authActions.resendVerification(email.trim());
+      if (resendError) throw resendError;
+      setSuccess('Verification email resent — check your inbox.');
+    } catch (e: any) {
+      setError(e.message ?? 'Could not resend verification email. Please try again.');
+    }
   }
 
   // ── OAuth handlers ────────────────────────────────────────────────────────
@@ -235,32 +273,55 @@ export default function AuthScreen({ navigation }: Props) {
   // requires expo-auth-session + a deep-link redirect URI configured in both
   // app.json (scheme) and the Supabase project's Allowed Redirect URLs.
 
-  async function handleGoogle() {
+  // OAuth flow: signInWithOAuth opens the system browser immediately and
+  // returns. The session arrives later via the siftly://auth/callback deep
+  // link → App.tsx exchangeCodeForSession → onAuthStateChange (SIGNED_IN)
+  // → oauthPending ref triggers afterAuth(). setOauthLoading stays true
+  // until that event fires (or an error is caught below).
+
+  async function handleOAuth(provider: 'google' | 'apple') {
     setOauthLoading(true);
     setOauthError('');
     try {
-      const { error: authError } = await authActions.signInWithGoogle();
+      const { data, error: authError } = provider === 'google'
+        ? await authActions.signInWithGoogle()
+        : await authActions.signInWithApple();
       if (authError) throw authError;
-      // Session is picked up by onAuthStateChange listener in useAuth
+      if (!data?.url) throw new Error('No OAuth URL returned.');
+
+      const result = await WebBrowser.openAuthSessionAsync(
+        data.url,
+        'siftly://auth/callback',
+      );
+
+      if (result.type === 'success' && result.url) {
+        // Implicit flow returns tokens in the URL fragment (#access_token=...&refresh_token=...)
+        const fragment = result.url.split('#')[1] ?? result.url.split('?')[1] ?? '';
+        const params = Object.fromEntries(new URLSearchParams(fragment));
+        if (params.access_token && params.refresh_token) {
+          const { error: sessionError } = await supabase.auth.setSession({
+            access_token:  params.access_token,
+            refresh_token: params.refresh_token,
+          });
+          if (sessionError) throw sessionError;
+          await afterAuth();
+        } else if (params.code) {
+          const { error: sessionError } = await supabase.auth.exchangeCodeForSession(result.url);
+          if (sessionError) throw sessionError;
+          await afterAuth();
+        } else {
+          throw new Error('No tokens in OAuth callback URL.');
+        }
+      }
     } catch (e: any) {
-      setOauthError(e.message ?? 'Google sign-in failed. Please try again.');
+      setOauthError(e.message ?? `${provider} sign-in failed. Please try again.`);
     } finally {
       setOauthLoading(false);
     }
   }
 
-  async function handleApple() {
-    setOauthLoading(true);
-    setOauthError('');
-    try {
-      const { error: authError } = await authActions.signInWithApple();
-      if (authError) throw authError;
-    } catch (e: any) {
-      setOauthError(e.message ?? 'Apple sign-in failed. Please try again.');
-    } finally {
-      setOauthLoading(false);
-    }
-  }
+  const handleGoogle = () => handleOAuth('google');
+  const handleApple  = () => handleOAuth('apple');
 
   // ── View renderers ────────────────────────────────────────────────────────
 
@@ -304,7 +365,7 @@ export default function AuthScreen({ navigation }: Props) {
         <OrDivider />
         <View style={v.socials}>
           <SocialButton icon="G" label={oauthLoading ? 'Signing in...' : 'Continue with Google'} onPress={handleGoogle} disabled={oauthLoading} />
-          <SocialButton icon="" label="Continue with Apple" onPress={handleApple} disabled={oauthLoading} />
+          <SocialButton icon="🍎" label="Continue with Apple" onPress={handleApple} disabled={oauthLoading} />
         </View>
         {!!oauthError && <ErrorBanner text={oauthError} />}
 
@@ -374,7 +435,7 @@ export default function AuthScreen({ navigation }: Props) {
         <OrDivider />
         <View style={v.socials}>
           <SocialButton icon="G" label={oauthLoading ? 'Signing in...' : 'Continue with Google'} onPress={handleGoogle} disabled={oauthLoading} />
-          <SocialButton icon="" label="Continue with Apple" onPress={handleApple} disabled={oauthLoading} />
+          <SocialButton icon="🍎" label="Continue with Apple" onPress={handleApple} disabled={oauthLoading} />
         </View>
         {!!oauthError && <ErrorBanner text={oauthError} />}
 
@@ -438,7 +499,7 @@ export default function AuthScreen({ navigation }: Props) {
         <OrDivider />
         <View style={v.socials}>
           <SocialButton icon="G" label={oauthLoading ? 'Signing in...' : 'Continue with Google'} onPress={handleGoogle} disabled={oauthLoading} />
-          <SocialButton icon="" label="Continue with Apple" onPress={handleApple} disabled={oauthLoading} />
+          <SocialButton icon="🍎" label="Continue with Apple" onPress={handleApple} disabled={oauthLoading} />
         </View>
         {!!oauthError && <ErrorBanner text={oauthError} />}
 
@@ -652,7 +713,7 @@ const v = StyleSheet.create({
   // ── Forgot ─────────────────────────────────────────────────────────────
   forgotIcon: {
     width: 56, height: 56, borderRadius: 18,
-    backgroundColor: '#FFFBEB',
+    backgroundColor: DS.warningBg,
     alignItems: 'center', justifyContent: 'center',
     alignSelf: 'flex-start',
   },

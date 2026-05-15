@@ -12,13 +12,13 @@ import {
 } from '../lib/revenuecat';
 
 const SecureStorage = {
-  async getItem(key: string) {
+  async getItem(key: string): Promise<string | null> {
     if (Platform.OS === 'web') return AsyncStorage.getItem(key);
-    return SecureStore.getItemAsync(key);
+    try { return await SecureStore.getItemAsync(key); } catch { return null; }
   },
-  async setItem(key: string, value: string) {
-    if (Platform.OS === 'web') return AsyncStorage.setItem(key, value);
-    return SecureStore.setItemAsync(key, value);
+  async setItem(key: string, value: string): Promise<void> {
+    if (Platform.OS === 'web') { await AsyncStorage.setItem(key, value); return; }
+    try { await SecureStore.setItemAsync(key, value); } catch { /* keychain unavailable */ }
   },
 };
 
@@ -52,9 +52,9 @@ export const SAVE_LIMITS: Record<Tier, number> = {
 // ─── Pricing ───────────────────────────────────────────────────────────────────
 
 export const PLANS = {
-  explorer: { name: 'Explorer', monthly: 0,  annual: 0,   annualMonthly: 0     },
-  builder:  { name: 'Builder',  monthly: 17, annual: 119, annualMonthly: 9.92  },
-  operator: { name: 'Operator', monthly: 39, annual: 288, annualMonthly: 24.00 },
+  explorer: { name: 'Explorer', monthly: 0,     annual: 0,      annualMonthly: 0     },
+  builder:  { name: 'Builder',  monthly: 17.99, annual: 119.99, annualMonthly: 10.00 },
+  operator: { name: 'Operator', monthly: 39.99, annual: 289.00, annualMonthly: 24.08 },
 } as const;
 
 export const LAUNCH_PACK_PRICE = 79;
@@ -181,15 +181,23 @@ export function useSubscription() {
 
   // ─── Public: purchase via RevenueCat ───────────────────────────────────────
 
-  const purchasePlan = useCallback(async (t: Tier, isAnnual: boolean): Promise<void> => {
-    const pkg = await getPackageForTier(t, isAnnual);
+  const purchasePlan = useCallback(async (t: Tier, _isAnnual: boolean): Promise<void> => {
+    if (DEV_BYPASS) {
+      await unlock(t);
+      return;
+    }
+    const pkg = await getPackageForTier(t, _isAnnual);
     if (!pkg) throw new Error('Product unavailable. Check your connection and try again.');
     const customerInfo = await purchasePackage(pkg);
     const newTier = tierFromCustomerInfo(customerInfo);
     await unlock(newTier);
+    const reset = freshUsage();
+    setUsage(reset);
+    await AsyncStorage.setItem(KEYS.usage, JSON.stringify(reset));
   }, [unlock]);
 
   const restorePurchases = useCallback(async (): Promise<void> => {
+    if (DEV_BYPASS) return;
     const customerInfo = await restoreRC();
     const newTier = tierFromCustomerInfo(customerInfo);
     if (newTier !== 'explorer') {
@@ -210,8 +218,11 @@ export function useSubscription() {
       research: 'research', supplier: 'suppliers', suppliers: 'suppliers',
       keywords: 'keywords', brand: 'brands', brands: 'brands',
       calculator: null, trends: null, opportunity: null,
+      feasibility: null, // available on builder+ (non-explorer) — checked separately via tier
       saves: 'saves',
     };
+    // feasibility is locked for explorer regardless of usage
+    if (feature === 'feasibility') return tier !== 'explorer';
     const mapped = featureMap[feature];
     if (mapped === undefined) return tier !== 'explorer';
     if (mapped === null) return true;

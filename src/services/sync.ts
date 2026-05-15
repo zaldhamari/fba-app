@@ -86,9 +86,9 @@ export async function pushAnalysis(userId: string, asin: string, productName: st
       { user_id: userId, asin, product_name: productName, data, updated_at: new Date().toISOString() },
       { onConflict: 'user_id,asin' },
     );
-    if (error) console.warn('[sync] pushAnalysis failed:', error.code, error.message);
+    if (error && __DEV__) console.warn('[sync] pushAnalysis failed:', error.code, error.message);
   } catch (e) {
-    console.warn('[sync] pushAnalysis network error:', e);
+    if (__DEV__) console.warn('[sync] pushAnalysis network error:', e);
   }
 }
 

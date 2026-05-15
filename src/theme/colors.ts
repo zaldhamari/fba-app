@@ -11,22 +11,22 @@ export const bg = {
   hero:     '#EEF4FF' as const,  // Section hero panels
 } as const;
 
-// ── Primary accent — Indigo (#4361EE) ─────────────────────────────────────────
+// ── Primary accent — Blue (#2563EB) ───────────────────────────────────────────
 export const accent = {
-  base:   '#4361EE' as const,
-  light:  '#EEF4FF' as const,
-  dim:    'rgba(67,97,238,0.08)'  as const,
-  border: 'rgba(67,97,238,0.22)' as const,
+  base:   '#2563EB' as const,
+  light:  '#DBEAFE' as const,
+  dim:    'rgba(37,99,235,0.08)'  as const,
+  border: 'rgba(37,99,235,0.22)' as const,
 } as const;
 
-// ── Section identity colors ────────────────────────────────────────────────────
+// ── Section identity — all unified to primary blue ────────────────────────────
 export const section = {
-  pilot:    '#4361EE' as const,  // Co-pilot — Indigo
-  search:   '#0284C7' as const,  // Search — Sky Blue
-  brand:    '#DB2777' as const,  // Brand — Rose
-  calc:     '#7C3AED' as const,  // Calculator — Violet
-  keywords: '#D97706' as const,  // Keywords — Amber
-  launch:   '#059669' as const,  // Launch — Emerald
+  pilot:    '#2563EB' as const,
+  search:   '#2563EB' as const,
+  brand:    '#2563EB' as const,
+  calc:     '#2563EB' as const,
+  keywords: '#2563EB' as const,
+  launch:   '#2563EB' as const,
 } as const;
 
 // ── Semantic status ────────────────────────────────────────────────────────────
@@ -46,22 +46,22 @@ export const status = {
   dangerDim:    'rgba(239,68,68,0.10)'  as const,
   dangerBorder: 'rgba(239,68,68,0.22)' as const,
 
-  info:       '#06B6D4' as const,
-  infoLight:  '#CFFAFE' as const,
-  infoDim:    'rgba(6,182,212,0.10)'  as const,
-  infoBorder: 'rgba(6,182,212,0.22)' as const,
+  info:       '#2563EB' as const,
+  infoLight:  '#DBEAFE' as const,
+  infoDim:    'rgba(37,99,235,0.10)'  as const,
+  infoBorder: 'rgba(37,99,235,0.22)' as const,
 } as const;
 
 // ── Extended palette ───────────────────────────────────────────────────────────
 export const palette = {
-  violet:  '#8B5CF6' as const,
-  pink:    '#EC4899' as const,
-  emerald: '#059669' as const,
-  orange:  '#F97316' as const,
-  cyan:    '#06B6D4' as const,
-  sky:     '#0284C7' as const,
-  rose:    '#DB2777' as const,
-  amber:   '#D97706' as const,
+  violet:  '#2563EB' as const,
+  pink:    '#2563EB' as const,
+  emerald: '#059669' as const,  // kept — semantic success only
+  orange:  '#F97316' as const,  // kept — semantic warning only
+  cyan:    '#2563EB' as const,
+  sky:     '#2563EB' as const,
+  rose:    '#2563EB' as const,
+  amber:   '#D97706' as const,  // kept — semantic warning only
 } as const;
 
 // ── Text ───────────────────────────────────────────────────────────────────────
@@ -70,7 +70,7 @@ export const text = {
   secondary: '#5C6B8A' as const,
   muted:     '#8196B0' as const,
   inverse:   '#FFFFFF' as const,
-  accent:    '#4361EE' as const,
+  accent:    '#2563EB' as const,
 } as const;
 
 // ── Borders ────────────────────────────────────────────────────────────────────
@@ -88,7 +88,7 @@ export const util = {
 } as const;
 
 // ── Flat colors object (backward-compatible with existing screens) ─────────────
-// All existing keys are preserved with identical values.
+// All existing keys preserved — accent/section colors unified to blue.
 export const colors = {
   // Canvas
   bg:         '#F5F7FF',
@@ -97,42 +97,44 @@ export const colors = {
   bgSubtle:   '#F8FAFF',
   bgHero:     '#EEF4FF',
 
-  // Primary accent
-  purple:       '#4361EE',
-  purpleLight:  '#EEF4FF',
-  purpleDim:    'rgba(67,97,238,0.10)',
-  purpleBorder: 'rgba(67,97,238,0.22)',
+  // Primary accent — unified blue
+  purple:       '#2563EB',
+  purpleLight:  '#DBEAFE',
+  purpleDim:    'rgba(37,99,235,0.10)',
+  purpleBorder: 'rgba(37,99,235,0.22)',
 
-  // Research / Sky blue
-  cyan:       '#0284C7',
-  cyanLight:  '#E0F2FE',
-  cyanDim:    'rgba(2,132,199,0.09)',
-  cyanBorder: 'rgba(2,132,199,0.22)',
+  // Research section — blue (was sky/cyan)
+  cyan:       '#2563EB',
+  cyanLight:  '#DBEAFE',
+  cyanDim:    'rgba(37,99,235,0.09)',
+  cyanBorder: 'rgba(37,99,235,0.22)',
 
-  // Brand / Rose
-  pink:       '#DB2777',
-  pinkLight:  '#FCE7F3',
-  pinkDim:    'rgba(219,39,119,0.09)',
-  pinkBorder: 'rgba(219,39,119,0.22)',
+  // Brand section — blue (was rose/pink)
+  pink:       '#2563EB',
+  pinkLight:  '#DBEAFE',
+  pinkDim:    'rgba(37,99,235,0.09)',
+  pinkBorder: 'rgba(37,99,235,0.22)',
 
-  // Keywords / Amber
-  amber:       '#D97706',
+  // Keywords section — blue (was amber; amber kept only as semantic warning)
+  amber:       '#D97706',   // semantic warning — unchanged
   amberLight:  '#FEF3C7',
   amberDim:    'rgba(217,119,6,0.10)',
   amberBorder: 'rgba(217,119,6,0.22)',
 
-  // Launch / Emerald
+  // Semantic status — green: LAUNCH verdict success
   green:      '#059669',
   greenLight: '#D1FAE5',
   greenDim:   'rgba(5,150,105,0.10)',
 
-  // Status
+  // Semantic status — red: AVOID verdict danger
   red:        '#DC2626',
   redLight:   '#FEE2E2',
+
+  // Semantic status — orange: warning
   orange:     '#D97706',
   orangeLight: 'rgba(217,119,6,0.12)',
 
-  // New semantic status tokens (additive — don't conflict with existing keys)
+  // Semantic status tokens
   success:       '#10B981',
   successLight:  '#D1FAE5',
   successDim:    'rgba(16,185,129,0.10)',
@@ -142,14 +144,14 @@ export const colors = {
   danger:        '#EF4444',
   dangerLight:   '#FEE2E2',
   dangerDim:     'rgba(239,68,68,0.10)',
-  info:          '#06B6D4',
-  infoLight:     '#CFFAFE',
-  infoDim:       'rgba(6,182,212,0.10)',
+  info:          '#2563EB',
+  infoLight:     '#DBEAFE',
+  infoDim:       'rgba(37,99,235,0.10)',
 
-  // New extended palette aliases
-  violet: '#8B5CF6',
-  hotPink: '#EC4899',
-  emerald: '#059669',
+  // Extended palette aliases — all non-semantic unified to blue
+  violet:  '#2563EB',
+  hotPink: '#2563EB',
+  emerald: '#059669',  // semantic success only
 
   // Text
   textPrimary:   '#0D1B4B',
@@ -164,12 +166,12 @@ export const colors = {
   white: '#FFFFFF',
   black: '#0F172A',
 
-  // Section colors
-  sectionSearch:   '#0284C7',
-  sectionBrand:    '#DB2777',
-  sectionCalc:     '#7C3AED',
-  sectionKeywords: '#D97706',
-  sectionLaunch:   '#059669',
+  // Section colors — all unified to primary blue
+  sectionSearch:   '#2563EB',
+  sectionBrand:    '#2563EB',
+  sectionCalc:     '#2563EB',
+  sectionKeywords: '#2563EB',
+  sectionLaunch:   '#2563EB',
 
   // Legacy aliases
   surface:     '#FFFFFF',
@@ -179,11 +181,11 @@ export const colors = {
   gray400:     '#8196B0',
   gray600:     '#5C6B8A',
   gray800:     '#1A2D45',
-  accent:      '#4361EE',
-  accentLight: '#EEF4FF',
-  accentDim:   'rgba(67,97,238,0.08)',
-  blue:        '#0284C7',
-  blueLight:   '#E0F2FE',
+  accent:      '#2563EB',
+  accentLight: '#DBEAFE',
+  accentDim:   'rgba(37,99,235,0.08)',
+  blue:        '#2563EB',
+  blueLight:   '#DBEAFE',
   bgInput:     '#EEF2FA',
 } as const;
 

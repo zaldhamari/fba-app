@@ -160,11 +160,11 @@ const s = StyleSheet.create({
     position: 'absolute',
     top: -40, right: -60,
     width: 240, height: 240, borderRadius: 120,
-    backgroundColor: 'rgba(67,97,238,0.10)',
+    backgroundColor: 'rgba(37,99,235,0.10)',
     opacity: 0.5,
   },
   eyebrow: {
-    fontSize: 10, fontWeight: '800', color: '#4361EE',
+    fontSize: 10, fontWeight: '800', color: '#2563EB',
     letterSpacing: 2.8, marginBottom: spacing.sm,
   },
   title: {
@@ -198,7 +198,7 @@ const s = StyleSheet.create({
     shadowOpacity: 0.06, shadowRadius: 8, elevation: 2,
   },
   sectionNumber: {
-    fontSize: 9, fontWeight: '900', color: '#4361EE',
+    fontSize: 9, fontWeight: '900', color: '#2563EB',
     letterSpacing: 1.5, opacity: 0.7,
   },
   sectionTitle: {
@@ -221,19 +221,19 @@ const s = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md + 2,
     borderWidth: 1,
-    borderColor: 'rgba(67,97,238,0.22)',
+    borderColor: 'rgba(37,99,235,0.22)',
     gap: spacing.sm,
-    shadowColor: '#0284C7',
+    shadowColor: '#2563EB',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.10, shadowRadius: 10, elevation: 3,
   },
   emailChipLabel: {
-    fontSize: 9, fontWeight: '800', color: '#4361EE', letterSpacing: 2,
+    fontSize: 9, fontWeight: '800', color: '#2563EB', letterSpacing: 2,
   },
   emailChipValue: {
     flex: 1, fontSize: 14, fontWeight: '600', color: colors.textPrimary,
   },
-  emailChipArrow: { fontSize: 16, color: '#4361EE', fontWeight: '700' },
+  emailChipArrow: { fontSize: 16, color: '#2563EB', fontWeight: '700' },
 
   // ── Bottom actions
   actions: {
@@ -254,7 +254,7 @@ const s = StyleSheet.create({
     paddingVertical: spacing.md + 2,
     gap: 4,
   },
-  actionIcon: { fontSize: 16, color: '#4361EE' },
+  actionIcon: { fontSize: 16, color: '#2563EB' },
   actionText: { fontSize: 11, fontWeight: '700', color: colors.textSecondary },
   actionDivider: { width: 1, backgroundColor: colors.border, marginVertical: spacing.sm },
 

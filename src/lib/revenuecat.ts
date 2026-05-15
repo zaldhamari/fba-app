@@ -19,7 +19,7 @@ export function initRevenueCat(): void {
     return;
   }
   if (!__DEV__ && apiKey.startsWith('test_')) {
-    console.error('[RC] Test key used in production build — replace with live key before App Store submission');
+    if (__DEV__) console.error('[RC] Test key used in production build — replace with live key before App Store submission');
   }
   if (__DEV__) Purchases.setLogLevel(LOG_LEVEL.DEBUG);
   Purchases.configure({ apiKey });
@@ -33,17 +33,23 @@ export function tierFromCustomerInfo(info: CustomerInfo): Tier {
   return 'explorer';
 }
 
-// Fetch the package matching the billing period from the current offering.
-// RC dashboard default offering uses standard identifiers: $rc_monthly, $rc_annual
+// Fetch the package for a given tier + billing period from the current RC offering.
+// Tries tier-specific identifiers first (builder_monthly, operator_annual, etc.),
+// then falls back to the RC standard identifiers ($rc_monthly / $rc_annual).
+// This supports both a single-offering layout and a per-tier offering layout.
 export async function getPackageForTier(
-  _tier: Tier,
+  tier: Tier,
   isAnnual: boolean,
 ): Promise<PurchasesPackage | null> {
   const offerings = await Purchases.getOfferings();
-  const pkgId = isAnnual ? '$rc_annual' : '$rc_monthly';
-  return (
-    offerings.current?.availablePackages.find(p => p.identifier === pkgId) ?? null
-  );
+  const pkgs = offerings.current?.availablePackages ?? [];
+  const period = isAnnual ? 'annual' : 'monthly';
+  // Try tier-specific id first, e.g. "builder_monthly" or "operator_annual"
+  const tierSpecific = pkgs.find(p => p.identifier === `${tier}_${period}`);
+  if (tierSpecific) return tierSpecific;
+  // Fall back to RC standard identifiers ($rc_monthly / $rc_annual)
+  const fallbackId = isAnnual ? '$rc_annual' : '$rc_monthly';
+  return pkgs.find(p => p.identifier === fallbackId) ?? null;
 }
 
 // Returns current customer info without triggering a purchase.
@@ -62,4 +68,15 @@ export async function purchasePackage(
 // Restore prior purchases and return the resulting CustomerInfo.
 export async function restoreRC(): Promise<CustomerInfo> {
   return Purchases.restorePurchases();
+}
+
+// Link the RevenueCat customer record to the authenticated Supabase user.
+// Safe to call multiple times — RC deduplicates by userId.
+export async function identifyUser(userId: string): Promise<void> {
+  await Purchases.logIn(userId);
+}
+
+// Return RevenueCat to anonymous mode after sign-out.
+export async function anonymizeUser(): Promise<void> {
+  await Purchases.logOut();
 }

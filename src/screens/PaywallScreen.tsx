@@ -172,7 +172,7 @@ function PlanCard({
   const cardBorderColor = isRecommended
     ? DS.indigo
     : tier === 'operator'
-    ? '#7C3AED'
+    ? DS.indigo
     : isSelected
     ? DS.accent
     : DS.border;
@@ -188,7 +188,7 @@ function PlanCard({
     : isRecommended
     ? DS.indigo
     : tier === 'operator'
-    ? '#7C3AED'
+    ? DS.indigo
     : DS.textMuted;
 
   const ctaLabel = tier === 'explorer'
@@ -276,7 +276,7 @@ const pc = StyleSheet.create({
     overflow:     'hidden',
   },
   cardShadow: {
-    shadowColor:   '#6366F1',
+    shadowColor:   DS.indigo,
     shadowOffset:  { width: 0, height: 4 },
     shadowOpacity: 0.16,
     shadowRadius:  16,
@@ -434,7 +434,7 @@ function LaunchPackCard({ onPress }: { onPress: () => void }) {
 const lp = StyleSheet.create({
   card: {
     gap: 14,
-    borderColor: DS.indigo + '44',
+    borderColor: DS.indigoLight,
     borderWidth: 1.5,
   },
   topRow:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
@@ -562,7 +562,7 @@ export default function PaywallScreen({ navigation, route }: Props) {
   const selectedPlan = PLANS[selected];
   const primaryCtaLabel = selected === 'explorer'
     ? 'Start Free'
-    : `Start Free Trial — ${selectedPlan.name}`;
+    : `Get ${selectedPlan.name}`;
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
@@ -573,6 +573,16 @@ export default function PaywallScreen({ navigation, route }: Props) {
         contentContainerStyle={s.content}
         showsVerticalScrollIndicator={false}
       >
+        {/* ── Close button ──────────────────────────────────── */}
+        <TouchableOpacity
+          style={s.closeBtn}
+          onPress={() => navigation.goBack()}
+          activeOpacity={0.7}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+        >
+          <Text style={s.closeBtnText}>✕</Text>
+        </TouchableOpacity>
+
         {/* ── Header ────────────────────────────────────────── */}
         <View style={s.header}>
           <View style={s.logoPill}>
@@ -633,9 +643,7 @@ export default function PaywallScreen({ navigation, route }: Props) {
         <SectionHeader title="Full Comparison" style={s.sectionHead} />
         <ComparisonCard />
 
-        {/* ── Launch pack ───────────────────────────────────── */}
-        <SectionHeader title="One-Time Add-On" style={s.sectionHead} />
-        <LaunchPackCard onPress={() => setShowLaunchPack(true)} />
+        {/* Launch Pack removed — will be re-added once wired to IAP */}
 
         {/* ── Trust ─────────────────────────────────────────── */}
         <TrustCard />
@@ -718,9 +726,25 @@ const s = StyleSheet.create({
     gap:               DS.sectionGap,
   },
 
+  // Close button
+  closeBtn: {
+    alignSelf:   'flex-end',
+    marginTop:   12,
+    marginRight: 4,
+    width:       36,
+    height:      36,
+    borderRadius: 18,
+    backgroundColor: DS.bgSubtle,
+    borderWidth: 1,
+    borderColor: DS.border,
+    alignItems:  'center',
+    justifyContent: 'center',
+  },
+  closeBtnText: { fontSize: 15, color: DS.textMuted, fontWeight: '400' },
+
   // Header
   header: {
-    paddingTop:    32,
+    paddingTop:    16,
     paddingBottom: DS.sectionGap,
     gap:           10,
   },
@@ -734,7 +758,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical:   6,
     borderWidth:       1,
-    borderColor:       DS.indigo + '40',
+    borderColor:       DS.indigoLight,
   },
   logoPillIcon: { fontSize: 11, color: DS.indigo },
   logoPillText: { fontSize: 10, fontWeight: '900', color: DS.indigo, letterSpacing: 1 },
@@ -765,7 +789,7 @@ const s = StyleSheet.create({
   // Error
   errorBox: {
     backgroundColor: DS.dangerBg, borderRadius: 14,
-    padding: 14, borderWidth: 1, borderColor: DS.danger + '30',
+    padding: 14, borderWidth: 1, borderColor: DS.dangerBg,
   },
   errorText: { fontSize: 13, color: DS.dangerText, textAlign: 'center', fontWeight: '600' },
 

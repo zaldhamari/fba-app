@@ -44,9 +44,9 @@ export const VAULT_STATUSES: VaultStatus[] = [
 ];
 
 export const STATUS_CONFIG: Record<VaultStatus, { label: string; color: string }> = {
-  researching:        { label: 'Researching',     color: '#0284C7' },
+  researching:        { label: 'Researching',     color: '#2563EB' },
   supplier_contacted: { label: 'Supplier Sent',   color: '#D97706' },
-  testing:            { label: 'Testing',          color: '#5B50E8' },
+  testing:            { label: 'Testing',          color: '#2563EB' },
   ready_to_launch:    { label: 'Ready to Launch', color: '#059669' },
   rejected:           { label: 'Rejected',         color: '#DC2626' },
 };

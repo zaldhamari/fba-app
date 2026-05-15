@@ -3,20 +3,34 @@ import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { DS } from '../theme/ds';
-import LaunchControlScreen    from '../screens/LaunchControlScreen';
+import { ErrorBoundary } from '../components/ErrorBoundary';
 import ResearchWorkspaceScreen from '../screens/ResearchWorkspaceScreen';
-import ProfitLabScreen        from '../screens/ProfitLabScreen';
-import BrandStudioScreen      from '../screens/BrandStudioScreen';
-import CoPilotScreen          from '../screens/CoPilotScreen';
+import BuilderScreen           from '../screens/BuilderScreen';
+import BrandStudioScreen       from '../screens/BrandStudioScreen';
+import CopilotScreen           from '../screens/CopilotScreen';
+import ProfitLabScreen         from '../screens/ProfitLabScreen';
+
+function withBoundary<P extends object>(
+  Component: React.ComponentType<P>,
+  label: string,
+): React.ComponentType<P> {
+  return function BoundaryWrapped(props: P) {
+    return (
+      <ErrorBoundary fallbackLabel={label}>
+        <Component {...props} />
+      </ErrorBoundary>
+    );
+  };
+}
 
 const Tab = createBottomTabNavigator();
 
 const TABS = [
-  { name: 'Launch',   icon: '↑',  label: 'Launch',   component: LaunchControlScreen    },
-  { name: 'Search',   icon: '◎',  label: 'Research',  component: ResearchWorkspaceScreen },
-  { name: 'Calculate', icon: '◈', label: 'Profit',   component: ProfitLabScreen        },
-  { name: 'Brand',    icon: '✦',  label: 'Brand',    component: BrandStudioScreen      },
-  { name: 'CoPilot',  icon: '⊛',  label: 'Co-Pilot', component: CoPilotScreen          },
+  { name: 'Copilot',   icon: '◉',  label: 'Copilot',   component: withBoundary(CopilotScreen,          'Copilot tab')   },
+  { name: 'Search',    icon: '◎',  label: 'Research',  component: withBoundary(ResearchWorkspaceScreen,'Research tab')  },
+  { name: 'Calculate', icon: '#',  label: 'Profit',    component: withBoundary(ProfitLabScreen,        'Profit tab')    },
+  { name: 'Brand',     icon: '✦',  label: 'Brand',     component: withBoundary(BrandStudioScreen,      'Brand tab')     },
+  { name: 'LaunchPad', icon: '◈',  label: 'LaunchPad', component: withBoundary(BuilderScreen,          'LaunchPad tab') },
 ] as const;
 
 function CustomTabBar({ state, navigation }: BottomTabBarProps) {

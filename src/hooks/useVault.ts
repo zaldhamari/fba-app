@@ -30,6 +30,7 @@ function syncEntry(userId: string, entry: VaultEntry) {
 
 export function useVault() {
   const [entries, setEntries] = useState<VaultEntry[]>([]);
+  const [vaultLoaded, setVaultLoaded] = useState(false);
   const userIdRef = useRef<string | null>(null);
 
   // Keep userIdRef current via auth state listener — fires immediately with existing session
@@ -47,6 +48,7 @@ export function useVault() {
         const raw = await AsyncStorage.getItem(VAULT_KEY);
         const local: VaultEntry[] = raw ? JSON.parse(raw) : [];
         if (local.length > 0) setEntries(local);
+        setVaultLoaded(true);
 
         // Then merge from cloud if signed in
         const { data: { session } } = await supabase.auth.getSession();
@@ -97,12 +99,20 @@ export function useVault() {
     analysis: AnalysisSnapshot | null,
     marketplace: string,
     currency: string,
-  ) => {
+    saveLimit: number = 9999,
+  ): { success: boolean; reason?: string } => {
+    let result: { success: boolean; reason?: string } = { success: false };
     setEntries(prev => {
       const now = new Date().toISOString();
+      const isUpdate = prev.some(e => e.asin === product.asin);
+      // Enforce save limit only for new entries, not updates to existing ones
+      if (!isUpdate && prev.length >= saveLimit) {
+        result = { success: false, reason: 'save_limit_reached' };
+        return prev;
+      }
       let entry: VaultEntry;
       let next: VaultEntry[];
-      if (prev.some(e => e.asin === product.asin)) {
+      if (isUpdate) {
         next = prev.map(e =>
           e.asin === product.asin
             ? { ...e, analysis: analysis ?? e.analysis, updatedAt: now }
@@ -116,8 +126,10 @@ export function useVault() {
       AsyncStorage.setItem(VAULT_KEY, JSON.stringify(next));
       const uid = userIdRef.current;
       if (uid) syncEntry(uid, entry);
+      result = { success: true };
       return next;
     });
+    return result;
   }, []);
 
   const removeEntry = useCallback((asin: string) => {
@@ -197,6 +209,7 @@ export function useVault() {
 
   return {
     entries,
+    vaultLoaded,
     addEntry,
     removeEntry,
     updateStatus,

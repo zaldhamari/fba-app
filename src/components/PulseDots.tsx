@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { View, Animated } from 'react-native';
 import { colors } from '../theme';
 
-export default function PulseDots({ color = '#4361EE' }: { color?: string }) {
+export default function PulseDots({ color = '#2563EB' }: { color?: string }) {
   const a = useRef(new Animated.Value(0.3)).current;
   const b = useRef(new Animated.Value(0.3)).current;
   const c = useRef(new Animated.Value(0.3)).current;
