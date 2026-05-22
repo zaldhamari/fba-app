@@ -227,6 +227,19 @@ export function AppHeader({ helpKey }: AppHeaderProps = {}) {
               </View>
             )}
 
+            {/* ── Explore ────────────────────────────────────── */}
+            <View style={h.section}>
+              <Text style={h.sectionLabel}>EXPLORE</Text>
+              <TouchableOpacity
+                style={h.linkRow}
+                onPress={() => { setShowSettings(false); setTimeout(() => navigation.navigate('ProductBlueprint' as any), 300); }}
+                activeOpacity={0.7}
+              >
+                <Text style={h.linkText}>Product Blueprint</Text>
+                <Text style={h.linkArrow}>→</Text>
+              </TouchableOpacity>
+            </View>
+
             {/* ── Legal ──────────────────────────────────────── */}
             <View style={h.section}>
               <Text style={h.sectionLabel}>LEGAL</Text>
