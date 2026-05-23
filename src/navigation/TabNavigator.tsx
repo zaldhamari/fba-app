@@ -4,10 +4,10 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { DS } from '../theme/ds';
 import { ErrorBoundary } from '../components/ErrorBoundary';
+import NicheResearchScreen    from '../screens/NicheResearchScreen';
 import ResearchWorkspaceScreen from '../screens/ResearchWorkspaceScreen';
-import BuilderScreen           from '../screens/BuilderScreen';
+import SupplierSourcingScreen  from '../screens/SupplierSourcingScreen';
 import BrandStudioScreen       from '../screens/BrandStudioScreen';
-import CopilotScreen           from '../screens/CopilotScreen';
 import ProfitLabScreen         from '../screens/ProfitLabScreen';
 
 function withBoundary<P extends object>(
@@ -26,11 +26,11 @@ function withBoundary<P extends object>(
 const Tab = createBottomTabNavigator();
 
 const TABS = [
-  { name: 'Copilot',   icon: '◉',  label: 'Copilot',   component: withBoundary(CopilotScreen,          'Copilot tab')   },
-  { name: 'Search',    icon: '◎',  label: 'Research',  component: withBoundary(ResearchWorkspaceScreen,'Research tab')  },
-  { name: 'Calculate', icon: '#',  label: 'Profit',    component: withBoundary(ProfitLabScreen,        'Profit tab')    },
-  { name: 'Brand',     icon: '✦',  label: 'Brand',     component: withBoundary(BrandStudioScreen,      'Brand tab')     },
-  { name: 'LaunchPad', icon: '◈',  label: 'LaunchPad', component: withBoundary(BuilderScreen,          'LaunchPad tab') },
+  { name: 'Niche',     icon: '◎', label: 'Niche',     component: withBoundary(NicheResearchScreen,    'Niche tab')     },
+  { name: 'Validate',  icon: '✦', label: 'Validate',  component: withBoundary(ResearchWorkspaceScreen,'Validate tab')  },
+  { name: 'Suppliers', icon: '⬡', label: 'Suppliers', component: withBoundary(SupplierSourcingScreen, 'Suppliers tab') },
+  { name: 'Label',     icon: '▣', label: 'Label',     component: withBoundary(BrandStudioScreen,      'Label tab')     },
+  { name: 'Costs',     icon: '✈', label: 'Costs',     component: withBoundary(ProfitLabScreen,        'Costs tab')     },
 ] as const;
 
 function CustomTabBar({ state, navigation }: BottomTabBarProps) {
@@ -81,25 +81,23 @@ export default function TabNavigator() {
 
 const s = StyleSheet.create({
   wrapper: {
-    backgroundColor: DS.bgCard,
-    borderTopWidth:  1,
-    borderTopColor:  DS.border,
+    backgroundColor:  DS.bgCard,
+    borderTopWidth:   1,
+    borderTopColor:   DS.border,
     paddingHorizontal: 4,
-    paddingTop:      6,
-    paddingBottom:   Platform.OS === 'ios' ? 24 : 8,
-    shadowColor:     '#0D1B4B',
-    shadowOffset:    { width: 0, height: -2 },
-    shadowOpacity:   0.06,
-    shadowRadius:    12,
-    elevation:       12,
+    paddingTop:       6,
+    paddingBottom:    Platform.OS === 'ios' ? 24 : 8,
+    shadowColor:      '#0D1B4B',
+    shadowOffset:     { width: 0, height: -2 },
+    shadowOpacity:    0.06,
+    shadowRadius:     12,
+    elevation:        12,
   },
-  bar: {
-    flexDirection: 'row',
-  },
+  bar: { flexDirection: 'row' },
   tabBtn: {
-    flex:        1,
-    alignItems:  'center',
-    gap:         2,
+    flex:            1,
+    alignItems:      'center',
+    gap:             2,
     paddingVertical: 2,
   },
   iconWrap: {
@@ -109,25 +107,9 @@ const s = StyleSheet.create({
     alignItems:     'center',
     justifyContent: 'center',
   },
-  iconWrapActive: {
-    backgroundColor: DS.accentLight,
-  },
-  tabIcon: {
-    fontSize:   15,
-    fontWeight: '700',
-    color:      DS.textMuted,
-  },
-  tabIconActive: {
-    color: DS.accent,
-  },
-  tabLabel: {
-    fontSize:   9,
-    fontWeight: '500',
-    color:      DS.textMuted,
-    letterSpacing: 0.2,
-  },
-  tabLabelActive: {
-    fontWeight: '700',
-    color:      DS.accent,
-  },
+  iconWrapActive:  { backgroundColor: DS.accentLight },
+  tabIcon:         { fontSize: 15, fontWeight: '700', color: DS.textMuted },
+  tabIconActive:   { color: DS.accent },
+  tabLabel:        { fontSize: 9, fontWeight: '500', color: DS.textMuted, letterSpacing: 0.2 },
+  tabLabelActive:  { fontWeight: '700', color: DS.accent },
 });

@@ -238,6 +238,24 @@ export function AppHeader({ helpKey }: AppHeaderProps = {}) {
                 <Text style={h.linkText}>Product Blueprint</Text>
                 <Text style={h.linkArrow}>→</Text>
               </TouchableOpacity>
+              <View style={h.divider} />
+              <TouchableOpacity
+                style={h.linkRow}
+                onPress={() => { setShowSettings(false); setTimeout(() => navigation.navigate('LaunchPad' as any), 300); }}
+                activeOpacity={0.7}
+              >
+                <Text style={h.linkText}>LaunchPad</Text>
+                <Text style={h.linkArrow}>→</Text>
+              </TouchableOpacity>
+              <View style={h.divider} />
+              <TouchableOpacity
+                style={h.linkRow}
+                onPress={() => { setShowSettings(false); setTimeout(() => navigation.navigate('Copilot' as any), 300); }}
+                activeOpacity={0.7}
+              >
+                <Text style={h.linkText}>AI Copilot</Text>
+                <Text style={h.linkArrow}>→</Text>
+              </TouchableOpacity>
             </View>
 
             {/* ── Legal ──────────────────────────────────────── */}
@@ -261,7 +279,11 @@ export function AppHeader({ helpKey }: AppHeaderProps = {}) {
 
       {/* ── Header bar ─────────────────────────────────────── */}
       <View style={h.bar}>
-        <View>
+        <TouchableOpacity onPress={() => navigation.navigate('Copilot' as any)} activeOpacity={0.8} style={h.copilotBtn}>
+          <Text style={h.copilotIcon}>◉</Text>
+          <Text style={h.copilotLabel}>AI</Text>
+        </TouchableOpacity>
+        <View style={h.barCenter}>
           <Text style={h.appName}>Siftly</Text>
           <Text style={h.appEye}>SIFTLY</Text>
         </View>
@@ -291,19 +313,33 @@ export function AppHeader({ helpKey }: AppHeaderProps = {}) {
 
 const h = StyleSheet.create({
   bar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 10,
-    backgroundColor: DS.bgCard,
+    flexDirection:     'row',
+    justifyContent:    'space-between',
+    alignItems:        'center',
+    paddingHorizontal: 16,
+    paddingTop:        10,
+    paddingBottom:     10,
+    backgroundColor:   DS.bgCard,
     borderBottomWidth: 1,
     borderBottomColor: DS.border,
   },
-  barRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  appName:  { fontSize: 21, fontWeight: '900', color: DS.textPrimary, letterSpacing: -0.8 },
-  appEye:   { fontSize: 8, fontWeight: '800', color: DS.indigo, letterSpacing: 2.5 },
+  barCenter: { alignItems: 'center' },
+  barRight:  { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  appName:   { fontSize: 21, fontWeight: '900', color: DS.textPrimary, letterSpacing: -0.8 },
+  appEye:    { fontSize: 8, fontWeight: '800', color: DS.indigo, letterSpacing: 2.5 },
+  copilotBtn: {
+    alignItems:      'center',
+    justifyContent:  'center',
+    backgroundColor: DS.accent + '12',
+    borderRadius:    DS.radiusButton,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderWidth:     1,
+    borderColor:     DS.accent + '30',
+    gap:             1,
+  },
+  copilotIcon:  { fontSize: 14, color: DS.accent },
+  copilotLabel: { fontSize: 8, fontWeight: '800', color: DS.accent, letterSpacing: 1 },
   tierPill: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
     borderWidth: 1, borderRadius: 20,
