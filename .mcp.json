@@ -1,0 +1,21 @@
+{
+  "supabase": {
+    "command": "npx",
+    "args": [
+      "-y",
+      "@supabase/mcp-server-supabase",
+      "--access-token",
+      "sbp_99e4fbefcd3212973d1fc3a1f50f3525219626c4"
+    ]
+  },
+  "github": {
+    "command": "npx",
+    "args": [
+      "-y",
+      "@modelcontextprotocol/server-github"
+    ],
+    "env": {
+      "GITHUB_PERSONAL_ACCESS_TOKEN": "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"
+    }
+  }
+}

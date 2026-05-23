@@ -16,6 +16,7 @@ import type {
 import { STAGE_ORDER, STAGE_LABELS, STAGE_ICONS } from '../types/builder';
 import { HelpButton } from '../components/HelpModal';
 import { AppHeader } from '../components/AppHeader';
+import { useNavigation } from '@react-navigation/native';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -1432,6 +1433,7 @@ function StageCard({
 // ── Main Builder Screen ───────────────────────────────────────────────────────
 
 export default function BuilderScreen() {
+  const navigation = useNavigation<any>();
   const {
     loaded, activeSession, archivedSessions,
     startNewSession, abandonSession, goBackToStage,
@@ -1544,6 +1546,23 @@ export default function BuilderScreen() {
 
           <TouchableOpacity style={bs.startBtn} onPress={startNewSession} activeOpacity={0.85}>
             <Text style={bs.startBtnTxt}>Start New LaunchPad →</Text>
+          </TouchableOpacity>
+
+          {/* Product Blueprint card */}
+          <TouchableOpacity
+            style={bs.blueprintCard}
+            onPress={() => navigation.navigate('ProductBlueprint')}
+            activeOpacity={0.85}
+          >
+            <View style={bs.blueprintLeft}>
+              <Text style={bs.blueprintIcon}>◈</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={bs.blueprintLabel}>PRODUCT BLUEPRINT</Text>
+                <Text style={bs.blueprintTitle}>The complete Siftly roadmap</Text>
+                <Text style={bs.blueprintSub}>5 phases · From niche to launch</Text>
+              </View>
+            </View>
+            <Text style={bs.blueprintArrow}>→</Text>
           </TouchableOpacity>
 
           {archivedSessions.length > 0 && (
@@ -1733,6 +1752,24 @@ const bs = StyleSheet.create({
 
   startBtn:     { alignSelf: 'stretch', backgroundColor: DS.indigo, borderRadius: 16, paddingVertical: 18, alignItems: 'center' },
   startBtnTxt:  { fontSize: 16, fontWeight: '900', color: '#fff', letterSpacing: -0.3 },
+
+  blueprintCard: {
+    alignSelf:        'stretch',
+    backgroundColor:  DS.bgCard,
+    borderRadius:     DS.radiusCard,
+    borderWidth:      1.5,
+    borderColor:      DS.accent + '30',
+    padding:          16,
+    flexDirection:    'row',
+    alignItems:       'center',
+    justifyContent:   'space-between',
+  },
+  blueprintLeft:  { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
+  blueprintIcon:  { fontSize: 24, color: DS.accent },
+  blueprintLabel: { fontSize: 9, fontWeight: '800', color: DS.accent, letterSpacing: 2, marginBottom: 2 },
+  blueprintTitle: { fontSize: 13, fontWeight: '800', color: DS.textPrimary, letterSpacing: -0.2 },
+  blueprintSub:   { fontSize: 11, color: DS.textSecondary, marginTop: 1 },
+  blueprintArrow: { fontSize: 18, color: DS.accent, fontWeight: '700' },
 
   archiveTitle:   { fontSize: 12, fontWeight: '700', color: DS.textMuted, letterSpacing: 1 },
   archiveCard:    { backgroundColor: DS.bgCard, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: DS.border, gap: 4 },
