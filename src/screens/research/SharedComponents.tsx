@@ -526,35 +526,66 @@ export function AnalyzeProductModal({
           {error !== '' && !loading && (
             <View style={am.errBox}><Text style={am.errTxt}>{error}</Text></View>
           )}
-          {result && !loading && (
-            <>
-              <View style={am.disclaimer}>
-                <Text style={am.disclaimerText}>⚠️ Based on estimated data. Verify before ordering.</Text>
-              </View>
-              <View style={am.section}>
-                <Text style={am.sectionTitle}>Verdict</Text>
-                <Text style={am.bullet}>{result.verdict} · {result.confidence}% confidence</Text>
-              </View>
-              <View style={am.section}>
-                <Text style={am.sectionTitle}>Summary</Text>
-                <Text style={am.bullet}>{result.summary}</Text>
-              </View>
-              {result.reasons.length > 0 && (
-                <View style={am.section}>
-                  <Text style={am.sectionTitle}>Key Reasons</Text>
-                  {result.reasons.map((r, i) => <Text key={i} style={am.bullet}>· {r}</Text>)}
+          {result && !loading && (() => {
+            const verdictColor = result.verdict === 'LAUNCH' ? DS.success : result.verdict === 'TEST' ? DS.warning : DS.danger;
+            const verdictIcon  = result.verdict === 'LAUNCH' ? '✓' : result.verdict === 'TEST' ? '◉' : '✕';
+            return (
+              <>
+                {/* Go / No-Go verdict card */}
+                <View style={[am.verdictCard, { borderColor: verdictColor + '50', backgroundColor: verdictColor + '08' }]}>
+                  <View style={am.verdictTop}>
+                    <View style={[am.verdictBadge, { backgroundColor: verdictColor }]}>
+                      <Text style={am.verdictIcon}>{verdictIcon}</Text>
+                      <Text style={am.verdictWord}>{result.verdict}</Text>
+                    </View>
+                    <View style={{ flex: 1, gap: 6 }}>
+                      <Text style={am.confidenceLabel}>{result.confidence}% confidence</Text>
+                      <View style={am.confBar}>
+                        <View style={[am.confFill, { width: `${result.confidence}%`, backgroundColor: verdictColor }]} />
+                      </View>
+                    </View>
+                  </View>
+                  <Text style={am.summaryTxt}>{result.summary}</Text>
                 </View>
-              )}
-              <View style={am.section}>
-                <Text style={am.sectionTitle}>Risk</Text>
-                <Text style={am.bullet}>{result.risk}</Text>
-              </View>
-              <View style={am.section}>
-                <Text style={am.sectionTitle}>Next Step</Text>
-                <Text style={am.bullet}>{result.next_step}</Text>
-              </View>
-            </>
-          )}
+
+                {/* Reasons */}
+                {result.reasons.length > 0 && (
+                  <View style={am.section}>
+                    <Text style={am.sectionTitle}>Why This Verdict</Text>
+                    {result.reasons.map((r, i) => (
+                      <View key={i} style={am.reasonRow}>
+                        <Text style={[am.reasonIcon, { color: verdictColor }]}>{result.verdict === 'AVOID' ? '✕' : '✓'}</Text>
+                        <Text style={am.bullet}>{r}</Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+
+                {/* Risk */}
+                {!!result.risk && (
+                  <View style={[am.section, { borderColor: DS.warning + '40', backgroundColor: DS.warning + '08' }]}>
+                    <Text style={am.sectionTitle}>Risk to Watch</Text>
+                    <View style={am.reasonRow}>
+                      <Text style={[am.reasonIcon, { color: DS.warning }]}>⚠</Text>
+                      <Text style={[am.bullet, { color: DS.warning }]}>{result.risk}</Text>
+                    </View>
+                  </View>
+                )}
+
+                {/* Next step */}
+                {!!result.next_step && (
+                  <View style={[am.section, { borderColor: DS.accent + '30', backgroundColor: DS.accent + '06' }]}>
+                    <Text style={am.sectionTitle}>Recommended Next Step</Text>
+                    <Text style={[am.bullet, { color: DS.accent, fontWeight: '600' }]}>{result.next_step}</Text>
+                  </View>
+                )}
+
+                <View style={am.disclaimer}>
+                  <Text style={am.disclaimerText}>Based on estimated market data. Always verify before ordering.</Text>
+                </View>
+              </>
+            );
+          })()}
         </ScrollView>
       </SafeAreaView>
     </Modal>
@@ -570,13 +601,25 @@ export const am = StyleSheet.create({
   content:     { paddingHorizontal: 20, paddingBottom: 60, gap: 16 },
   center:      { alignItems: 'center', paddingVertical: 60, gap: 12 },
   loadTxt:     { fontSize: 13, color: DS.textMuted, fontWeight: '600' },
-  errBox:       { backgroundColor: DS.dangerBg, borderRadius: 14, padding: 16 },
-  errTxt:       { fontSize: 13, color: DS.dangerText, textAlign: 'center' },
-  section:      { backgroundColor: DS.bgCard, borderRadius: 16, padding: 16, gap: 10, borderWidth: 1, borderColor: DS.border },
-  sectionTitle: { fontSize: 10, fontWeight: '800', color: DS.textMuted, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 2 },
-  bullet:       { fontSize: 13, color: DS.textSecondary, lineHeight: 20 },
-  disclaimer:   { backgroundColor: '#FFFBEB', borderRadius: 10, padding: 10, borderWidth: 1, borderColor: '#FDE68A' },
-  disclaimerText:{ fontSize: 11, color: '#92400E' },
+  errBox:      { backgroundColor: DS.dangerBg, borderRadius: 14, padding: 16 },
+  errTxt:      { fontSize: 13, color: DS.dangerText, textAlign: 'center' },
+  section:     { backgroundColor: DS.bgCard, borderRadius: DS.radiusCard, padding: 16, gap: 10, borderWidth: 1, borderColor: DS.border },
+  sectionTitle:{ fontSize: 10, fontWeight: '800', color: DS.textMuted, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 2 },
+  bullet:      { fontSize: 13, color: DS.textSecondary, lineHeight: 20, flex: 1 },
+  disclaimer:  { backgroundColor: DS.bgElevated, borderRadius: DS.radiusChip, padding: 10, borderWidth: 1, borderColor: DS.border },
+  disclaimerText: { fontSize: 11, color: DS.textMuted },
+  // Go/No-Go scorecard
+  verdictCard: { borderRadius: DS.radiusCard, borderWidth: 1.5, padding: DS.cardPadding, gap: 12 },
+  verdictTop:  { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  verdictBadge:{ borderRadius: DS.radiusButton, paddingHorizontal: 16, paddingVertical: 12, alignItems: 'center', gap: 2, minWidth: 72 },
+  verdictIcon: { fontSize: 20, color: '#fff', fontWeight: '900' },
+  verdictWord: { fontSize: 11, color: '#fff', fontWeight: '900', letterSpacing: 1 },
+  confidenceLabel: { fontSize: 11, fontWeight: '700', color: DS.textSecondary },
+  confBar:     { height: 6, backgroundColor: DS.bgElevated, borderRadius: 3 },
+  confFill:    { height: 6, borderRadius: 3 },
+  summaryTxt:  { fontSize: 13, color: DS.textSecondary, lineHeight: 20 },
+  reasonRow:   { flexDirection: 'row', gap: 8, alignItems: 'flex-start' },
+  reasonIcon:  { fontSize: 12, fontWeight: '800', marginTop: 3 },
 });
 
 // ── Analyze Supplier modal ────────────────────────────────────────────────────

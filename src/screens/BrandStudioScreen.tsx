@@ -792,7 +792,52 @@ const br = StyleSheet.create({
   recBody:   { fontSize: 12, color: DS.textSecondary, lineHeight: 18 },
 });
 
-// ── Saved Assets section ──────────────────────────────────────────────────────
+// ── Amazon Compliance Card ────────────────────────────────────────────────────
+
+const COMPLIANCE_ITEMS = [
+  { label: 'Brand name clearly visible',         required: true  },
+  { label: 'Product name / description',         required: true  },
+  { label: 'Net weight / quantity stated',       required: true  },
+  { label: 'Country of origin',                  required: true  },
+  { label: 'FNSKU barcode (on unit & packaging)',required: true  },
+  { label: 'Suffocation warning (bags/poly)',    required: false },
+  { label: 'Choking hazard (if applicable)',     required: false },
+  { label: 'Ingredient list (food/supplements)', required: false },
+  { label: 'UPC / EAN barcode',                  required: false },
+];
+
+function AmazonComplianceCard() {
+  return (
+    <AppCard style={{ marginTop: 16, gap: 12 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <Text style={{ fontSize: 16 }}>✅</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontSize: 13, fontWeight: '800', color: DS.textPrimary }}>Amazon Compliance Checklist</Text>
+          <Text style={{ fontSize: 11, color: DS.textMuted }}>Required elements before sending to supplier</Text>
+        </View>
+      </View>
+      {COMPLIANCE_ITEMS.map((item, i) => (
+        <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <View style={{
+            width: 20, height: 20, borderRadius: 10,
+            backgroundColor: item.required ? DS.success + '18' : DS.bgElevated,
+            alignItems: 'center', justifyContent: 'center',
+          }}>
+            <Text style={{ fontSize: 10, color: item.required ? DS.success : DS.textMuted, fontWeight: '800' }}>
+              {item.required ? '✓' : '○'}
+            </Text>
+          </View>
+          <Text style={{ fontSize: 13, color: DS.textSecondary, flex: 1 }}>{item.label}</Text>
+          {item.required && (
+            <View style={{ backgroundColor: DS.danger + '12', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
+              <Text style={{ fontSize: 9, fontWeight: '800', color: DS.danger }}>REQ</Text>
+            </View>
+          )}
+        </View>
+      ))}
+    </AppCard>
+  );
+}
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
@@ -954,17 +999,20 @@ export default function BrandStudioScreen() {
           />
         )}
         {assetTab === 'label' && (
-          <LabelGeneratorTab
-            brandName={inputs.brandName}
-            loading={labelLoading}
-            result={labelResult}
-            onGenerate={handleGenerateLabel}
-            genError={labelError}
-            exportLoading={exportLoading}
-            exportError={exportError}
-            onExport={handleExportLabel}
-            accentColor={ASSET_TABS.find(t => t.id === assetTab)!.color}
-          />
+          <>
+            <LabelGeneratorTab
+              brandName={inputs.brandName}
+              loading={labelLoading}
+              result={labelResult}
+              onGenerate={handleGenerateLabel}
+              genError={labelError}
+              exportLoading={exportLoading}
+              exportError={exportError}
+              onExport={handleExportLabel}
+              accentColor={ASSET_TABS.find(t => t.id === assetTab)!.color}
+            />
+            <AmazonComplianceCard />
+          </>
         )}
         {assetTab === 'insert' && (
           <PackagingInsertTab
