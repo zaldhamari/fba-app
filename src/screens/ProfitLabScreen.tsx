@@ -23,6 +23,8 @@ import {
 } from '../components/ds';
 import { STORAGE_KEYS } from '../constants/storage';
 import { useCurrency } from '../context/CurrencyContext';
+import { usePipeline } from '../context/PipelineContext';
+import { PipelineProgressBar } from '../components/PipelineProgressBar';
 import type { CurrencyCode, MarketplaceId } from '../context/CurrencyContext';
 import { useActiveProduct } from '../context/ActiveProductContext';
 import { CurrencySelector } from '../components/CurrencySelector';
@@ -336,6 +338,7 @@ function FBAWorkspace({
   onFeasibility: () => void;
 }) {
   const { fmtLocal, symbol, currency, marketplace } = useCurrency();
+  const pipeline = usePipeline();
   const profile = getMarketplaceProfile(marketplace);
   const [inputs,            setInputs]            = useState<FBAInputs>(FBA_DEFAULTS);
   const [committed,         setCommitted]          = useState<FBAInputs>(FBA_DEFAULTS);
@@ -410,6 +413,30 @@ function FBAWorkspace({
     }).catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeProductPrice, activeProductName]);
+
+  // Pre-fill supplier cost from pipeline when no saved calculation exists.
+  useEffect(() => {
+    if (!pipeline.selectedSupplier || autofillDone) return;
+    AsyncStorage.getItem(STORAGE_KEYS.savedCalculations).then(raw => {
+      if (raw) {
+        try {
+          const list: FBASaved[] = JSON.parse(raw);
+          if (list.length > 0) return;
+        } catch { /* fall through */ }
+      }
+      const cost = pipeline.selectedSupplier?.unitCost;
+      if (cost && cost > 0) {
+        setInputs(prev => prev.productCost !== '' ? prev : { ...prev, productCost: cost.toFixed(2) });
+      }
+      if (pipeline.activeProduct?.title) {
+        setProductName(prev => prev.trim() ? prev : (pipeline.activeProduct?.title ?? ''));
+      }
+      if (pipeline.activeProduct?.price) {
+        setInputs(prev => prev.sellingPrice !== '' ? prev : { ...prev, sellingPrice: (pipeline.activeProduct?.price ?? 0).toFixed(2) });
+      }
+    }).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pipeline.selectedSupplier, pipeline.activeProduct, autofillDone]);
 
   const c  = useMemo(() => computeFBA(committed), [committed]);
   const sc = useMemo(() => {
@@ -2588,6 +2615,7 @@ export default function ProfitLabScreen() {
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <AppHeader helpKey={CALC_HELP[calcType]} />
+      <PipelineProgressBar />
 
       <ScrollView
         style={s.scroll}

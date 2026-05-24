@@ -1,10 +1,10 @@
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import {
   ScrollView, StyleSheet, View, Text,
   TouchableOpacity, ActivityIndicator, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { CompositeNavigationProp } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type { StackNavigationProp } from '@react-navigation/stack';
@@ -27,6 +27,8 @@ import { AppHeader } from '../components/AppHeader';
 import { SkeletonProductCard } from '../components/ds/LoadingSkeleton';
 import { useCurrency } from '../context/CurrencyContext';
 import { useActiveProduct } from '../context/ActiveProductContext';
+import { usePipeline } from '../context/PipelineContext';
+import { PipelineProgressBar } from '../components/PipelineProgressBar';
 import {
   expandProductKeywords,
   buildSupplierQueries,
@@ -127,6 +129,8 @@ export default function ResearchWorkspaceScreen() {
   const { setActiveProduct }     = useActiveProduct();
   const { profile: sellerProfile } = useSellerProfile();
   const { marketplace }          = useCurrency();
+  const pipeline                 = usePipeline();
+  const prefilled                = useRef(false);
 
   // ── Mode & search ──────────────────────────────────────────────────────────
   const [mode,          setMode]          = useState<Mode>('market');
@@ -157,6 +161,13 @@ export default function ResearchWorkspaceScreen() {
       if (kw) setSavedKWs(JSON.parse(kw));
     }).catch(() => {});
   }, []);
+
+  useFocusEffect(useCallback(() => {
+    if (!prefilled.current && pipeline.activeNiche?.keyword && !searchQuery) {
+      setSearchQuery(pipeline.activeNiche.keyword);
+      prefilled.current = true;
+    }
+  }, [pipeline.activeNiche, searchQuery]));
 
   const addRecentMarket = useCallback((q: string) => {
     setRecentMarket(prev => {
@@ -808,6 +819,15 @@ export default function ResearchWorkspaceScreen() {
     };
     setActiveProduct(snapshot); // updates context + AsyncStorage atomically
     setFeasProductId(item.id);
+    pipeline.setActiveProduct({
+      title:   item.name,
+      asin:    item.id,
+      price:   item.price ?? 0,
+      reviews: item.reviewCount ?? 0,
+      rating:  item.rating ?? 0,
+      url:     item.url,
+    });
+    pipeline.trackEvent('product_selected', { title: item.name, asin: item.id });
     navigation.navigate('FeasibilityCheck' as any);
   }, [feasProductId, navigation, setActiveProduct]);
 
@@ -911,8 +931,15 @@ export default function ResearchWorkspaceScreen() {
             <Text style={fl.eye}>RESEARCH FLOW · STEP 2</Text>
             <Text style={fl.title}>Find suppliers for your saved product</Text>
             <Text style={fl.sub}>You've saved {savedIds.size} product{savedIds.size > 1 ? 's' : ''}. Select the one you want to source, then find matching suppliers.</Text>
-            <TouchableOpacity style={fl.btn} onPress={switchToSuppliers} activeOpacity={0.85}>
-              <Text style={fl.btnTxt}>🏭  Find Suppliers →</Text>
+            <TouchableOpacity
+              style={fl.btn}
+              onPress={() => {
+                pipeline.trackEvent('validate_handoff_suppliers', { query: searchQuery });
+                navigation.navigate('Suppliers' as any);
+              }}
+              activeOpacity={0.85}
+            >
+              <Text style={fl.btnTxt}>Source This Product →</Text>
             </TouchableOpacity>
           </AppCard>
         )}
@@ -1418,6 +1445,7 @@ export default function ResearchWorkspaceScreen() {
       />
 
       <AppHeader helpKey={mode === 'suppliers' ? 'suppliers' : mode === 'market' ? 'research' : mode === 'freight' ? 'freight_tab' : 'smart_search'} />
+      <PipelineProgressBar />
 
       <ScrollView
         style={s.scroll}

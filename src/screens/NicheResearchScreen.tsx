@@ -4,11 +4,14 @@ import {
   TouchableOpacity, ActivityIndicator, Alert,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useNavigation } from '@react-navigation/native';
 import { DS } from '../components/ds';
 import { api } from '../services/api';
 import { AppHeader } from '../components/AppHeader';
+import { PipelineProgressBar } from '../components/PipelineProgressBar';
 import { useCurrency } from '../context/CurrencyContext';
 import { useSellerProfile } from '../hooks/useSellerProfile';
+import { usePipeline } from '../context/PipelineContext';
 
 const WATCHLIST_KEY = 'siftly_niche_watchlist_v1';
 
@@ -95,6 +98,8 @@ function Stat({ label, value, sub }: { label: string; value: string; sub?: strin
 export default function NicheResearchScreen() {
   const { marketplace } = useCurrency();
   const { profile }     = useSellerProfile();
+  const pipeline        = usePipeline();
+  const navigation      = useNavigation<any>();
 
   const [keyword,   setKeyword]   = useState('');
   const [priceMin,  setPriceMin]  = useState('15');
@@ -132,6 +137,13 @@ export default function NicheResearchScreen() {
         budget,
       });
       setReport(result);
+      pipeline.setActiveNiche({
+        keyword:      result.keyword,
+        marketplace:  result.marketplace,
+        verdictLabel: result.verdict.label,
+        score:        result.verdict.score,
+      });
+      pipeline.trackEvent('niche_analyzed', { keyword: result.keyword, verdict: result.verdict.label });
     } catch (e: any) {
       setError(e?.message ?? 'Something went wrong');
     } finally {
@@ -166,6 +178,7 @@ export default function NicheResearchScreen() {
   return (
     <View style={s.container}>
       <AppHeader helpKey="research" />
+      <PipelineProgressBar />
       <ScrollView style={s.scroll} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
 
         {/* Hero */}
@@ -218,6 +231,55 @@ export default function NicheResearchScreen() {
         </View>
 
         {/* Loading */}
+        {/* Quick-start niches — only when no search yet */}
+        {!report && !loading && (
+          <View style={s.quickSection}>
+            <Text style={s.quickTitle}>TRENDING NICHES TO EXPLORE</Text>
+            <View style={s.quickGrid}>
+              {[
+                { label: 'Bamboo kitchen', icon: '🎋' },
+                { label: 'Pet enrichment toys', icon: '🐾' },
+                { label: 'Portable blender', icon: '🥤' },
+                { label: 'Posture corrector', icon: '🧘' },
+                { label: 'LED desk lamp', icon: '💡' },
+                { label: 'Silicone baby spoon', icon: '🍼' },
+                { label: 'Car phone holder', icon: '🚗' },
+                { label: 'Resistance bands', icon: '💪' },
+                { label: 'Reusable beeswax wrap', icon: '🍯' },
+                { label: 'Magnetic bookmarks', icon: '📚' },
+                { label: 'Shower head filter', icon: '🚿' },
+                { label: 'Dog cooling mat', icon: '🐕' },
+              ].map(n => (
+                <TouchableOpacity
+                  key={n.label}
+                  style={s.quickChip}
+                  onPress={() => { setKeyword(n.label); }}
+                  activeOpacity={0.75}
+                >
+                  <Text style={s.quickChipIcon}>{n.icon}</Text>
+                  <Text style={s.quickChipTxt}>{n.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <View style={s.howItWorks}>
+              <Text style={s.howTitle}>HOW IT WORKS</Text>
+              <View style={s.howRow}>
+                <View style={s.howStep}><Text style={s.howNum}>1</Text></View>
+                <Text style={s.howTxt}>Tap a niche or type your own idea</Text>
+              </View>
+              <View style={s.howRow}>
+                <View style={s.howStep}><Text style={s.howNum}>2</Text></View>
+                <Text style={s.howTxt}>Get a market score, competition analysis, and gap opportunities</Text>
+              </View>
+              <View style={s.howRow}>
+                <View style={s.howStep}><Text style={s.howNum}>3</Text></View>
+                <Text style={s.howTxt}>Save promising niches to your watchlist and validate in the next tab</Text>
+              </View>
+            </View>
+          </View>
+        )}
+
         {loading && (
           <View style={s.loadingWrap}>
             <ActivityIndicator color={DS.accent} size="large" />
@@ -265,6 +327,17 @@ export default function NicheResearchScreen() {
 
               <TouchableOpacity style={[s.saveBtn, { borderColor: vc + '50' }]} onPress={saveToWatchlist} activeOpacity={0.8}>
                 <Text style={[s.saveBtnTxt, { color: vc }]}>+ Save to Watchlist</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={s.handoffBtn}
+                onPress={() => {
+                  pipeline.trackEvent('niche_handoff_validate', { keyword: report.keyword });
+                  navigation.navigate('Validate');
+                }}
+                activeOpacity={0.88}
+              >
+                <Text style={s.handoffBtnTxt}>Validate Products in This Niche →</Text>
               </TouchableOpacity>
             </View>
 
@@ -440,6 +513,37 @@ const s = StyleSheet.create({
   },
   filterHint: { fontSize: 10, color: DS.textMuted },
 
+  quickSection:  { gap: 14 },
+  quickTitle:    { fontSize: 10, fontWeight: '800', color: DS.textMuted, letterSpacing: 2 },
+  quickGrid:     { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  quickChip: {
+    flexDirection:   'row',
+    alignItems:      'center',
+    gap:             6,
+    backgroundColor: DS.bgCard,
+    borderRadius:    DS.radiusBadge,
+    borderWidth:     1,
+    borderColor:     DS.border,
+    paddingHorizontal: 12,
+    paddingVertical:   8,
+  },
+  quickChipIcon: { fontSize: 14 },
+  quickChipTxt:  { fontSize: 12, fontWeight: '600', color: DS.textPrimary },
+
+  howItWorks: {
+    backgroundColor: DS.bgCard,
+    borderRadius:    DS.radiusCard,
+    borderWidth:     1,
+    borderColor:     DS.border,
+    padding:         DS.cardPadding,
+    gap:             12,
+  },
+  howTitle:  { fontSize: 9, fontWeight: '800', color: DS.textMuted, letterSpacing: 2 },
+  howRow:    { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  howStep:   { width: 24, height: 24, borderRadius: 12, backgroundColor: DS.accent, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  howNum:    { fontSize: 12, fontWeight: '900', color: '#fff' },
+  howTxt:    { fontSize: 13, color: DS.textSecondary, flex: 1, lineHeight: 18 },
+
   loadingWrap: { alignItems: 'center', gap: 12, paddingVertical: 32 },
   loadingTxt:  { fontSize: 14, color: DS.textSecondary },
   errorTxt:    { fontSize: 13, color: DS.danger, textAlign: 'center' },
@@ -465,6 +569,14 @@ const s = StyleSheet.create({
     alignItems:      'center',
   },
   saveBtnTxt: { fontSize: 13, fontWeight: '800' },
+
+  handoffBtn: {
+    backgroundColor: DS.accent,
+    borderRadius:    DS.radiusButton,
+    paddingVertical: 13,
+    alignItems:      'center',
+  },
+  handoffBtnTxt: { fontSize: 14, fontWeight: '900', color: '#fff', letterSpacing: -0.2 },
 
   card: {
     backgroundColor: DS.bgCard,

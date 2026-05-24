@@ -7,6 +7,7 @@ import * as Sentry from '@sentry/react-native';
 import RootNavigator from './src/navigation/RootNavigator';
 import { CurrencyProvider } from './src/context/CurrencyContext';
 import { ActiveProductProvider } from './src/context/ActiveProductContext';
+import { PipelineProvider } from './src/context/PipelineContext';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { initRevenueCat } from './src/lib/revenuecat';
 import { validateConfig } from './src/lib/validateConfig';
@@ -29,12 +30,14 @@ function App() {
     <ErrorBoundary fallbackLabel="App">
       <CurrencyProvider>
         <ActiveProductProvider>
-          <SafeAreaProvider>
-            <NavigationContainer>
-              <StatusBar style="dark" />
-              <RootNavigator />
-            </NavigationContainer>
-          </SafeAreaProvider>
+          <PipelineProvider>
+            <SafeAreaProvider>
+              <NavigationContainer>
+                <StatusBar style="dark" />
+                <RootNavigator />
+              </NavigationContainer>
+            </SafeAreaProvider>
+          </PipelineProvider>
         </ActiveProductProvider>
       </CurrencyProvider>
     </ErrorBoundary>

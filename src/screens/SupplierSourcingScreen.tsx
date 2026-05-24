@@ -1,12 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TextInput,
   TouchableOpacity, ActivityIndicator, Alert, Linking,
 } from 'react-native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { DS } from '../components/ds';
 import { api } from '../services/api';
 import { AppHeader } from '../components/AppHeader';
+import { PipelineProgressBar } from '../components/PipelineProgressBar';
 import { useCurrency } from '../context/CurrencyContext';
+import { usePipeline } from '../context/PipelineContext';
 
 type Supplier = {
   title:         string;
@@ -146,6 +149,9 @@ function SupplierCard({
 
 export default function SupplierSourcingScreen() {
   const { marketplace } = useCurrency();
+  const pipeline        = usePipeline();
+  const navigation      = useNavigation<any>();
+  const prefilled       = useRef(false);
 
   const [product,     setProduct]     = useState('');
   const [maxPrice,    setMaxPrice]    = useState('');
@@ -157,6 +163,15 @@ export default function SupplierSourcingScreen() {
   const [scoringIdx,  setScoringIdx]  = useState<number | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [emailModal,  setEmailModal]  = useState<{ subject: string; body: string; tips: string[] } | null>(null);
+
+  useFocusEffect(useCallback(() => {
+    if (prefilled.current) return;
+    const prefillQuery = pipeline.activeProduct?.title ?? pipeline.activeNiche?.keyword;
+    if (prefillQuery && !product) {
+      setProduct(prefillQuery);
+      prefilled.current = true;
+    }
+  }, [pipeline.activeProduct, pipeline.activeNiche, product]));
 
   async function handleSearch() {
     const p = product.trim();
@@ -211,12 +226,34 @@ export default function SupplierSourcingScreen() {
     }
   }
 
+  function handleSelectSupplier(idx: number) {
+    const newIdx = selectedIdx === idx ? null : idx;
+    setSelectedIdx(newIdx);
+    if (newIdx !== null) {
+      const sup = suppliers[newIdx];
+      const unitCost = sup.price_range?.min ?? 0;
+      pipeline.setSelectedSupplier({
+        name:     sup.supplier || sup.title,
+        platform: 'Alibaba',
+        unitCost,
+        moq:      parseInt(sup.moq) || 200,
+        url:      sup.url,
+        score:    sup.score?.total_score,
+        grade:    sup.score?.grade,
+      });
+      pipeline.trackEvent('supplier_selected', { name: sup.supplier, grade: sup.score?.grade });
+    } else {
+      pipeline.setSelectedSupplier(null);
+    }
+  }
+
   const selectedSuppliers = selectedIdx !== null ? [suppliers[selectedIdx]] : [];
   const compareMode = selectedIdx !== null;
 
   return (
     <View style={s.container}>
       <AppHeader helpKey="research" />
+      <PipelineProgressBar />
       <ScrollView style={s.scroll} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
 
         {/* Hero */}
@@ -284,13 +321,38 @@ export default function SupplierSourcingScreen() {
                 supplier={sup}
                 index={idx}
                 selected={selectedIdx === idx}
-                onSelect={() => setSelectedIdx(prev => prev === idx ? null : idx)}
+                onSelect={() => handleSelectSupplier(idx)}
                 onScore={() => handleScore(idx)}
                 onEmail={() => handleEmail(idx)}
                 scoring={scoringIdx === idx}
               />
             ))}
           </>
+        )}
+
+        {/* Pipeline handoff — shown when a supplier is selected */}
+        {selectedIdx !== null && pipeline.selectedSupplier && (
+          <View style={s.handoffCard}>
+            <View style={s.handoffTop}>
+              <Text style={s.handoffIcon}>✈</Text>
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text style={s.handoffTitle}>Supplier locked in</Text>
+                <Text style={s.handoffSub}>
+                  {pipeline.selectedSupplier.name} · ~${pipeline.selectedSupplier.unitCost}/unit · MOQ {pipeline.selectedSupplier.moq}
+                </Text>
+              </View>
+            </View>
+            <TouchableOpacity
+              style={s.handoffBtn}
+              onPress={() => {
+                pipeline.trackEvent('supplier_handoff_costs', { name: pipeline.selectedSupplier?.name });
+                navigation.navigate('Costs');
+              }}
+              activeOpacity={0.88}
+            >
+              <Text style={s.handoffBtnTxt}>Use Supplier in Cost Calculation →</Text>
+            </TouchableOpacity>
+          </View>
         )}
 
         {/* Email modal content rendered inline */}
@@ -454,4 +516,24 @@ const s = StyleSheet.create({
   emptyIcon:  { fontSize: 40, color: DS.textMuted },
   emptyTitle: { fontSize: 16, fontWeight: '900', color: DS.textPrimary },
   emptySub:   { fontSize: 13, color: DS.textSecondary, textAlign: 'center', lineHeight: 20, maxWidth: 280 },
+
+  handoffCard: {
+    backgroundColor: DS.bgCard,
+    borderRadius:    DS.radiusCard,
+    borderWidth:     1.5,
+    borderColor:     DS.accent + '40',
+    padding:         DS.cardPadding,
+    gap:             12,
+  },
+  handoffTop:  { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+  handoffIcon: { fontSize: 22, color: DS.accent },
+  handoffTitle: { fontSize: 14, fontWeight: '800', color: DS.textPrimary },
+  handoffSub:  { fontSize: 12, color: DS.textSecondary, lineHeight: 17 },
+  handoffBtn: {
+    backgroundColor: DS.accent,
+    borderRadius:    DS.radiusButton,
+    paddingVertical: 13,
+    alignItems:      'center',
+  },
+  handoffBtnTxt: { fontSize: 14, fontWeight: '900', color: '#fff', letterSpacing: -0.2 },
 });

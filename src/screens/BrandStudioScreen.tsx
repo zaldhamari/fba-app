@@ -2,6 +2,8 @@ import React, { useState, useCallback, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STORAGE_KEYS } from '../constants/storage';
 import { useActiveProduct } from '../context/ActiveProductContext';
+import { usePipeline } from '../context/PipelineContext';
+import { PipelineProgressBar } from '../components/PipelineProgressBar';
 import {
   ScrollView, StyleSheet, View, Text, TouchableOpacity,
 } from 'react-native';
@@ -844,6 +846,7 @@ function AmazonComplianceCard() {
 export default function BrandStudioScreen() {
   const { can, increment } = useSubscription();
   const { activeProduct } = useActiveProduct();
+  const pipeline = usePipeline();
 
   const [inputs, setInputs] = useState<BrandInputs>({
     brandName:      '',
@@ -870,12 +873,15 @@ export default function BrandStudioScreen() {
     }).catch(() => {});
   }, []);
 
-  // Pre-fill brand name whenever the active product changes (context async load).
+  // Pre-fill brand name from pipeline product or active product.
   useEffect(() => {
-    if (activeProduct?.name) {
-      setInputs(prev => prev.brandName.trim() ? prev : { ...prev, brandName: activeProduct.name });
+    const pipelineTitle = pipeline.activeProduct?.title;
+    const fallbackName  = activeProduct?.name;
+    const name = pipelineTitle ?? fallbackName;
+    if (name) {
+      setInputs(prev => prev.brandName.trim() ? prev : { ...prev, brandName: name });
     }
-  }, [activeProduct]);
+  }, [activeProduct, pipeline.activeProduct]);
 
   function handleInputChange(key: keyof BrandInputs, value: string) {
     setInputs(prev => ({ ...prev, [key]: value }));
@@ -956,6 +962,7 @@ export default function BrandStudioScreen() {
       <PaywallModal visible={showPaywall} onClose={() => setShowPaywall(false)} featureContext="brand" />
 
       <AppHeader helpKey={ASSET_HELP[assetTab]} />
+      <PipelineProgressBar />
 
       <ScrollView
         style={s.scroll}
