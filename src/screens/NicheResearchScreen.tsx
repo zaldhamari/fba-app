@@ -143,7 +143,7 @@ export default function NicheResearchScreen() {
         verdictLabel: result.verdict.label,
         score:        result.verdict.score,
       });
-      pipeline.trackEvent('niche_analyzed', { keyword: result.keyword, verdict: result.verdict.label });
+      pipeline.trackPipelineEvent('niche_analyzed', { keyword: result.keyword, verdict: result.verdict.label });
     } catch (e: any) {
       setError(e?.message ?? 'Something went wrong');
     } finally {
@@ -332,7 +332,7 @@ export default function NicheResearchScreen() {
               <TouchableOpacity
                 style={s.handoffBtn}
                 onPress={() => {
-                  pipeline.trackEvent('niche_handoff_validate', { keyword: report.keyword });
+                  pipeline.trackPipelineEvent('niche_handoff_validate', { keyword: report.keyword });
                   navigation.navigate('Validate');
                 }}
                 activeOpacity={0.88}

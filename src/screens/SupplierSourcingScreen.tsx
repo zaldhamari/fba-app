@@ -241,7 +241,7 @@ export default function SupplierSourcingScreen() {
         score:    sup.score?.total_score,
         grade:    sup.score?.grade,
       });
-      pipeline.trackEvent('supplier_selected', { name: sup.supplier, grade: sup.score?.grade });
+      pipeline.trackPipelineEvent('supplier_selected', { name: sup.supplier, grade: sup.score?.grade });
     } else {
       pipeline.setSelectedSupplier(null);
     }
@@ -345,7 +345,7 @@ export default function SupplierSourcingScreen() {
             <TouchableOpacity
               style={s.handoffBtn}
               onPress={() => {
-                pipeline.trackEvent('supplier_handoff_costs', { name: pipeline.selectedSupplier?.name });
+                pipeline.trackPipelineEvent('supplier_handoff_costs', { name: pipeline.selectedSupplier?.name });
                 navigation.navigate('Costs');
               }}
               activeOpacity={0.88}

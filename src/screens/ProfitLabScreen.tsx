@@ -266,6 +266,57 @@ const sel = StyleSheet.create({
   badgeTxtActive: { color: DS.indigo },
 });
 
+// ─── Pipeline action buttons (cost model + launch decision) ──────────────────
+
+function PipelineActions({
+  onSaveCostModel,
+  costModelSaved,
+}: {
+  onSaveCostModel: () => void;
+  costModelSaved: boolean;
+}) {
+  const navigation = useNavigation<any>();
+  const [saved, setSaved] = useState(false);
+
+  function handleSave() {
+    onSaveCostModel();
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2500);
+  }
+
+  return (
+    <View style={pa.wrap}>
+      <TouchableOpacity
+        style={[pa.btn, pa.btnSave, costModelSaved && pa.btnSaved]}
+        onPress={handleSave}
+        activeOpacity={0.85}
+      >
+        <Text style={[pa.btnTxt, costModelSaved && pa.btnSavedTxt]}>
+          {saved ? '✓ Cost Model Saved' : costModelSaved ? '✓ Update Cost Model' : '◉ Save Cost Model to Pipeline'}
+        </Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[pa.btn, pa.btnLaunch]}
+        onPress={() => navigation.navigate('LaunchDecision')}
+        activeOpacity={0.85}
+      >
+        <Text style={pa.btnLaunchTxt}>Open Launch Decision →</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+const pa = StyleSheet.create({
+  wrap:         { gap: 8 },
+  btn:          { borderRadius: DS.radiusButton, paddingVertical: 13, alignItems: 'center', borderWidth: 1 },
+  btnSave:      { borderColor: DS.accent + '50', backgroundColor: DS.accentLight },
+  btnSaved:     { borderColor: DS.success + '50', backgroundColor: DS.success + '10' },
+  btnTxt:       { fontSize: 13, fontWeight: '800', color: DS.accent },
+  btnSavedTxt:  { color: DS.success },
+  btnLaunch:    { backgroundColor: DS.accent, borderColor: DS.accent },
+  btnLaunchTxt: { fontSize: 14, fontWeight: '900', color: '#fff', letterSpacing: -0.2 },
+});
+
 // ─── 1. FBA Profitability ─────────────────────────────────────────────────────
 
 interface FBAInputs {
@@ -769,6 +820,33 @@ function FBAWorkspace({
           />
         )}
       </View>
+
+      {/* Pipeline actions */}
+      {n(committed.sellingPrice) > 0 && (
+        <PipelineActions
+          onSaveCostModel={() => {
+            const moq = n(committed.unitsOrdered);
+            pipeline.setCostModel({
+              sellingPrice:    n(committed.sellingPrice),
+              unitCost:        n(committed.productCost),
+              freight:         n(committed.freight),
+              fbaFee:          n(committed.fbaFees),
+              referralFee:     n(committed.referralFee),
+              duties:          n(committed.duties),
+              packaging:       n(committed.packaging),
+              netProfit:       sc.netProfit,
+              marginPct:       sc.margin,
+              roiPct:          sc.roi,
+              totalCost:       sc.totalCost,
+              unitsOrdered:    moq,
+              totalInvestment: moq > 0 ? (n(committed.productCost) + n(committed.freight) + n(committed.duties) + n(committed.packaging)) * moq : 0,
+              savedAt:         new Date().toISOString(),
+            });
+            pipeline.trackPipelineEvent('cost_model_saved', { margin: sc.margin.toFixed(1), roi: sc.roi.toFixed(0) });
+          }}
+          costModelSaved={!!pipeline.costModel}
+        />
+      )}
 
       {/* Load Saved Product */}
       <AppCard style={{ gap: 10 }}>

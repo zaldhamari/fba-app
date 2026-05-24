@@ -827,7 +827,7 @@ export default function ResearchWorkspaceScreen() {
       rating:  item.rating ?? 0,
       url:     item.url,
     });
-    pipeline.trackEvent('product_selected', { title: item.name, asin: item.id });
+    pipeline.trackPipelineEvent('product_selected', { title: item.name, asin: item.id });
     navigation.navigate('FeasibilityCheck' as any);
   }, [feasProductId, navigation, setActiveProduct]);
 
@@ -934,7 +934,7 @@ export default function ResearchWorkspaceScreen() {
             <TouchableOpacity
               style={fl.btn}
               onPress={() => {
-                pipeline.trackEvent('validate_handoff_suppliers', { query: searchQuery });
+                pipeline.trackPipelineEvent('validate_handoff_suppliers', { query: searchQuery });
                 navigation.navigate('Suppliers' as any);
               }}
               activeOpacity={0.85}

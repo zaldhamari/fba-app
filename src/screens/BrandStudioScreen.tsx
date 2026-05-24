@@ -841,6 +841,71 @@ function AmazonComplianceCard() {
   );
 }
 
+// ── Pipeline actions ──────────────────────────────────────────────────────────
+
+import { useNavigation } from '@react-navigation/native';
+import type { PipelineContextValue } from '../context/PipelineContext';
+
+function BrandPipelineActions({
+  brandName, productTitle, tagline, keywords, style, pipeline,
+}: {
+  brandName: string; productTitle: string; tagline: string;
+  keywords: string[]; style: string;
+  pipeline: PipelineContextValue;
+}) {
+  const navigation = useNavigation<any>();
+  const [saved, setSaved] = React.useState(false);
+
+  function handleSave() {
+    pipeline.setBrandData({
+      brandName,
+      productTitle,
+      tagline,
+      keywords,
+      style,
+      savedAt: new Date().toISOString(),
+    });
+    pipeline.trackPipelineEvent('brand_saved', { brandName, style });
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2500);
+  }
+
+  return (
+    <View style={bp.wrap}>
+      <TouchableOpacity
+        style={[bp.btn, bp.btnSave, !!pipeline.brandData && bp.btnSaved]}
+        onPress={handleSave}
+        activeOpacity={0.85}
+      >
+        <Text style={[bp.btnTxt, !!pipeline.brandData && bp.btnSavedTxt]}>
+          {saved ? '✓ Brand Saved' : pipeline.brandData ? '✓ Update Brand in Pipeline' : '▣ Save Brand Data to Pipeline'}
+        </Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[bp.btn, bp.btnLaunch]}
+        onPress={() => {
+          pipeline.trackPipelineEvent('launch_decision_viewed', { from: 'label' });
+          navigation.navigate('LaunchDecision');
+        }}
+        activeOpacity={0.85}
+      >
+        <Text style={bp.btnLaunchTxt}>Open Launch Decision →</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+const bp = StyleSheet.create({
+  wrap:         { gap: 8 },
+  btn:          { borderRadius: DS.radiusButton, paddingVertical: 13, alignItems: 'center', borderWidth: 1 },
+  btnSave:      { borderColor: DS.accent + '50', backgroundColor: DS.accentLight },
+  btnSaved:     { borderColor: DS.success + '50', backgroundColor: DS.success + '10' },
+  btnTxt:       { fontSize: 13, fontWeight: '800', color: DS.accent },
+  btnSavedTxt:  { color: DS.success },
+  btnLaunch:    { backgroundColor: DS.accent, borderColor: DS.accent },
+  btnLaunchTxt: { fontSize: 14, fontWeight: '900', color: '#fff', letterSpacing: -0.2 },
+});
+
 // ── Screen ────────────────────────────────────────────────────────────────────
 
 export default function BrandStudioScreen() {
@@ -1032,6 +1097,18 @@ export default function BrandStudioScreen() {
             exportError={exportError}
             onExport={handleExportInsert}
             accentColor={ASSET_TABS.find(t => t.id === assetTab)!.color}
+          />
+        )}
+
+        {/* Pipeline: Save Brand + Launch Decision */}
+        {inputs.brandName.trim().length > 0 && (
+          <BrandPipelineActions
+            brandName={inputs.brandName}
+            productTitle={pipeline.activeProduct?.title ?? inputs.brandName}
+            tagline={brandResult?.tagline ?? ''}
+            keywords={brandResult?.generated_keywords ?? []}
+            style={inputs.style}
+            pipeline={pipeline}
           />
         )}
 

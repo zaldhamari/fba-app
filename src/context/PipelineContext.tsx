@@ -35,12 +35,40 @@ export interface PipelineSupplier {
   grade?:    string;
 }
 
+export interface PipelineCostModel {
+  sellingPrice:    number;
+  unitCost:        number;
+  freight:         number;
+  fbaFee:          number;
+  referralFee:     number;
+  duties:          number;
+  packaging:       number;
+  netProfit:       number;
+  marginPct:       number;
+  roiPct:          number;
+  totalCost:       number;
+  unitsOrdered:    number;
+  totalInvestment: number;
+  savedAt:         string;
+}
+
+export interface PipelineBrandData {
+  brandName:    string;
+  productTitle: string;
+  tagline:      string;
+  keywords:     string[];
+  style:        string;
+  savedAt:      string;
+}
+
 // ── State ─────────────────────────────────────────────────────────────────────
 
 interface PipelineState {
   activeNiche:      PipelineNiche    | null;
   activeProduct:    PipelineProduct  | null;
   selectedSupplier: PipelineSupplier | null;
+  costModel:        PipelineCostModel | null;
+  brandData:        PipelineBrandData | null;
   lastUpdated:      string;
 }
 
@@ -48,30 +76,36 @@ const INITIAL: PipelineState = {
   activeNiche:      null,
   activeProduct:    null,
   selectedSupplier: null,
+  costModel:        null,
+  brandData:        null,
   lastUpdated:      '',
 };
 
 // ── Context shape ─────────────────────────────────────────────────────────────
 
-interface PipelineContextValue extends PipelineState {
-  loaded:              boolean;
-  completedStages:     string[];
-  setActiveNiche:      (niche: PipelineNiche | null) => void;
-  setActiveProduct:    (product: PipelineProduct | null) => void;
-  setSelectedSupplier: (supplier: PipelineSupplier | null) => void;
-  clearPipeline:       () => void;
-  trackEvent:          (event: string, data?: Record<string, unknown>) => void;
+export interface PipelineContextValue extends PipelineState {
+  loaded:               boolean;
+  completedStages:      string[];
+  setActiveNiche:       (niche: PipelineNiche | null) => void;
+  setActiveProduct:     (product: PipelineProduct | null) => void;
+  setSelectedSupplier:  (supplier: PipelineSupplier | null) => void;
+  setCostModel:         (model: PipelineCostModel | null) => void;
+  setBrandData:         (brand: PipelineBrandData | null) => void;
+  clearPipeline:        () => void;
+  trackPipelineEvent:   (event: string, data?: Record<string, unknown>) => void;
 }
 
 const PipelineContext = createContext<PipelineContextValue>({
   ...INITIAL,
-  loaded:              false,
-  completedStages:     [],
-  setActiveNiche:      () => {},
-  setActiveProduct:    () => {},
-  setSelectedSupplier: () => {},
-  clearPipeline:       () => {},
-  trackEvent:          () => {},
+  loaded:               false,
+  completedStages:      [],
+  setActiveNiche:       () => {},
+  setActiveProduct:     () => {},
+  setSelectedSupplier:  () => {},
+  setCostModel:         () => {},
+  setBrandData:         () => {},
+  clearPipeline:        () => {},
+  trackPipelineEvent:   () => {},
 });
 
 // ── Provider ──────────────────────────────────────────────────────────────────
@@ -106,11 +140,19 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
     persist(prev => ({ ...prev, selectedSupplier: supplier, lastUpdated: new Date().toISOString() }));
   }, [persist]);
 
+  const setCostModel = useCallback((model: PipelineCostModel | null) => {
+    persist(prev => ({ ...prev, costModel: model, lastUpdated: new Date().toISOString() }));
+  }, [persist]);
+
+  const setBrandData = useCallback((brand: PipelineBrandData | null) => {
+    persist(prev => ({ ...prev, brandData: brand, lastUpdated: new Date().toISOString() }));
+  }, [persist]);
+
   const clearPipeline = useCallback(() => {
     persist(() => ({ ...INITIAL, lastUpdated: new Date().toISOString() }));
   }, [persist]);
 
-  const trackEvent = useCallback(async (event: string, data?: Record<string, unknown>) => {
+  const trackPipelineEvent = useCallback(async (event: string, data?: Record<string, unknown>) => {
     if (__DEV__) console.log('[Pipeline]', event, data);
     try {
       const raw    = await AsyncStorage.getItem(EVENTS_KEY);
@@ -124,6 +166,8 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
     state.activeNiche      ? 'niche'     : null,
     state.activeProduct    ? 'validate'  : null,
     state.selectedSupplier ? 'suppliers' : null,
+    state.costModel        ? 'costs'     : null,
+    state.brandData        ? 'label'     : null,
   ].filter(Boolean) as string[];
 
   return (
@@ -134,8 +178,10 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
       setActiveNiche,
       setActiveProduct,
       setSelectedSupplier,
+      setCostModel,
+      setBrandData,
       clearPipeline,
-      trackEvent,
+      trackPipelineEvent,
     }}>
       {children}
     </PipelineContext.Provider>

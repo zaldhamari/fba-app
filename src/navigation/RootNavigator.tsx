@@ -11,6 +11,7 @@ import ProductBlueprintScreen from '../screens/ProductBlueprintScreen';
 import SellerProfileScreen    from '../screens/SellerProfileScreen';
 import BuilderScreen          from '../screens/BuilderScreen';
 import CopilotScreen          from '../screens/CopilotScreen';
+import LaunchDecisionScreen   from '../screens/LaunchDecisionScreen';
 import TabNavigator           from './TabNavigator';
 import { LegalDocumentType }  from '../constants/legalContent';
 
@@ -28,6 +29,7 @@ export type RootStackParamList = {
   ProductBlueprint: undefined;
   LaunchPad:        undefined;
   Copilot:          undefined;
+  LaunchDecision:   undefined;
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -51,6 +53,7 @@ export default function RootNavigator() {
       <Stack.Screen name="ProductBlueprint"  component={ProductBlueprintScreen} options={{ animationEnabled: true }} />
       <Stack.Screen name="LaunchPad"         component={BuilderScreen}          options={{ animationEnabled: true }} />
       <Stack.Screen name="Copilot"           component={CopilotScreen}          options={{ animationEnabled: true }} />
+      <Stack.Screen name="LaunchDecision"   component={LaunchDecisionScreen}   options={{ animationEnabled: true }} />
     </Stack.Navigator>
   );
 }
