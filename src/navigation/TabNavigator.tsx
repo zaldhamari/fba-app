@@ -4,11 +4,11 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { DS } from '../theme/ds';
 import { ErrorBoundary } from '../components/ErrorBoundary';
-import NicheResearchScreen    from '../screens/NicheResearchScreen';
-import ResearchWorkspaceScreen from '../screens/ResearchWorkspaceScreen';
-import SupplierSourcingScreen  from '../screens/SupplierSourcingScreen';
-import BrandStudioScreen       from '../screens/BrandStudioScreen';
-import ProfitLabScreen         from '../screens/ProfitLabScreen';
+import { HomeScreen }             from '../screens/CopilotScreen';
+import ResearchWorkspaceScreen    from '../screens/ResearchWorkspaceScreen';
+import SourcingLogisticsScreen    from '../screens/SourcingLogisticsScreen';
+import ProfitLabScreen            from '../screens/ProfitLabScreen';
+import BrandStudioScreen          from '../screens/BrandStudioScreen';
 
 function withBoundary<P extends object>(
   Component: React.ComponentType<P>,
@@ -26,11 +26,12 @@ function withBoundary<P extends object>(
 const Tab = createBottomTabNavigator();
 
 const TABS = [
-  { name: 'Niche',     icon: '◎', label: 'Niche',     component: withBoundary(NicheResearchScreen,    'Niche tab')     },
-  { name: 'Validate',  icon: '✦', label: 'Validate',  component: withBoundary(ResearchWorkspaceScreen,'Validate tab')  },
-  { name: 'Suppliers', icon: '⬡', label: 'Suppliers', component: withBoundary(SupplierSourcingScreen, 'Suppliers tab') },
-  { name: 'Label',     icon: '▣', label: 'Label',     component: withBoundary(BrandStudioScreen,      'Label tab')     },
-  { name: 'Costs',     icon: '✈', label: 'Costs',     component: withBoundary(ProfitLabScreen,        'Costs tab')     },
+  // Discover (niche research) is merged into the Home screen, so it's no longer a tab.
+  { name: 'Home',     icon: '⌂', label: 'Home',     component: withBoundary(HomeScreen,             'Home tab')     },
+  { name: 'Research', icon: '✦', label: 'Research', component: withBoundary(ResearchWorkspaceScreen,'Research tab') },
+  { name: 'Sourcing', icon: '◈', label: 'Source',   component: withBoundary(SourcingLogisticsScreen,'Source tab')   },
+  { name: 'Profit',   icon: '✈', label: 'Profit',   component: withBoundary(ProfitLabScreen,        'Profit tab')   },
+  { name: 'Brand',    icon: '◑', label: 'Brand',    component: withBoundary(BrandStudioScreen,      'Brand tab')    },
 ] as const;
 
 function CustomTabBar({ state, navigation }: BottomTabBarProps) {
@@ -87,7 +88,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 4,
     paddingTop:       6,
     paddingBottom:    Platform.OS === 'ios' ? 24 : 8,
-    shadowColor:      '#0D1B4B',
+    shadowColor:      DS.textPrimary,
     shadowOffset:     { width: 0, height: -2 },
     shadowOpacity:    0.06,
     shadowRadius:     12,
