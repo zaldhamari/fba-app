@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import { DS } from '../theme/ds';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import { colors, spacing } from '../theme';
 import { useSubscription } from '../hooks/useSubscription';
@@ -90,7 +91,7 @@ export default function SplashScreen({ navigation }: Props) {
 const s = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F7FF',
+    backgroundColor: DS.bgCanvas,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -126,18 +127,18 @@ const s = StyleSheet.create({
     marginBottom: spacing.xs,
   },
   iconSymbol: {
-    fontSize: 22, color: '#2563EB', fontWeight: '700',
+    fontSize: 22, color: DS.accent, fontWeight: '700',
   },
   wordmark: {
     fontSize: 42,
     fontWeight: '900',
-    color: '#0D1B4B',
+    color: DS.textPrimary,
     letterSpacing: -2,
   },
   tagline: {
     fontSize: 13,
     fontWeight: '400',
-    color: '#8196B0',
+    color: DS.textMuted,
     letterSpacing: 0.4,
     textAlign: 'center',
     marginTop: 4,

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { DS } from '../theme/ds';
 import {
   Modal, View, Text, StyleSheet, TouchableOpacity, ScrollView,
 } from 'react-native';
@@ -26,9 +27,16 @@ export default function LaunchPackModal({ visible, onClose, productName }: Props
 
   async function handlePurchase() {
     setPurchasing(true);
-    await purchaseLaunchPack();
-    setPurchasing(false);
-    setPurchased(true);
+    try {
+      await purchaseLaunchPack();
+      setPurchased(true);
+    } catch {
+      // purchaseLaunchPack throws until wired to a real RevenueCat product.
+      // The CTA button is disabled so this path is unreachable in production —
+      // this catch exists as a safety net against future code regressions.
+    } finally {
+      setPurchasing(false);
+    }
   }
 
   if (launchPackPurchased || purchased) {
@@ -154,7 +162,7 @@ const s = StyleSheet.create({
     alignItems: 'flex-start', marginBottom: spacing.sm,
   },
   headerLeft: { flex: 1 },
-  eyebrow: { fontSize: 9, fontWeight: '800', color: '#2563EB', letterSpacing: 1.5, textTransform: 'uppercase' },
+  eyebrow: { fontSize: 9, fontWeight: '800', color: DS.accent, letterSpacing: 1.5, textTransform: 'uppercase' },
   title: { fontSize: 26, fontWeight: '900', color: colors.textPrimary, letterSpacing: -1, marginTop: 4 },
   productName: { fontSize: 13, color: colors.gray600, marginTop: 4 },
   priceWrap: { alignItems: 'flex-end' },
@@ -182,11 +190,11 @@ const s = StyleSheet.create({
   },
   valueItem: { flex: 1, alignItems: 'center', paddingVertical: spacing.md },
   valueDivider: { width: 1, backgroundColor: 'rgba(37,99,235,0.22)' },
-  valueNum: { fontSize: 22, fontWeight: '900', color: '#2563EB', letterSpacing: -1 },
+  valueNum: { fontSize: 22, fontWeight: '900', color: DS.accent, letterSpacing: -1 },
   valueLabel: { fontSize: 8, fontWeight: '700', color: colors.textMuted, letterSpacing: 1.5, textTransform: 'uppercase', marginTop: 2 },
 
   cta: {
-    backgroundColor: '#2563EB', borderRadius: radius.md,
+    backgroundColor: DS.accent, borderRadius: radius.md,
     paddingVertical: spacing.md + 2, alignItems: 'center', marginBottom: spacing.sm,
   },
   ctaDisabled: { opacity: 0.5 },
@@ -200,7 +208,7 @@ const s = StyleSheet.create({
   successTitle: { fontSize: 24, fontWeight: '900', color: colors.textPrimary, letterSpacing: -0.5 },
   successSub: { fontSize: 14, color: colors.gray600, textAlign: 'center', lineHeight: 20 },
   doneBtn: {
-    backgroundColor: '#2563EB', borderRadius: radius.md,
+    backgroundColor: DS.accent, borderRadius: radius.md,
     paddingVertical: spacing.md, paddingHorizontal: spacing.xl,
     marginTop: spacing.sm,
   },

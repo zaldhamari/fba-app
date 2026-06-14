@@ -1,9 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { DS } from '../theme/ds';
 import {
   View, Text, StyleSheet, TouchableOpacity, Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing, radius, shadow, motion } from '../theme';
+import { MONTHLY_LIMITS } from '../hooks/useSubscription';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/RootNavigator';
 
@@ -23,7 +25,7 @@ const SLIDES: Slide[] = [
     eyebrow: 'DISCOVER · 1 OF 3',
     title: "Find what's\nworth building.",
     body: 'Real Amazon signals. Trend data. Competition scored. One search reveals genuine demand.',
-    accentColor: '#2563EB',
+    accentColor: DS.accent,
     accentBg: 'rgba(37,99,235,0.10)',
   },
   {
@@ -33,14 +35,14 @@ const SLIDES: Slide[] = [
     body: 'Tap any opportunity. Margin, demand, and risk — clear signal in seconds.',
     accentColor: colors.green,
     accentBg: colors.greenDim,
-    badge: { label: 'LAUNCH', sub: '87% confidence · 34% margin · Rising', color: colors.green, bg: colors.greenLight },
+    badge: { label: 'LAUNCH', sub: 'AI-powered insight · Confidence improves as you add data', color: colors.green, bg: colors.greenLight },
   },
   {
     icon: '✦',
     eyebrow: 'BUILD · 3 OF 3',
     title: 'From signal\nto business.',
     body: 'Brand, listing, keywords, supplier — your full commerce stack in one place.',
-    accentColor: '#2563EB',
+    accentColor: DS.accent,
     accentBg: 'rgba(37,99,235,0.10)',
   },
 ];
@@ -208,13 +210,18 @@ export default function OnboardingScreen({ navigation }: Props) {
             <Text style={s.freeLinkText}>Start with free plan</Text>
           </TouchableOpacity>
         )}
+        {index === SLIDES.length - 1 && (
+          <Text style={s.freeTierNote}>
+            Free plan includes {MONTHLY_LIMITS.explorer.research} searches/mo — upgrade anytime for full access.
+          </Text>
+        )}
       </View>
     </SafeAreaView>
   );
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F5F7FF' },
+  container: { flex: 1, backgroundColor: DS.bgCanvas },
 
   // Atmospheric ambient background
   ambientOrb: {
@@ -305,5 +312,6 @@ const s = StyleSheet.create({
 
   freeLink:     { alignItems: 'center', paddingVertical: 4 },
   freeLinkText: { fontSize: 13, color: colors.textMuted, fontWeight: '500' },
+  freeTierNote: { fontSize: 11, color: colors.textMuted, textAlign: 'center', lineHeight: 16, opacity: 0.75 },
   tagline:      { fontSize: 11, color: colors.textMuted, textAlign: 'center', letterSpacing: 0.2, marginTop: 4 },
 });

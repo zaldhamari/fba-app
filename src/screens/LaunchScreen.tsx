@@ -14,6 +14,9 @@ import { AppCard, SectionHeader, StatusBadge, SecondaryButton, DS } from '../com
 import { HelpButton } from '../components/HelpModal';
 import type { FeatureKey } from '../lib/featureHelp';
 import type { RootStackParamList } from '../navigation/RootNavigator';
+import { AppHeader } from '../components/AppHeader';
+import { OfflineBanner } from '../components/OfflineBanner';
+import { useNetworkStatus } from '../hooks/useNetworkStatus';
 
 // ─── Navigation type ──────────────────────────────────────────────────────────
 
@@ -28,6 +31,7 @@ import { CLPhase, PHASES, ALL_IDS, LAUNCH_CHECKLIST_KEY, MILESTONES } from '../d
 import { STORAGE_KEYS } from '../constants/storage';
 import type { LaunchAdvisorSnapshot } from '../lib/launchDecision';
 import { useActiveProduct } from '../context/ActiveProductContext';
+import { usePipeline } from '../context/PipelineContext';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -76,7 +80,7 @@ const AI_GUIDE: Record<string, { title: string; body: string }> = {
   samples: { title: 'Ordering and Evaluating Samples',
     body: 'Always order samples before bulk orders.\n\n1. Contact 3–5 suppliers on Alibaba or Global Sources\n2. Request samples ($20–100 each)\n3. Evaluate: build quality, packaging options, accurate dimensions, branding capability\n\nRed flags: reluctance to send samples, mismatched photos, slow communication.\n\nCompare all samples side by side before choosing a supplier.' },
   brandname: { title: 'Choosing Your Brand Name',
-    body: 'A great brand name is short, memorable, and ownable.\n\n• 1–2 syllables (Nike, Yeti, Anker)\n• No hyphens, numbers, or special characters\n• Check trademark: USPTO.gov (US) or EUIPO.eu (EU)\n• Check .com domain availability\n\nUse Brand tab → Brand Creator for AI-powered name options.\nRegister your trademark early — Brand Registry requires it.' },
+    body: 'A great brand name is short, memorable, and ownable.\n\n• 1–2 syllables (Nike, Yeti, Anker)\n• No hyphens, numbers, or special characters\n• Check trademark: USPTO.gov (US) or EUIPO.eu (EU)\n• Check .com domain availability\n\nUse Brand Studio for AI-powered name options.\nRegister your trademark early — Brand Registry requires it.' },
   seller_central: { title: 'Setting Up Seller Central',
     body: 'Go to sell.amazon.com and choose Professional ($39.99/mo).\n\nYou will need:\n• Government ID or passport\n• Bank account details\n• Credit card\n• Tax information\n\nComplete the tax interview (10 min) and add your bank account (3–5 days to verify).\n\nTip: Open early — Amazon approval can take 24–72 hours.' },
   tax: { title: 'Tax Interview & Bank Account',
@@ -88,7 +92,7 @@ const AI_GUIDE: Record<string, { title: string; body: string }> = {
   freight: { title: 'Sea vs Air vs Express',
     body: 'Sea: orders > 200 kg, 25–35 day transit, ~$150/CBM + $600 fixed\nAir: 50–300 kg, 5–8 days, ~$5–6/kg\nExpress: < 50 kg, 2–4 days, ~$9–11/kg\n\nUse the Freight Calculator in the Search tab to compare landed costs.' },
   listing_title: { title: 'Writing a High-Converting Title',
-    body: 'Formula: Main Keyword + Secondary Keyword + Key Feature + Brand + Count/Size\n\n• 150–200 characters\n• Start with your #1 keyword\n• No promotional language ("Best", "Sale")\n• Include brand name\n\nUse Brand tab → Listing Builder to generate AI-optimised titles.' },
+    body: 'Formula: Main Keyword + Secondary Keyword + Key Feature + Brand + Count/Size\n\n• 150–200 characters\n• Start with your #1 keyword\n• No promotional language ("Best", "Sale")\n• Include brand name\n\nUse Brand Studio to generate AI-optimised titles.' },
   ppc: { title: 'Launching Your First PPC Campaign',
     body: 'Start with Sponsored Products Auto Campaign:\n\n1. Advertising → Campaign Manager\n2. Automatic Targeting\n3. Daily budget: $20–30\n4. Default bid: $0.75–1.00\n5. Run 2 weeks without changes\n\nAfter 2 weeks: download Search Term Report, move winning keywords to Manual (exact match). Target ACoS 25–40% at launch.' },
   pricing: { title: 'Launch Pricing Strategy',
@@ -213,7 +217,7 @@ function HeroProgressCard({ checked }: { checked: Set<string> }) {
           </View>
           <View style={hero.statDiv} />
           <View style={hero.stat}>
-            <Text style={[hero.statVal, { color: '#2563EB' }]}>
+            <Text style={[hero.statVal, { color: DS.accent }]}>
               {MILESTONES.filter(m => m.requiredIds.every(id => checked.has(id))).length}
             </Text>
             <Text style={hero.statLabel}>MILESTONES</Text>
@@ -357,6 +361,24 @@ const sc = StyleSheet.create({
 
 // ─── Task list card ───────────────────────────────────────────────────────────
 
+function buildPipelineAutoMap(pipeline: ReturnType<typeof usePipeline>): Record<string, string | undefined> {
+  const { activeNiche, activeProduct, selectedSupplier, costModel, brandData, reconInsights, freightEstimate, sourcingStrategy } = pipeline;
+  const hasFreight = !!(freightEstimate?.perUnitCost ?? (costModel?.freight && costModel.freight > 0));
+  return {
+    p1:  activeNiche     ? `Niche: ${activeNiche.keyword}`                                          : undefined,
+    p2:  costModel?.marginPct != null && costModel.marginPct >= 30
+           ? `Margin: ${costModel.marginPct.toFixed(1)}%`                                           : undefined,
+    p5:  selectedSupplier ? `Supplier: ${selectedSupplier.name}`                                    : undefined,
+    s2:  selectedSupplier ? `${selectedSupplier.name} · $${selectedSupplier.unitCost}/unit`         : undefined,
+    s3:  hasFreight        ? `Freight: $${(freightEstimate?.perUnitCost ?? costModel?.freight ?? 0).toFixed(2)}/unit` : undefined,
+    b1:  brandData?.brandName ? `Brand: ${brandData.brandName}`                                     : undefined,
+    l2:  brandData?.listingTitle ? `Title saved`                                                    : undefined,
+    l3:  brandData?.listingBullets?.length ? `${brandData.listingBullets.length} bullets saved`    : undefined,
+    k1:  reconInsights    ? `${reconInsights.complaints.length} complaints + keywords mapped`       : undefined,
+    sh1: costModel        ? `Units: ${costModel.unitsOrdered}`                                      : undefined,
+  };
+}
+
 function TaskListCard({
   phaseId, checked, onToggle, onAI,
 }: {
@@ -365,13 +387,15 @@ function TaskListCard({
   onToggle: (id: string) => void;
   onAI: (k: string) => void;
 }) {
+  const pipeline = usePipeline();
+  const autoMap  = buildPipelineAutoMap(pipeline);
   const phase = PHASES.find(p => p.id === phaseId);
   if (!phase) return null;
 
   const done       = phase.items.filter(i => checked.has(i.id)).length;
   const total      = phase.items.length;
   const pct        = Math.round((done / total) * 100);
-  const nextTask   = phase.items.find(i => !checked.has(i.id));
+  const nextTask   = phase.items.find(i => !checked.has(i.id) && !autoMap[i.id]);
   const isComplete = done === total;
 
   return (
@@ -401,7 +425,9 @@ function TaskListCard({
       {/* Task rows */}
       <View style={tl.tasks}>
         {phase.items.map((item, idx) => {
-          const isDone = checked.has(item.id);
+          const isDone    = checked.has(item.id);
+          const autoLabel = autoMap[item.id];
+          const isAuto    = !!autoLabel && !isDone;
           return (
             <View
               key={item.id}
@@ -409,23 +435,31 @@ function TaskListCard({
                 tl.row,
                 idx < phase.items.length - 1 && tl.rowBorder,
                 isDone && { backgroundColor: phase.color + '0D', borderRadius: 10, marginHorizontal: -4, paddingHorizontal: 4 },
+                isAuto && { backgroundColor: DS.success + '0A', borderRadius: 10, marginHorizontal: -4, paddingHorizontal: 4 },
               ]}
             >
               <TouchableOpacity
-                style={[tl.checkbox, isDone && { backgroundColor: phase.color, borderColor: phase.color }]}
+                style={[tl.checkbox, isDone && { backgroundColor: phase.color, borderColor: phase.color }, isAuto && { backgroundColor: DS.success, borderColor: DS.success }]}
                 onPress={() => onToggle(item.id)}
                 activeOpacity={0.7}
               >
-                {isDone && <Text style={tl.checkmark}>✓</Text>}
+                {(isDone || isAuto) && <Text style={tl.checkmark}>✓</Text>}
               </TouchableOpacity>
 
               <TouchableOpacity style={{ flex: 1 }} onPress={() => onToggle(item.id)} activeOpacity={0.7}>
-                <Text style={[tl.taskText, isDone && { color: phase.color, fontWeight: '600' }]}>{item.text}</Text>
+                <Text style={[tl.taskText, isDone && { color: phase.color, fontWeight: '600' }, isAuto && { color: DS.success, fontWeight: '600' }]}>{item.text}</Text>
+                {isAuto && (
+                  <Text style={tl.autoPipelineLbl}>Auto-completed from pipeline · {autoLabel}</Text>
+                )}
               </TouchableOpacity>
 
               {isDone ? (
                 <View style={[tl.doneTag, { backgroundColor: phase.color + '20', borderColor: phase.color + '40' }]}>
                   <Text style={[tl.doneTagText, { color: phase.color }]}>Done</Text>
+                </View>
+              ) : isAuto ? (
+                <View style={[tl.doneTag, { backgroundColor: DS.success + '20', borderColor: DS.success + '40' }]}>
+                  <Text style={[tl.doneTagText, { color: DS.success }]}>Auto</Text>
                 </View>
               ) : (
                 <TouchableOpacity
@@ -487,6 +521,7 @@ const tl = StyleSheet.create({
   },
   checkmark: { fontSize: 11, color: '#fff', fontWeight: '900' },
   taskText:  { fontSize: 13, color: DS.textSecondary, lineHeight: 20 },
+  autoPipelineLbl: { fontSize: 10, color: DS.success, fontWeight: '600', marginTop: 2 },
 
   aiBtn:     { borderRadius: 10, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 4, flexShrink: 0 },
   aiBtnText: { fontSize: 9, fontWeight: '900', letterSpacing: 0.3 },
@@ -572,39 +607,39 @@ type Tip = { icon: string; title: string; body: string; color: string };
 
 const STAGE_TIPS: Record<string, Tip[]> = {
   discover: [
-    { icon: '◎', title: 'Validate demand first',       body: 'Confirm 3+ demand signals before anything else: BSR under 100k, Google Trends stable or rising, and Amazon autocomplete confirming buyer searches.', color: '#2563EB' },
-    { icon: '≋', title: 'Check competitor review counts', body: 'Top 3 results with under 1,000 reviews is your green light. Under 300 is easy entry — over 1,000, move on.', color: '#2563EB' },
-    { icon: '◈', title: 'Model profit before falling in love', body: 'Work backwards from a 30%+ margin. Use the Calculate tab to stress-test unit economics before committing.', color: '#2563EB' },
+    { icon: '◎', title: 'Validate demand first',       body: 'Confirm 3+ demand signals before anything else: BSR under 100k, Google Trends stable or rising, and Amazon autocomplete confirming buyer searches.', color: DS.accent },
+    { icon: '≋', title: 'Check competitor review counts', body: 'Top 3 results with under 1,000 reviews is your green light. Under 300 is easy entry — over 1,000, move on.', color: DS.accent },
+    { icon: '◈', title: 'Model profit before falling in love', body: 'Work backwards from a 30%+ margin. Use the Calculate tab to stress-test unit economics before committing.', color: DS.accent },
   ],
   brand: [
-    { icon: '✦', title: 'Pick a short, ownable name',   body: '1–2 syllables, no numbers or hyphens. Check trademark at USPTO.gov and .com availability before committing.', color: '#2563EB' },
-    { icon: '⊡', title: 'Start Brand Registry early',   body: 'Amazon Brand Registry requires a trademark — apply now. Approval takes 2–4 weeks and unlocks A+ Content at launch.', color: '#2563EB' },
-    { icon: '◈', title: 'Professional account only',    body: 'Always choose Professional ($39.99/mo). You cannot run Sponsored Products or win the Buy Box on an Individual account.', color: '#2563EB' },
+    { icon: '✦', title: 'Pick a short, ownable name',   body: '1–2 syllables, no numbers or hyphens. Check trademark at USPTO.gov and .com availability before committing.', color: DS.accent },
+    { icon: '⊡', title: 'Start Brand Registry early',   body: 'Amazon Brand Registry requires a trademark — apply now. Approval takes 2–4 weeks and unlocks A+ Content at launch.', color: DS.accent },
+    { icon: '◈', title: 'Professional account only',    body: 'Always choose Professional ($39.99/mo). You cannot run Sponsored Products or win the Buy Box on an Individual account.', color: DS.accent },
   ],
   keywords: [
-    { icon: '≋', title: 'Mine Amazon autocomplete',     body: 'Type your main keyword into Amazon search and note every suggestion — these are real buyer searches, not estimates.', color: '#2563EB' },
-    { icon: '◎', title: 'Purchase intent over volume',  body: 'A keyword with 3,000 high-intent searches beats 30,000 browse searches. Validate that people are buying, not just looking.', color: '#2563EB' },
-    { icon: '⊡', title: 'Backend: 249 bytes, no repeats', body: "Don't repeat words from your title or bullets. Use synonyms, misspellings, and Spanish variants for US products.", color: '#2563EB' },
+    { icon: '≋', title: 'Mine Amazon autocomplete',     body: 'Type your main keyword into Amazon search and note every suggestion — these are real buyer searches, not estimates.', color: DS.accent },
+    { icon: '◎', title: 'Purchase intent over volume',  body: 'A keyword with 3,000 high-intent searches beats 30,000 browse searches. Validate that people are buying, not just looking.', color: DS.accent },
+    { icon: '⊡', title: 'Backend: 249 bytes, no repeats', body: "Don't repeat words from your title or bullets. Use synonyms, misspellings, and Spanish variants for US products.", color: DS.accent },
   ],
   supplier: [
-    { icon: '⬡', title: 'Always sample 3+ factories',   body: 'Never commit to bulk without comparing samples side-by-side. Evaluate build quality, packaging options, and communication speed.', color: '#2563EB' },
-    { icon: '◈', title: 'Negotiate standard payment terms', body: 'Standard is 30% deposit, 70% before shipment. For large orders, push for escrow or letter of credit on the balance.', color: '#2563EB' },
-    { icon: '⊡', title: 'Sea vs air vs express',        body: 'Sea: over 200 kg, 25–35 days. Air: 50–300 kg, 5–8 days. Express: under 50 kg, 2–4 days. Use the Calculate tab to compare landed cost.', color: '#2563EB' },
+    { icon: '⬡', title: 'Always sample 3+ factories',   body: 'Never commit to bulk without comparing samples side-by-side. Evaluate build quality, packaging options, and communication speed.', color: DS.accent },
+    { icon: '◈', title: 'Negotiate standard payment terms', body: 'Standard is 30% deposit, 70% before shipment. For large orders, push for escrow or letter of credit on the balance.', color: DS.accent },
+    { icon: '⊡', title: 'Sea vs air vs express',        body: 'Sea: over 200 kg, 25–35 days. Air: 50–300 kg, 5–8 days. Express: under 50 kg, 2–4 days. Use the Calculate tab to compare landed cost.', color: DS.accent },
   ],
   listing: [
-    { icon: '≡', title: 'Title formula',                body: 'Main keyword + secondary keyword + key feature + brand + count/size. Keep it 150–200 characters. Lead with your #1 keyword.', color: '#2563EB' },
-    { icon: '◎', title: 'Images convert more than copy', body: '7+ images minimum. White background for the main. Add lifestyle, scale reference, and infographic shots to the set.', color: '#2563EB' },
-    { icon: '⊡', title: 'A+ Content is worth the effort', body: 'A+ Content (requires Brand Registry) increases conversion 3–10%. Prioritise it over any other listing enhancement after launch.', color: '#2563EB' },
+    { icon: '≡', title: 'Title formula',                body: 'Main keyword + secondary keyword + key feature + brand + count/size. Keep it 150–200 characters. Lead with your #1 keyword.', color: DS.accent },
+    { icon: '◎', title: 'Images convert more than copy', body: '7+ images minimum. White background for the main. Add lifestyle, scale reference, and infographic shots to the set.', color: DS.accent },
+    { icon: '⊡', title: 'A+ Content is worth the effort', body: 'A+ Content (requires Brand Registry) increases conversion 3–10%. Prioritise it over any other listing enhancement after launch.', color: DS.accent },
   ],
   inventory: [
-    { icon: '📦', title: 'Never stock out in 90 days',  body: 'Running out of stock collapses your BSR rank and is very hard to recover from. Over-order for your first launch window.', color: '#2563EB' },
-    { icon: '⊡', title: 'FNSKU on every unit',          body: "Amazon's barcode goes on the product itself, not just the box. Agree with your supplier to apply it before shipment — it's far cheaper than doing it at the warehouse.", color: '#2563EB' },
-    { icon: '◎', title: 'Third-party inspection',       body: 'Book a pre-shipment inspection (~$200) before goods leave the factory. Catching a bad batch overseas is far cheaper than a return from Amazon.', color: '#2563EB' },
+    { icon: '📦', title: 'Never stock out in 90 days',  body: 'Running out of stock collapses your BSR rank and is very hard to recover from. Over-order for your first launch window.', color: DS.accent },
+    { icon: '⊡', title: 'FNSKU on every unit',          body: "Amazon's barcode goes on the product itself, not just the box. Agree with your supplier to apply it before shipment — it's far cheaper than doing it at the warehouse.", color: DS.accent },
+    { icon: '◎', title: 'Third-party inspection',       body: 'Book a pre-shipment inspection (~$200) before goods leave the factory. Catching a bad batch overseas is far cheaper than a return from Amazon.', color: DS.accent },
   ],
   go: [
-    { icon: '🚀', title: 'Launch price strategy',       body: 'Price 10–15% below median competitors. Raise to median after 20 reviews, then consider above-median after 50+.', color: '#2563EB' },
-    { icon: '◉', title: 'Auto PPC first, manual second', body: 'Run Sponsored Products Auto campaigns for 2 weeks at $20–30/day. Mine the Search Term Report and move winning keywords to manual exact-match.', color: '#2563EB' },
-    { icon: '⊡', title: "Use 'Request a Review' on every order", body: "The Amazon Request a Review button sends a compliant, templated request. Use it on every single order — it's the safest review strategy available.", color: '#2563EB' },
+    { icon: '🚀', title: 'Launch price strategy',       body: 'Price 10–15% below median competitors. Raise to median after 20 reviews, then consider above-median after 50+.', color: DS.accent },
+    { icon: '◉', title: 'Auto PPC first, manual second', body: 'Run Sponsored Products Auto campaigns for 2 weeks at $20–30/day. Mine the Search Term Report and move winning keywords to manual exact-match.', color: DS.accent },
+    { icon: '⊡', title: "Use 'Request a Review' on every order", body: "The Amazon Request a Review button sends a compliant, templated request. Use it on every single order — it's the safest review strategy available.", color: DS.accent },
   ],
 };
 
@@ -735,10 +770,261 @@ const pt = StyleSheet.create({
   tip:      { fontSize: 13, color: DS.textSecondary, lineHeight: 20 },
 });
 
+// ─── Pipeline status card ─────────────────────────────────────────────────────
+
+type TaskPriority = 'critical' | 'recommended' | 'optional';
+
+interface PipelineTask {
+  label:     string;
+  detail?:   string;
+  done:      boolean;
+  blocker?:  boolean;
+  navTab?:   string;
+  priority:  TaskPriority;
+  why?:      string;
+}
+
+function buildPipelineTasks(pipeline: ReturnType<typeof usePipeline>): PipelineTask[] {
+  const { activeNiche, activeProduct, selectedSupplier, costModel, brandData, reconInsights } = pipeline;
+  const sup  = selectedSupplier;
+  const cost = costModel;
+
+  return [
+    // ── Critical blockers (launch is impossible without these) ──
+    { priority: 'critical', label: 'Niche researched',    done: !!activeNiche,
+      detail: activeNiche ? `${activeNiche.keyword} — ${activeNiche.verdictLabel}` : undefined,
+      why: 'No niche = no market thesis', navTab: 'Research' },
+    { priority: 'critical', label: 'Product selected',    done: !!activeProduct,
+      detail: activeProduct ? activeProduct.title : undefined,
+      why: 'Required for all downstream calculations', navTab: 'Research' },
+    { priority: 'critical', label: 'Supplier confirmed',  done: !!sup,
+      detail: sup ? `${sup.name} · $${sup.unitCost}/unit` : undefined,
+      why: 'No supplier = no product', navTab: 'Sourcing' },
+    { priority: 'critical', label: 'Cost model built',    done: !!cost,
+      detail: cost ? `Margin ${cost.marginPct.toFixed(0)}% · ROI ${cost.roiPct.toFixed(0)}%` : undefined,
+      why: 'Cannot confirm viability without numbers', navTab: 'Profit' },
+    { priority: 'critical', label: 'Margin ≥ 15%',        done: !cost || cost.marginPct >= 15,
+      detail: cost ? `${cost.marginPct.toFixed(1)}% net margin` : undefined,
+      why: 'Below 15% is not viable after PPC and returns', navTab: 'Profit',
+      blocker: !!(cost && cost.marginPct < 15) },
+    { priority: 'critical', label: 'Freight modelled',    done: !!(cost && cost.freight > 0),
+      detail: cost?.freight ? `$${cost.freight.toFixed(2)}/unit` : 'Add freight to cost model',
+      why: 'Rough landed cost distorts margin by ±18%', navTab: 'Sourcing',
+      blocker: !!(cost && cost.freight === 0) },
+
+    // ── Recommended (materially affect profitability / readiness) ──
+    { priority: 'recommended', label: 'MOQ under 500 units',  done: !sup || sup.moq < 500,
+      detail: sup ? `${sup.moq.toLocaleString()} units MOQ` : undefined,
+      why: 'High MOQ locks capital — negotiate before ordering', navTab: 'Sourcing',
+      blocker: !!(sup && sup.moq >= 500) },
+    { priority: 'recommended', label: 'Lead time confirmed',  done: !!(sup?.leadTimeDays),
+      detail: sup?.leadTimeDays ? `~${sup.leadTimeDays} days` : undefined,
+      why: 'Required to plan restock before stockout', navTab: 'Sourcing' },
+    { priority: 'recommended', label: 'Lead time ≤ 45 days',  done: !sup?.leadTimeDays || sup.leadTimeDays <= 45,
+      detail: sup?.leadTimeDays ? `${sup.leadTimeDays} days` : undefined,
+      why: 'Long lead times increase capital-at-risk period', navTab: 'Sourcing',
+      blocker: !!(sup?.leadTimeDays && sup.leadTimeDays > 45) },
+    { priority: 'recommended', label: 'ROI ≥ 20%',            done: !cost || cost.roiPct >= 20,
+      detail: cost ? `${cost.roiPct.toFixed(0)}% ROI` : undefined,
+      why: 'Below 20% ROI is hard to justify vs other uses of capital', navTab: 'Profit',
+      blocker: !!(cost && cost.roiPct < 20) },
+    { priority: 'recommended', label: 'Review recon done',    done: !!reconInsights,
+      detail: reconInsights ? `${reconInsights.complaints.length} complaints mapped` : undefined,
+      why: 'Unresearched complaints become your 1-star reviews', navTab: 'Research' },
+    { priority: 'recommended', label: 'PPC pressure checked', done: activeProduct?.ppcPressure !== undefined,
+      detail: activeProduct?.ppcPressure ? `${activeProduct.ppcPressure} PPC pressure` : undefined,
+      why: 'High PPC markets require ≥$30/day launch budget', navTab: 'Research',
+      blocker: activeProduct?.ppcPressure === 'High' },
+    { priority: 'recommended', label: 'Brand identity saved', done: !!brandData,
+      detail: brandData?.brandName || undefined,
+      why: 'Brand direction affects supplier briefings and listing', navTab: 'Brand' },
+
+    // ── Optional (improve quality, not launch-critical) ──
+    { priority: 'optional', label: 'Barcode strategy set',  done: !!(brandData?.barcodeIdentifier),
+      detail: brandData?.barcodeIdentifier?.replace(/_/g, ' '), navTab: 'Brand' },
+    { priority: 'optional', label: 'Listing title drafted', done: !!(brandData?.listingTitle), navTab: 'Brand' },
+    { priority: 'optional', label: 'Label concept saved',   done: !!(brandData?.labelTemplate), navTab: 'Brand' },
+    { priority: 'optional', label: 'Sales estimate present', done: !!(activeProduct?.salesEstLow),
+      detail: activeProduct?.salesEstLow != null ? `~${activeProduct.salesEstLow}–${activeProduct.salesEstHigh}/mo` : undefined,
+      navTab: 'Research' },
+  ];
+}
+
+const PRIORITY_CONFIG: Record<TaskPriority, { label: string; color: string; bg: string; icon: string }> = {
+  critical:    { label: 'Critical Blockers',       color: DS.danger,  bg: DS.danger  + '0F', icon: '⚑' },
+  recommended: { label: 'Recommended Actions',     color: DS.warning, bg: DS.warning + '0F', icon: '◎' },
+  optional:    { label: 'Optional Optimizations',  color: DS.textMuted, bg: DS.bgElevated,    icon: '○' },
+};
+
+function PipelineStatusCard() {
+  const navigation = useNavigation<NavProp>();
+  const pipeline   = usePipeline();
+  const [showAll, setShowAll] = useState(false);
+  const allTasks   = buildPipelineTasks(pipeline);
+  const doneCt     = allTasks.filter(t => t.done).length;
+  const readyPct   = Math.round((doneCt / allTasks.length) * 100);
+
+  const criticals    = allTasks.filter(t => t.priority === 'critical');
+  const recommended  = allTasks.filter(t => t.priority === 'recommended');
+  const optional     = allTasks.filter(t => t.priority === 'optional');
+
+  const critBlockers = criticals.filter(t => !t.done);
+  const recBlockers  = recommended.filter(t => !t.done && t.blocker);
+
+  function nav(tab?: string) {
+    if (!tab) return;
+    if (tab === 'Profit' || tab === 'Brand') (navigation as any).navigate('Main', { screen: tab });
+    else if (tab === 'Research' || tab === 'Sourcing') (navigation as any).navigate('Main', { screen: tab });
+    else (navigation as any).navigate(tab as any);
+  }
+
+  function renderTask(t: PipelineTask, i: number) {
+    const cfg = PRIORITY_CONFIG[t.priority];
+    const isDone = t.done;
+    return (
+      <TouchableOpacity
+        key={i}
+        style={ps.taskRow}
+        onPress={() => nav(t.navTab)}
+        activeOpacity={t.navTab ? 0.7 : 1}
+        disabled={!t.navTab}
+      >
+        <View style={[ps.taskCheck, {
+          backgroundColor: isDone ? DS.success + '14' : (!isDone && t.blocker) ? DS.danger + '14' : DS.bgElevated,
+          borderColor:     isDone ? DS.success        : (!isDone && t.blocker) ? DS.danger        : DS.border,
+        }]}>
+          <Text style={{ fontSize: 9, fontWeight: '900', color: isDone ? DS.success : (!isDone && t.blocker) ? DS.danger : DS.textMuted }}>
+            {isDone ? '✓' : t.blocker ? '!' : '○'}
+          </Text>
+        </View>
+        <View style={{ flex: 1, gap: 1 }}>
+          <Text style={[ps.taskLabel, !isDone && t.blocker && { color: DS.danger }, isDone && { color: DS.textMuted }]}>{t.label}</Text>
+          {t.detail && <Text style={ps.taskDetail}>{t.detail}</Text>}
+          {!isDone && t.why && <Text style={[ps.taskWhy, { color: cfg.color + 'BB' }]}>{t.why}</Text>}
+        </View>
+        {t.navTab && !isDone && <Text style={ps.taskArrow}>→</Text>}
+      </TouchableOpacity>
+    );
+  }
+
+  function renderSection(tasks: PipelineTask[], priority: TaskPriority) {
+    const cfg = PRIORITY_CONFIG[priority];
+    const incompleteCt = tasks.filter(t => !t.done).length;
+    return (
+      <View style={[ps.section, { borderColor: cfg.color + '30' }]}>
+        <View style={[ps.sectionHeader, { backgroundColor: cfg.bg }]}>
+          <Text style={[ps.sectionIcon, { color: cfg.color }]}>{cfg.icon}</Text>
+          <Text style={[ps.sectionTitle, { color: cfg.color }]}>{cfg.label}</Text>
+          <View style={[ps.sectionBadge, { backgroundColor: incompleteCt === 0 ? DS.success + '20' : cfg.color + '20' }]}>
+            <Text style={[ps.sectionBadgeTxt, { color: incompleteCt === 0 ? DS.success : cfg.color }]}>
+              {incompleteCt === 0 ? 'All done' : `${incompleteCt} remaining`}
+            </Text>
+          </View>
+        </View>
+        <View style={ps.sectionBody}>
+          {tasks.map((t, i) => renderTask(t, i))}
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <AppCard style={ps.card}>
+      {/* Header */}
+      <View style={ps.header}>
+        <View style={{ flex: 1, gap: 2 }}>
+          <Text style={ps.title}>Launch Readiness</Text>
+          <Text style={ps.sub}>{doneCt}/{allTasks.length} tasks complete · {readyPct}% ready</Text>
+        </View>
+        <TouchableOpacity
+          style={ps.launchBtn}
+          onPress={() => navigation.navigate('LaunchDecision')}
+          activeOpacity={0.85}
+        >
+          <Text style={ps.launchBtnTxt}>Full Decision →</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Progress bar */}
+      <View style={ps.barTrack}>
+        <View style={[ps.barFill, { width: `${readyPct}%` as any,
+          backgroundColor: readyPct >= 80 ? DS.success : readyPct >= 50 ? DS.warning : DS.danger }]} />
+      </View>
+
+      {/* Critical summary */}
+      {critBlockers.length > 0 && (
+        <View style={ps.critSummary}>
+          <Text style={ps.critSummaryTxt}>
+            ⚑  {critBlockers.length} critical blocker{critBlockers.length > 1 ? 's' : ''} prevent launch — fix these first
+          </Text>
+        </View>
+      )}
+      {critBlockers.length === 0 && recBlockers.length > 0 && (
+        <View style={ps.warnSummary}>
+          <Text style={ps.warnSummaryTxt}>
+            ◎  {recBlockers.length} recommended fix{recBlockers.length > 1 ? 'es' : ''} will improve your outcome
+          </Text>
+        </View>
+      )}
+      {critBlockers.length === 0 && recBlockers.length === 0 && (
+        <View style={ps.okSummary}>
+          <Text style={ps.okSummaryTxt}>✓  Critical and recommended items complete — ready for launch decision</Text>
+        </View>
+      )}
+
+      {/* Sections */}
+      {renderSection(criticals, 'critical')}
+      {renderSection(recommended, 'recommended')}
+      {showAll && renderSection(optional, 'optional')}
+
+      <TouchableOpacity
+        style={ps.toggleBtn}
+        onPress={() => setShowAll(p => !p)}
+        activeOpacity={0.7}
+      >
+        <Text style={ps.toggleTxt}>{showAll ? '▲ Hide optional items' : `▼ Show optional items (${optional.filter(t => !t.done).length} remaining)`}</Text>
+      </TouchableOpacity>
+    </AppCard>
+  );
+}
+
+const ps = StyleSheet.create({
+  card:          { gap: 12 },
+  header:        { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  title:         { fontSize: 14, fontWeight: '800', color: DS.textPrimary, letterSpacing: -0.2 },
+  sub:           { fontSize: 11, color: DS.textMuted },
+  launchBtn:     { backgroundColor: DS.accent, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 },
+  launchBtnTxt:  { fontSize: 11, fontWeight: '800', color: '#fff' },
+  barTrack:      { height: 5, backgroundColor: DS.bgElevated, borderRadius: 3, overflow: 'hidden' },
+  barFill:       { height: 5, borderRadius: 3 },
+  critSummary:   { backgroundColor: DS.danger + '0E', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7, borderWidth: 1, borderColor: DS.danger + '25' },
+  critSummaryTxt:{ fontSize: 11, fontWeight: '700', color: DS.danger },
+  warnSummary:   { backgroundColor: DS.warning + '0E', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7, borderWidth: 1, borderColor: DS.warning + '30' },
+  warnSummaryTxt:{ fontSize: 11, fontWeight: '700', color: DS.warning },
+  okSummary:     { backgroundColor: DS.success + '0E', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7, borderWidth: 1, borderColor: DS.success + '30' },
+  okSummaryTxt:  { fontSize: 11, fontWeight: '700', color: DS.success },
+  section:       { borderRadius: DS.radiusChip, borderWidth: 1.5, overflow: 'hidden' },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8 },
+  sectionIcon:   { fontSize: 12, fontWeight: '800' },
+  sectionTitle:  { flex: 1, fontSize: 11, fontWeight: '800', letterSpacing: 0.3 },
+  sectionBadge:  { borderRadius: DS.radiusBadge, paddingHorizontal: 8, paddingVertical: 2 },
+  sectionBadgeTxt:{ fontSize: 10, fontWeight: '700' },
+  sectionBody:   { paddingHorizontal: 12, paddingVertical: 8, gap: 8 },
+  taskRow:       { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  taskCheck:     { width: 20, height: 20, borderRadius: 10, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 },
+  taskLabel:     { fontSize: 12, fontWeight: '600', color: DS.textPrimary, lineHeight: 17 },
+  taskDetail:    { fontSize: 10, color: DS.textMuted, lineHeight: 14 },
+  taskWhy:       { fontSize: 10, lineHeight: 14, fontStyle: 'italic' },
+  taskArrow:     { fontSize: 12, color: DS.textMuted, fontWeight: '700', marginTop: 2 },
+  toggleBtn:     { alignItems: 'center', paddingVertical: 6 },
+  toggleTxt:     { fontSize: 11, fontWeight: '600', color: DS.textMuted },
+});
+
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function LaunchScreen() {
   const navigation                    = useNavigation<NavProp>();
+  const { isOnline }                  = useNetworkStatus();
   const [checked,        setChecked]        = useState<Set<string>>(new Set());
   const [selectedId,     setSelectedId]     = useState<string>(PHASES[0].id);
   const [aiKey,          setAiKey]          = useState<string | null>(null);
@@ -814,6 +1100,8 @@ export default function LaunchScreen() {
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
+      <AppHeader helpKey="launch_checklist" />
+      <OfflineBanner visible={!isOnline} />
       <AIModal aiKey={aiKey} onClose={() => setAiKey(null)} />
 
       {/* Phase completion celebration banner */}
@@ -848,8 +1136,8 @@ export default function LaunchScreen() {
           {feasProduct ? feasProduct.name : 'Your Product Launch Roadmap'}
         </Text>
         {!feasProduct && (
-          <TouchableOpacity onPress={() => navigation.navigate('LaunchPad' as any)} activeOpacity={0.75}>
-            <Text style={s.productHint}>No product selected — add one in Feasibility Check →</Text>
+          <TouchableOpacity onPress={() => navigation.navigate('Main' as any, { screen: 'Research' } as any)} activeOpacity={0.75}>
+            <Text style={s.productHint}>No product selected — search and track one in Research →</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -865,6 +1153,8 @@ export default function LaunchScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
+        <PipelineStatusCard />
+
         <HeroProgressCard checked={checked} />
 
         <SectionHeader title="Stage Tasks" />

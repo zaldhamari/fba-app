@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
+import { DS } from '../theme/ds';
 import {
-  View, Text, StyleSheet, TouchableOpacity, TextInput, Image,
+  View, Text, StyleSheet, TouchableOpacity, TextInput,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { colors, spacing, radius, shadow } from '../theme';
 import { VaultEntry, VaultStatus, VAULT_STATUSES, STATUS_CONFIG } from '../types/vault';
 
@@ -17,7 +19,7 @@ interface Props {
   onShare: () => void;
 }
 
-export default function VaultCard({ entry, onRemove, onStatusChange, onNoteChange, onShare }: Props) {
+function VaultCard({ entry, onRemove, onStatusChange, onNoteChange, onShare }: Props) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [editingNote, setEditingNote] = useState(false);
   const [noteText, setNoteText] = useState(entry.note);
@@ -44,7 +46,7 @@ export default function VaultCard({ entry, onRemove, onStatusChange, onNoteChang
       <View style={s.header}>
         <View style={s.infoRow}>
           {entry.product.image ? (
-            <Image source={{ uri: entry.product.image }} style={s.thumb} />
+            <Image source={{ uri: entry.product.image }} style={s.thumb} contentFit="cover" transition={150} accessibilityRole="image" accessibilityLabel={`Product photo: ${entry.product.title}`} />
           ) : (
             <View style={[s.thumb, s.thumbFallback]}>
               <Text style={s.thumbIcon}>◎</Text>
@@ -319,10 +321,13 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(37,99,235,0.22)',
   },
-  shareBtnText: { fontSize: 11, fontWeight: '700', color: '#2563EB' },
+  shareBtnText: { fontSize: 11, fontWeight: '700', color: DS.accent },
   removeBtn: {
     paddingHorizontal: spacing.sm,
     paddingVertical: 5,
   },
   removeBtnText: { fontSize: 11, fontWeight: '600', color: colors.textMuted },
 });
+
+// Memoized: vault rows skip re-render when unrelated entries or parent state change.
+export default React.memo(VaultCard);

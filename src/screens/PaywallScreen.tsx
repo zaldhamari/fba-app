@@ -1,14 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  ScrollView, Platform, Dimensions,
+  ScrollView, Platform, Dimensions, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/RootNavigator';
 import {
-  useSubscription, Tier, PLANS, PLAN_FEATURES,
+  useSubscription, Tier, PLANS, PLAN_FEATURES, MONTHLY_LIMITS,
 } from '../hooks/useSubscription';
+import { fetchLivePrices, LivePrices } from '../lib/revenuecat';
 import {
   AppCard, SectionHeader, StatusBadge, PrimaryButton, SecondaryButton, DS,
 } from '../components/ds';
@@ -36,16 +37,32 @@ const PLAN_EYEBROW: Record<Tier, string> = {
   operator: 'FOR SCALING SELLERS',
 };
 
+// Comparison values derived from MONTHLY_LIMITS so they always match enforcement.
+// Unlimited = 9999 in MONTHLY_LIMITS — display as 'Unlimited'.
+function fmtLimit(n: number): string {
+  return n >= 9999 ? 'Unlimited' : n === 0 ? '—' : `${n}/mo`;
+}
+
 const COMPARISON_ROWS: {
   label: string; icon: string;
   explorer: string; builder: string; operator: string;
 }[] = [
-  { label: 'Product searches',  icon: '◎', explorer: '3/mo',      builder: '50/mo',    operator: 'Unlimited' },
-  { label: 'Product analyses',  icon: '⊛', explorer: '—',         builder: '20/mo',    operator: 'Unlimited' },
-  { label: 'Profit calculator', icon: '◈', explorer: '✓',         builder: '✓',        operator: '✓'         },
-  { label: 'Brand assets',      icon: '✦', explorer: '1/mo',      builder: '5/mo',     operator: 'Unlimited' },
-  { label: 'Co-Pilot chats',    icon: '⊞', explorer: '—',         builder: '✓',        operator: '✓'         },
-  { label: 'Export tools',      icon: '↓', explorer: '—',         builder: '—',        operator: '✓'         },
+  {
+    label: 'Product searches', icon: '◎',
+    explorer: fmtLimit(MONTHLY_LIMITS.explorer.research),
+    builder:  fmtLimit(MONTHLY_LIMITS.builder.research),
+    operator: 'Unlimited',
+  },
+  { label: 'Product analyses',  icon: '⊛', explorer: '—',  builder: '20/mo', operator: 'Unlimited' },
+  { label: 'Profit calculator', icon: '◈', explorer: '✓',  builder: '✓',     operator: '✓'         },
+  {
+    label: 'Brand assets', icon: '✦',
+    explorer: fmtLimit(MONTHLY_LIMITS.explorer.brands),
+    builder:  fmtLimit(MONTHLY_LIMITS.builder.brands),
+    operator: 'Unlimited',
+  },
+  { label: 'Co-Pilot chats', icon: '⊞', explorer: '—', builder: '✓', operator: '✓' },
+  { label: 'Export tools',   icon: '↓', explorer: '—', builder: '—', operator: '✓' },
 ];
 
 const TRUST_POINTS = [
@@ -126,7 +143,7 @@ const tog = StyleSheet.create({
   },
   tabActive: {
     backgroundColor: DS.bgCard,
-    shadowColor:     '#0D1B4B',
+    shadowColor:     DS.textPrimary,
     shadowOffset:    { width: 0, height: 1 },
     shadowOpacity:   0.07,
     shadowRadius:    4,
@@ -290,7 +307,7 @@ const pc = StyleSheet.create({
   desc:       { fontSize: 12, color: DS.textSecondary, lineHeight: 17 },
   priceCol:   { alignItems: 'flex-end' },
   price:      { fontSize: 22, fontWeight: '900', color: DS.textPrimary, letterSpacing: -0.6 },
-  billing:    { fontSize: 10, color: DS.textMuted, marginTop: 2 },
+  billing:    { fontSize: 12, color: DS.textSecondary, marginTop: 2, fontWeight: '500' },
   divider:    { height: 1, backgroundColor: DS.borderLight, marginVertical: 4 },
   feature:    { flexDirection: 'row', gap: 8, alignItems: 'flex-start' },
   featureCheck: { fontSize: 12, fontWeight: '800', color: DS.accent, width: 14, marginTop: 1 },
@@ -467,12 +484,27 @@ export default function PaywallScreen({ navigation, route }: Props) {
   const [purchasing,   setPurchasing]   = useState(false);
   const [restoring,    setRestoring]    = useState(false);
   const [error,        setError]        = useState('');
+  // Synchronous ref guard — prevents double-tap from opening two purchase dialogs
+  // before the first `await` in handlePurchase resolves.
+  const purchasingRef = useRef(false);
+
+  const [livePrices, setLivePrices] = useState<LivePrices>({
+    builderMonthly: null, builderAnnual: null,
+    operatorMonthly: null, operatorAnnual: null,
+  });
+
+  useEffect(() => {
+    fetchLivePrices().then(setLivePrices).catch(() => {/* use static fallbacks */});
+  }, []);
 
   const forced = route?.params?.forced;
 
   async function handlePurchase(t: Tier) {
+    if (purchasingRef.current) return;
+    purchasingRef.current = true;
     setError('');
     if (t === 'explorer') {
+      purchasingRef.current = false;
       await completeOnboarding();
       navigation.replace('Main');
       return;
@@ -488,6 +520,7 @@ export default function PaywallScreen({ navigation, route }: Props) {
       }
     } finally {
       setPurchasing(false);
+      purchasingRef.current = false;
     }
   }
 
@@ -495,7 +528,14 @@ export default function PaywallScreen({ navigation, route }: Props) {
     setError('');
     setRestoring(true);
     try {
-      await restorePurchases();
+      const restoredTier = await restorePurchases();
+      if (restoredTier === 'explorer') {
+        Alert.alert(
+          'No Subscription Found',
+          'No active purchases were found for this Apple ID. If you believe this is an error, check that you are signed in with the correct Apple ID.',
+        );
+        return;
+      }
       await completeOnboarding();
       navigation.replace('Main');
     } catch (e: any) {
@@ -506,15 +546,18 @@ export default function PaywallScreen({ navigation, route }: Props) {
   }
 
   function priceLabel(t: Tier): string {
-    const p = PLANS[t];
-    if (p.monthly === 0) return 'Free';
-    return annual ? `$${p.annualMonthly.toFixed(2)}/mo` : `$${p.monthly}/mo`;
+    if (PLANS[t].monthly === 0) return 'Free';
+    if (annual) {
+      const live = t === 'builder' ? livePrices.builderAnnual : livePrices.operatorAnnual;
+      return live ? `${live}/yr` : `$${PLANS[t].annual}/yr`;
+    }
+    const live = t === 'builder' ? livePrices.builderMonthly : livePrices.operatorMonthly;
+    return live ? `${live}/mo` : `$${PLANS[t].monthly}/mo`;
   }
 
   function billingNote(t: Tier): string {
-    const p = PLANS[t];
-    if (p.monthly === 0) return 'Free forever';
-    return annual ? `Billed $${p.annual}/year` : 'Billed monthly';
+    if (PLANS[t].monthly === 0) return 'Free forever';
+    return annual ? 'Billed annually' : 'Billed monthly';
   }
 
   const screenHeight = Dimensions.get('window').height;
@@ -649,8 +692,15 @@ export default function PaywallScreen({ navigation, route }: Props) {
 
         {/* ── Legal footer ──────────────────────────────────── */}
         <Text style={s.legalText}>
-          Payments processed securely by Apple. Subscriptions auto-renew monthly or annually.
-          Cancel anytime in iOS Settings.
+          Payments processed securely by Apple. Subscriptions auto-renew unless cancelled at
+          least 24 hours before the end of the billing period. Cancel anytime in iOS Settings →
+          Subscriptions.{'\n'}
+          {'Builder: '}
+          {livePrices.builderMonthly  ?? `$${PLANS.builder.monthly}`}{'/mo · '}
+          {livePrices.builderAnnual   ?? `$${PLANS.builder.annual}`}{'/yr · '}
+          {'Operator: '}
+          {livePrices.operatorMonthly ?? `$${PLANS.operator.monthly}`}{'/mo · '}
+          {livePrices.operatorAnnual  ?? `$${PLANS.operator.annual}`}{'/yr'}
         </Text>
         <View style={s.legalRow}>
           <TouchableOpacity
@@ -759,7 +809,7 @@ const s = StyleSheet.create({
 
   // Legal
   legalText: {
-    fontSize: 11, color: DS.textMuted, textAlign: 'center', lineHeight: 17,
+    fontSize: 12, color: DS.textMuted, textAlign: 'center', lineHeight: 18,
   },
   legalRow: {
     flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8,

@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  SafeAreaView, Animated,
+  SafeAreaView, Animated, Linking, Alert, Share,
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/RootNavigator';
 import { DS } from '../components/ds';
 import { useSellerProfile } from '../hooks/useSellerProfile';
+import { usePipeline } from '../context/PipelineContext';
+import { APP_VERSION, BUILD_NUMBER } from '../constants/appVersion';
 import type { Marketplace, ExperienceLevel, CompetitionThreshold } from '../types/sellerProfile';
 import { MARKETPLACE_LABELS } from '../types/sellerProfile';
 
@@ -23,10 +25,10 @@ const EXPERIENCE_OPTIONS: { value: ExperienceLevel; label: string; sub: string }
 ];
 
 const BUDGET_OPTIONS: { value: number; label: string; sub: string }[] = [
-  { value: 250,   label: 'Under $500',    sub: 'Starting small' },
-  { value: 1000,  label: '$500 – $1,500', sub: 'Comfortable start' },
-  { value: 2500,  label: '$1,500 – $5k',  sub: 'Serious launch' },
-  { value: 7500,  label: '$5k+',          sub: 'Scaling fast' },
+  { value: 500,   label: 'Under $500',    sub: 'Starting small' },
+  { value: 1500,  label: '$500 – $1,500', sub: 'Comfortable start' },
+  { value: 5000,  label: '$1,500 – $5k',  sub: 'Serious launch' },
+  { value: 10000, label: '$5k+',          sub: 'Scaling fast' },
 ];
 
 const PRICE_OPTIONS: { priceMin: number; priceMax: number; label: string; sub: string }[] = [
@@ -55,6 +57,31 @@ const QUESTIONS = [
 
 export default function SellerProfileScreen({ navigation }: Props) {
   const { saveProfile } = useSellerProfile();
+  const pipeline = usePipeline();
+
+  function handleReportBug() {
+    const subject = encodeURIComponent(`Siftly Bug Report v${APP_VERSION}`);
+    const body = encodeURIComponent(`App Version: ${APP_VERSION}\n\nDescribe the bug:\n\nSteps to reproduce:\n\nWhat you expected:\n`);
+    Linking.openURL(`mailto:support@siftly.app?subject=${subject}&body=${body}`).catch(() => {
+      Alert.alert('Email not configured', 'Please email support@siftly.app to report a bug.');
+    });
+  }
+
+  function handleExportPipeline() {
+    pipeline.exportPipeline().then(json => {
+      const summary = JSON.parse(json);
+      const text = [
+        `Siftly Pipeline Export — ${new Date().toLocaleDateString()}`,
+        `Niche: ${summary.activeNiche?.keyword ?? 'Not set'}`,
+        `Product: ${summary.activeProduct?.title ?? 'Not set'}`,
+        `Supplier: ${summary.selectedSupplier?.name ?? 'Not set'}`,
+        `Brand: ${summary.brandData?.brandName ?? 'Not set'}`,
+        `Margin: ${summary.costModel?.marginPct?.toFixed(1) ?? '—'}%`,
+        `ROI: ${summary.costModel?.roiPct?.toFixed(0) ?? '—'}%`,
+      ].join('\n');
+      Share.share({ message: text, title: 'My Siftly Pipeline' });
+    }).catch(() => {});
+  }
 
   const [step,        setStep]        = useState(0); // 0-4
   const [marketplace, setMarketplace] = useState<Marketplace | null>(null);
@@ -269,6 +296,19 @@ export default function SellerProfileScreen({ navigation }: Props) {
             {saving ? 'Saving…' : step < 4 ? 'Next →' : 'Start Researching →'}
           </Text>
         </TouchableOpacity>
+
+        <View style={s.settingsList}>
+          <TouchableOpacity style={s.settingRow} onPress={handleExportPipeline} activeOpacity={0.7}>
+            <Text style={s.settingLabel}>Export Pipeline Data</Text>
+            <Text style={s.settingChevron}>→</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={s.settingRow} onPress={handleReportBug} activeOpacity={0.7}>
+            <Text style={s.settingLabel}>Report a Bug</Text>
+            <Text style={s.settingChevron}>→</Text>
+          </TouchableOpacity>
+        </View>
+
+        <Text style={s.versionTxt}>Version {APP_VERSION} · Build {BUILD_NUMBER}</Text>
       </View>
     </SafeAreaView>
   );
@@ -334,8 +374,15 @@ const s = StyleSheet.create({
   hint:    { backgroundColor: DS.indigoLight, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: DS.indigo + '30' },
   hintTxt: { fontSize: 12, color: DS.indigo, lineHeight: 18 },
 
-  footer:        { paddingHorizontal: 24, paddingBottom: 32, paddingTop: 12 },
+  footer:        { paddingHorizontal: 24, paddingBottom: 32, paddingTop: 12, gap: 12 },
   nextBtn:       { backgroundColor: DS.indigo, borderRadius: 16, paddingVertical: 16, alignItems: 'center' },
   nextBtnDisabled:{ opacity: 0.35 },
   nextTxt:       { fontSize: 16, fontWeight: '800', color: '#fff', letterSpacing: -0.3 },
+
+  settingsList: { borderTopWidth: 1, borderTopColor: DS.border, paddingTop: 8, gap: 2 },
+  settingRow:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, paddingHorizontal: DS.pagePadding },
+  settingLabel: { fontSize: 14, color: DS.textSecondary, fontWeight: '500' },
+  settingChevron: { fontSize: 14, color: DS.textMuted },
+
+  versionTxt: { fontSize: 11, color: DS.textMuted, textAlign: 'center', paddingBottom: 4 },
 });

@@ -3,6 +3,7 @@ import {
   TouchableOpacity, Text, ActivityIndicator, View,
   StyleSheet, ViewStyle, TextStyle, StyleProp,
 } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { DS, DSButtonSize } from '../../theme/ds';
 
 // ── Size config ───────────────────────────────────────────────────────────────
@@ -61,7 +62,7 @@ export function PrimaryButton({
         disabled && s.disabled,
         style,
       ]}
-      onPress={onPress}
+      onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {}); onPress(); }}
       disabled={disabled || loading}
       activeOpacity={0.85}
       accessibilityRole="button"
@@ -106,7 +107,7 @@ export function SecondaryButton({
         disabled && s.disabled,
         style,
       ]}
-      onPress={onPress}
+      onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); onPress(); }}
       disabled={disabled || loading}
       activeOpacity={0.82}
       accessibilityRole="button"
@@ -151,7 +152,7 @@ export function GhostButton({
         disabled && s.disabled,
         style,
       ]}
-      onPress={onPress}
+      onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); onPress(); }}
       disabled={disabled || loading}
       activeOpacity={0.75}
       accessibilityRole="button"

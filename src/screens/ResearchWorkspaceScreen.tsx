@@ -4,7 +4,7 @@ import {
   TouchableOpacity, ActivityIndicator, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation, useFocusEffect, useRoute } from '@react-navigation/native';
 import type { CompositeNavigationProp } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type { StackNavigationProp } from '@react-navigation/stack';
@@ -17,34 +17,33 @@ import {
   DS,
 } from '../components/ds';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { safeParseJSON } from '../utils/safeJSON';
 import { STORAGE_KEYS } from '../constants/storage';
 import { useSellerProfile } from '../hooks/useSellerProfile';
-import { api, Product, Supplier } from '../services/api';
+import { api, Product } from '../services/api';
 import { useSubscription, SAVE_LIMITS } from '../hooks/useSubscription';
+import { useAuth } from '../hooks/useAuth';
+import { enqueueEvent } from '../lib/analyticsTransmit';
+import { FreeAllowanceBar } from '../components/FreeAllowanceBar';
 import { useVault } from '../hooks/useVault';
 import PaywallModal from '../components/PaywallModal';
 import { AppHeader } from '../components/AppHeader';
 import { SkeletonProductCard } from '../components/ds/LoadingSkeleton';
 import { useCurrency } from '../context/CurrencyContext';
 import { useActiveProduct } from '../context/ActiveProductContext';
-import { usePipeline } from '../context/PipelineContext';
+import { usePipeline, PipelineReconInsights } from '../context/PipelineContext';
 import { PipelineProgressBar } from '../components/PipelineProgressBar';
+import { roughMarginPct, ppcColor, confidenceColor } from '../lib/financialEngine';
+import { FIN } from '../lib/financialConstants';
+import type { PPCPressure } from '../lib/financialEngine';
 import {
   expandProductKeywords,
-  buildSupplierQueries,
   deduplicateProducts,
-  deduplicateSuppliers,
   scoreProduct,
-  scoreSupplier,
   detectCategory,
-  detectSupplierType,
   buildEmptySuggestion,
   SmartSearchSummary,
 } from '../lib/smartSearch';
-import {
-  FeasibilityProduct,
-  FeasibilitySupplier,
-} from '../lib/feasibility';
 
 // ── Nav types ─────────────────────────────────────────────────────────────────
 
@@ -59,27 +58,22 @@ type NavProp = CompositeNavigationProp<
 import {
   Mode,
   ProductDisplay,
-  SupplierDisplay,
   KeywordMetric,
   EnrichedKeyword,
   AnalyzeProductResult,
-  AnalyzeSupplierResult,
-  OutreachEmail,
 } from './research/types';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 import {
-  MOCK_KEYWORD_METRICS,
-  MOCK_RELATED_KEYWORDS,
-  MOCK_PRODUCTS,
-  MOCK_SUPPLIERS,
   productToDisplay,
-  supplierToDisplay,
   displayToProduct,
   trendsToMetrics,
   enrichKeywords,
   hasEnoughDataForCompare,
+  productToPipelinePayload,
+  isASIN,
+  REAL_ASIN_RE,
 } from './research/productHelpers';
 
 // ── Shared components ─────────────────────────────────────────────────────────
@@ -94,7 +88,6 @@ import {
   SelectedProductBanner,
   EmptyState,
   AnalyzeProductModal,
-  AnalyzeSupplierModal,
   KeywordMetricsCard,
   MarketSummaryCard,
   SEOKeywordsPanel,
@@ -104,70 +97,117 @@ import {
 
 import {
   ProductMarketCard,
-  ProductLookupCard,
   CompareProductsModal,
 } from './research/ProductCards';
-
-// ── Supplier card components ──────────────────────────────────────────────────
-
-import {
-  SupplierCard,
-  CompareSuppliersModal,
-  OutreachEmailCard,
-} from './research/SupplierCards';
 
 // ── URL opener ────────────────────────────────────────────────────────────────
 
 import { openURL } from './research/utils';
+import { useNetworkStatus } from '../hooks/useNetworkStatus';
+import { OfflineBanner } from '../components/OfflineBanner';
+import { track } from '../lib/analytics';
+import { useProductIntelligence } from '../hooks/useProductIntelligence';
+import { ProductQuickIntel } from '../components/ProductQuickIntel';
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
 export default function ResearchWorkspaceScreen() {
+  const { isOnline } = useNetworkStatus();
   const { can, increment, tier } = useSubscription();
+  const { user } = useAuth();
   const vault                    = useVault();
   const navigation               = useNavigation<NavProp>();
   const { setActiveProduct }     = useActiveProduct();
   const { profile: sellerProfile } = useSellerProfile();
   const { marketplace }          = useCurrency();
   const pipeline                 = usePipeline();
+  const intelProfile             = useProductIntelligence();
+  const route                    = useRoute<any>();
   const prefilled                = useRef(false);
+  const autoSearchConsumed       = useRef(false);
+  const autoReconConsumed        = useRef(false);
+  const isMountedRef             = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => { isMountedRef.current = false; };
+  }, []);
 
   // ── Mode & search ──────────────────────────────────────────────────────────
-  const [mode,          setMode]          = useState<Mode>('market');
-  const [searchQuery,   setSearchQuery]   = useState('');
-  const [supplierQuery, setSupplierQuery] = useState('');
-  const [showPaywall,   setShowPaywall]   = useState(false);
-  const [paywallFeature, setPaywallFeature] = useState<'research' | 'suppliers' | 'saves'>('research');
+  const [mode,              setMode]              = useState<Mode>('market');
+  const [searchQuery,       setSearchQuery]       = useState('');
+  const [pendingAutoSearch, setPendingAutoSearch] = useState<string | null>(null);
+  const [pendingAutoRecon,  setPendingAutoRecon]  = useState<string | null>(null);
+  const [reconSaved,        setReconSaved]        = useState(false);
+  const [showPaywall,       setShowPaywall]       = useState(false);
+  const [paywallFeature,    setPaywallFeature]    = useState<'research' | 'saves' | 'free_limit'>('research');
+  const [paywallResetDate,  setPaywallResetDate]  = useState<string | undefined>(undefined);
+
+  // ── Free-tier Keepa allowance ──────────────────────────────────────────────
+  const [freeAllowance,     setFreeAllowance]     = useState<{ used: number; limit: number; resets_on: string } | null>(null);
+  const [allowanceLoading,  setAllowanceLoading]  = useState(false);
+  const allowanceDebounce   = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── Recent searches ────────────────────────────────────────────────────────
   const [recentMarket,   setRecentMarket]   = useState<string[]>([]);
   const [recentLookup,   setRecentLookup]   = useState<string[]>([]);
-  const [recentSupplier, setRecentSupplier] = useState<string[]>([]);
 
   useEffect(() => {
     Promise.all([
       AsyncStorage.getItem(STORAGE_KEYS.recentMarketSearches),
       AsyncStorage.getItem(STORAGE_KEYS.recentLookupSearches),
-      AsyncStorage.getItem(STORAGE_KEYS.recentSupplierSearches),
-      AsyncStorage.getItem(STORAGE_KEYS.feasibilityProduct),
-      AsyncStorage.getItem(STORAGE_KEYS.feasibilitySupplier),
       AsyncStorage.getItem(STORAGE_KEYS.savedKeywords),
-    ]).then(([m, l, s, fp, fs, kw]) => {
-      if (m)  setRecentMarket(JSON.parse(m));
-      if (l)  setRecentLookup(JSON.parse(l));
-      if (s)  setRecentSupplier(JSON.parse(s));
-      if (fp) setFeasProductId(JSON.parse(fp)?.id ?? null);
-      if (fs) setFeasSupplierName(JSON.parse(fs)?.name ?? null);
-      if (kw) setSavedKWs(JSON.parse(kw));
+      AsyncStorage.getItem(STORAGE_KEYS.reviewIntelligence),
+    ]).then(([m, l, kw, rev]) => {
+      if (m)  { const p = safeParseJSON<string[]>(m);         if (p) setRecentMarket(p); }
+      if (l)  { const p = safeParseJSON<string[]>(l);         if (p) setRecentLookup(p); }
+      if (kw) { const p = safeParseJSON<unknown[]>(kw);        if (p) setSavedKWs(p as any); }
+      // Restore last review recon result so it survives tab changes
+      if (rev) {
+        const parsed = safeParseJSON<{ name: string; cat: string; result: any; savedAt: string }>(rev);
+        if (parsed) {
+          setRevResult(parsed.result);
+          setRevProductName(parsed.name);
+          setRevCategory(parsed.cat);
+        }
+      }
     }).catch(() => {});
+    // Restore persisted differentiation result from pipeline on mount
+    const ri = pipeline.reconInsights;
+    if (ri?.differentiationAngles) {
+      setDiffResult({
+        product_improvements: ri.improvementSpecs ?? [],
+        bundle_ideas:         ri.bundleIdeas        ?? [],
+        niche_angles:         ri.differentiationAngles,
+        listing_angle:        ri.listingAngle        ?? '',
+        price_positioning:    ri.pricePositioning    ?? '',
+        source:               'pipeline',
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useFocusEffect(useCallback(() => {
-    if (!prefilled.current && pipeline.activeNiche?.keyword && !searchQuery) {
+    const params = route.params as { autoSearch?: string; autoRecon?: string } | undefined;
+    if (params?.autoRecon && !autoReconConsumed.current) {
+      autoReconConsumed.current = true;
+      const q = params.autoRecon as string;
+      (navigation as any).setParams({ autoRecon: undefined });
+      setSearchQuery(q);
+      setMode('lookup');
+      setPendingAutoRecon(q);
+    } else if (params?.autoSearch && !autoSearchConsumed.current) {
+      autoSearchConsumed.current = true;
+      const q = params.autoSearch as string;
+      (navigation as any).setParams({ autoSearch: undefined });
+      setSearchQuery(q);
+      setMode('market');
+      setPendingAutoSearch(q);
+    } else if (!prefilled.current && pipeline.activeNiche?.keyword && !searchQuery) {
       setSearchQuery(pipeline.activeNiche.keyword);
       prefilled.current = true;
     }
-  }, [pipeline.activeNiche, searchQuery]));
+  }, [route.params, pipeline.activeNiche, searchQuery, navigation]));
 
   const addRecentMarket = useCallback((q: string) => {
     setRecentMarket(prev => {
@@ -185,14 +225,6 @@ export default function ResearchWorkspaceScreen() {
     });
   }, []);
 
-  const addRecentSupplier = useCallback((q: string) => {
-    setRecentSupplier(prev => {
-      const next = [q, ...prev.filter(x => x !== q)].slice(0, 5);
-      AsyncStorage.setItem(STORAGE_KEYS.recentSupplierSearches, JSON.stringify(next)).catch(() => {});
-      return next;
-    });
-  }, []);
-
   const clearRecentMarket = useCallback(() => {
     setRecentMarket([]);
     AsyncStorage.removeItem(STORAGE_KEYS.recentMarketSearches).catch(() => {});
@@ -203,10 +235,28 @@ export default function ResearchWorkspaceScreen() {
     AsyncStorage.removeItem(STORAGE_KEYS.recentLookupSearches).catch(() => {});
   }, []);
 
-  const clearRecentSupplier = useCallback(() => {
-    setRecentSupplier([]);
-    AsyncStorage.removeItem(STORAGE_KEYS.recentSupplierSearches).catch(() => {});
-  }, []);
+  // ── Free-tier allowance fetch (debounced, explorer only) ──────────────────
+  const refreshAllowance = useCallback(async (userId: string) => {
+    if (!userId || tier !== 'explorer') return;
+    if (allowanceDebounce.current) clearTimeout(allowanceDebounce.current);
+    allowanceDebounce.current = setTimeout(async () => {
+      try {
+        setAllowanceLoading(true);
+        const data = await api.getFreeAllowance(userId);
+        if (isMountedRef.current) setFreeAllowance(data);
+      } catch {
+        // Non-critical — allowance display is best-effort
+      } finally {
+        if (isMountedRef.current) setAllowanceLoading(false);
+      }
+    }, 400);
+  }, [tier]);
+
+  useEffect(() => {
+    if (user?.id && tier === 'explorer') {
+      void refreshAllowance(user.id);
+    }
+  }, [user?.id, tier, refreshAllowance]);
 
   // ── Saved keyword handlers ─────────────────────────────────────────────────
   const saveKeyword = useCallback((kw: EnrichedKeyword) => {
@@ -216,7 +266,13 @@ export default function ResearchWorkspaceScreen() {
       AsyncStorage.setItem(STORAGE_KEYS.savedKeywords, JSON.stringify(next)).catch(() => {});
       return next;
     });
-  }, []);
+    if (pipeline.brandData) {
+      const existing = pipeline.brandData.keywords ?? [];
+      if (!existing.some(k => k.toLowerCase() === kw.phrase.toLowerCase())) {
+        pipeline.setBrandData({ ...pipeline.brandData, keywords: [...existing, kw.phrase] });
+      }
+    }
+  }, [pipeline]);
 
   const unsaveKeyword = useCallback((phrase: string) => {
     setSavedKWs(prev => {
@@ -230,21 +286,14 @@ export default function ResearchWorkspaceScreen() {
   const [amazonLoading,  setAmazonLoading]  = useState(false);
   const [amazonError,    setAmazonError]    = useState('');
   const [amazonSearched, setAmazonSearched] = useState(false);
-  const [products,       setProducts]       = useState<ProductDisplay[]>(MOCK_PRODUCTS);
-  const [keywords,       setKeywords]       = useState<EnrichedKeyword[]>(MOCK_RELATED_KEYWORDS);
+  const [products,       setProducts]       = useState<ProductDisplay[]>([]);
+  const [keywords,       setKeywords]       = useState<EnrichedKeyword[]>([]);
   const [savedKWs,       setSavedKWs]       = useState<EnrichedKeyword[]>([]);
-  const [metrics,        setMetrics]        = useState<KeywordMetric[]>(MOCK_KEYWORD_METRICS);
+  const [metrics,        setMetrics]        = useState<KeywordMetric[]>([]);
   const [currentKeyword, setCurrentKeyword] = useState('');
 
   // ── Smart search summaries ─────────────────────────────────────────────────
   const [productSummary,  setProductSummary]  = useState<SmartSearchSummary | null>(null);
-  const [supplierSummary, setSupplierSummary] = useState<SmartSearchSummary | null>(null);
-
-  // ── Supplier search state ──────────────────────────────────────────────────
-  const [suppLoading,  setSuppLoading]  = useState(false);
-  const [suppError,    setSuppError]    = useState('');
-  const [suppSearched, setSuppSearched] = useState(false);
-  const [suppliers,    setSuppliers]    = useState<SupplierDisplay[]>(MOCK_SUPPLIERS);
 
   // ── Selected product (context for suppliers / copilot) ─────────────────────
   const [selectedProduct, setSelectedProduct] = useState<ProductDisplay | null>(null);
@@ -253,17 +302,9 @@ export default function ResearchWorkspaceScreen() {
   const [savedIds,     setSavedIds]     = useState<Set<string>>(new Set());
   const [saveLoadingId, setSaveLoadingId] = useState<string | null>(null);
 
-  // ── Feasibility selection tracking ────────────────────────────────────────
-  const [feasProductId,    setFeasProductId]    = useState<string | null>(null);
-  const [feasSupplierName, setFeasSupplierName] = useState<string | null>(null);
-
   // ── Product comparison ─────────────────────────────────────────────────────
   const [compareProductIds,   setCompareProductIds]   = useState<Set<string>>(new Set());
   const [showCompareProducts, setShowCompareProducts] = useState(false);
-
-  // ── Supplier comparison ────────────────────────────────────────────────────
-  const [compareSupplierIds,   setCompareSupplierIds]   = useState<Set<string>>(new Set());
-  const [showCompareSuppliers, setShowCompareSuppliers] = useState(false);
 
   // ── Analyze product modal ──────────────────────────────────────────────────
   const [analyzeProductModal,   setAnalyzeProductModal]   = useState(false);
@@ -271,22 +312,9 @@ export default function ResearchWorkspaceScreen() {
   const [analyzeProductResult,  setAnalyzeProductResult]  = useState<AnalyzeProductResult | null>(null);
   const [analyzeProductError,   setAnalyzeProductError]   = useState('');
 
-  // ── Analyze supplier modal ─────────────────────────────────────────────────
-  const [analyzeSupplierModal,   setAnalyzeSupplierModal]   = useState(false);
-  const [analyzeSupplierLoading, setAnalyzeSupplierLoading] = useState(false);
-  const [analyzeSupplierResult,  setAnalyzeSupplierResult]  = useState<AnalyzeSupplierResult | null>(null);
-  const [analyzeSupplierError,   setAnalyzeSupplierError]   = useState('');
-
-  // ── Outreach email ─────────────────────────────────────────────────────────
-  const [outreachLoading, setOutreachLoading] = useState(false);
-  const [outreachError,   setOutreachError]   = useState('');
-  const [outreachEmail,   setOutreachEmail]   = useState<OutreachEmail | null>(null);
-  const [outreachLoadingId, setOutreachLoadingId] = useState<string | null>(null);
-
   // ── Review Intelligence state ──────────────────────────────────────────────
   const [revProductName,      setRevProductName]      = useState('');
   const [revCategory,         setRevCategory]         = useState('');
-  const [revLoadingProductId, setRevLoadingProductId] = useState<string | null>(null);
   const [revLoading,          setRevLoading]          = useState(false);
   const [revError,       setRevError]       = useState('');
   const [revResult,      setRevResult]      = useState<{
@@ -309,40 +337,11 @@ export default function ResearchWorkspaceScreen() {
     source:               string;
   } | null>(null);
 
-  // ── Lookup keyword warning ─────────────────────────────────────────────────
-  const [lookupKeywordWarning, setLookupKeywordWarning] = useState(false);
-
   // ── Ask AI ─────────────────────────────────────────────────────────────────
   const [askQuestion,  setAskQuestion]  = useState('');
   const [askAnswer,    setAskAnswer]    = useState('');
   const [askLoading,   setAskLoading]   = useState(false);
   const [askError,     setAskError]     = useState('');
-
-  // ── Freight tab ────────────────────────────────────────────────────────────
-  const [freightProduct,    setFreightProduct]    = useState('');
-  const [freightUnits,      setFreightUnits]      = useState('200');
-  const [freightWeightKg,   setFreightWeightKg]   = useState('0.5');
-  const [freightLengthCm,   setFreightLengthCm]   = useState('20');
-  const [freightWidthCm,    setFreightWidthCm]    = useState('15');
-  const [freightHeightCm,   setFreightHeightCm]   = useState('10');
-  const [freightLoading,    setFreightLoading]    = useState(false);
-  const [freightError,      setFreightError]      = useState('');
-  const [freightResult,     setFreightResult]     = useState<{
-    product: string;
-    marketplace: string;
-    units: number;
-    total_weight_kg: number;
-    total_cbm: number;
-    modes: {
-      air:     { mode: string; total_cost: number; cost_per_unit: number; transit_days: number; notes: string };
-      sea_lcl: { mode: string; total_cost: number; cost_per_unit: number; transit_days: number; notes: string };
-      sea_fcl: { mode: string; total_cost: number; cost_per_unit: number; transit_days: number; notes: string } | null;
-      express: { mode: string; total_cost: number; cost_per_unit: number; transit_days: number; notes: string };
-    };
-    recommended: string;
-    fba_inbound_est: number;
-    prep_cost: number;
-  } | null>(null);
 
   const handleAskAI = useCallback(async () => {
     const q = askQuestion.trim();
@@ -364,25 +363,6 @@ export default function ResearchWorkspaceScreen() {
   }, [askQuestion, askLoading, selectedProduct]);
 
   // ── Handlers ───────────────────────────────────────────────────────────────
-
-  const runLookupSearch = useCallback(async (q: string) => {
-    setAmazonLoading(true);
-    setAmazonError('');
-    setProducts([]);
-    setProductSummary(null);
-    try {
-      const res = await api.searchAmazon(q, marketplace);
-      const finalProducts: ProductDisplay[] = res.products.map(p => productToDisplay(p));
-      setProducts(finalProducts);
-      setAmazonSearched(true);
-      setCompareProductIds(new Set());
-      await increment('research');
-    } catch (err: any) {
-      setAmazonError(err?.message ?? 'Search failed. Please try again.');
-    } finally {
-      setAmazonLoading(false);
-    }
-  }, [increment]);
 
   const runMarketSearch = useCallback(async (q: string) => {
     setAmazonLoading(true);
@@ -439,6 +419,7 @@ export default function ResearchWorkspaceScreen() {
       await increment('research');
 
       // ── 9. Update state ───────────────────────────────────────────────────
+      if (!isMountedRef.current) return;
       setProducts(finalProducts);
       setKeywords(enrichKeywords(kwRes, primaryAmazonRes.trends, q));
       setMetrics(trendsToMetrics(q, primaryAmazonRes.trends, kwRes.total_found, kwRes.seo_score));
@@ -454,91 +435,20 @@ export default function ResearchWorkspaceScreen() {
         topCategory:      detectCategory(q),
       });
     } catch (err: any) {
+      if (!isMountedRef.current) return;
       setAmazonError(err?.message ?? 'Search failed. Please try again.');
     } finally {
-      setAmazonLoading(false);
+      if (isMountedRef.current) setAmazonLoading(false);
     }
   }, [increment, tier]);
 
-  const handleAmazonSearch = useCallback(async () => {
-    const q = searchQuery.trim();
-    if (!q) return;
-    if (!can('research')) { setPaywallFeature('research'); setShowPaywall(true); return; }
-    if (mode === 'market') { addRecentMarket(q); await runMarketSearch(q); }
-    else                   { addRecentLookup(q); await runLookupSearch(q); }
-  }, [searchQuery, mode, can, runMarketSearch, runLookupSearch, addRecentMarket, addRecentLookup]);
-
-  const selectRecentQuery = useCallback(async (q: string) => {
-    setSearchQuery(q);
-    if (!can('research')) { setPaywallFeature('research'); setShowPaywall(true); return; }
-    if (mode === 'market') { addRecentMarket(q); await runMarketSearch(q); }
-    else                   { addRecentLookup(q); await runLookupSearch(q); }
-  }, [mode, can, runMarketSearch, runLookupSearch, addRecentMarket, addRecentLookup]);
-
-  const runSmartSupplierSearch = useCallback(async (rawQ: string, selectedProd: ProductDisplay | null) => {
-    setSuppLoading(true);
-    setSuppError('');
-    setSuppliers([]);
-    setSupplierSummary(null);
-    try {
-      const queries = buildSupplierQueries(rawQ, selectedProd, tier);
-
-      // Run all supplier queries in parallel
-      const results = await Promise.allSettled(
-        queries.map(q => api.searchSuppliers(q, marketplace)),
-      );
-
-      const allRaw: Supplier[] = [];
-      for (const r of results) {
-        if (r.status === 'fulfilled') allRaw.push(...r.value.suppliers);
-      }
-      if (allRaw.length === 0) throw new Error('No suppliers found. Try a different product name.');
-
-      const { results: deduped, removed } = deduplicateSuppliers(allRaw);
-
-      const scored = deduped
-        .map((s, i) => {
-          const sc   = scoreSupplier(s, rawQ);
-          const disp = supplierToDisplay(s, i);
-          return {
-            ...disp,
-            relevanceScore:   sc.relevanceScore,
-            opportunityScore: sc.opportunityScore,
-            finalScore:       sc.finalScore,
-            badges:           sc.badges,
-            matchReason:      sc.matchReason,
-            _finalScore:      sc.finalScore,
-          };
-        })
-        .sort((a, b) => (b._finalScore ?? 0) - (a._finalScore ?? 0))
-        .slice(0, 15);
-
-      const finalSuppliers: SupplierDisplay[] = scored.map(({ _finalScore: _, ...rest }) => rest);
-
-      await increment('suppliers');
-      setSuppliers(finalSuppliers);
-      setSuppSearched(true);
-      setCompareSupplierIds(new Set());
-      setSupplierSummary({
-        originalQuery:     rawQ,
-        expandedKeywords:  queries,
-        totalScanned:      allRaw.length,
-        duplicatesRemoved: removed,
-        finalCount:        finalSuppliers.length,
-        topCategory:       detectSupplierType(allRaw),
-      });
-    } catch (err: any) {
-      setSuppError(err?.message ?? 'Supplier search failed. Please try again.');
-    } finally {
-      setSuppLoading(false);
+  useEffect(() => {
+    if (pendingAutoSearch && can('research')) {
+      addRecentMarket(pendingAutoSearch);
+      runMarketSearch(pendingAutoSearch);
+      setPendingAutoSearch(null);
     }
-  }, [tier, increment]);
-
-  const selectRecentSupplier = useCallback(async (q: string) => {
-    setSupplierQuery(q);
-    if (!can('suppliers')) { setPaywallFeature('suppliers'); setShowPaywall(true); return; }
-    await runSmartSupplierSearch(q, selectedProduct);
-  }, [can, runSmartSupplierSearch, selectedProduct]);
+  }, [pendingAutoSearch, can, addRecentMarket, runMarketSearch]);
 
   const handleDifferentiation = useCallback(async () => {
     const name = revProductName.trim();
@@ -550,38 +460,28 @@ export default function ResearchWorkspaceScreen() {
       const top_complaints = revResult?.top_complaints ?? [];
       const result = await api.getDifferentiation(name, cat, top_complaints);
       setDiffResult(result);
+      // Auto-persist diff result into reconInsights so it survives navigation
+      const base = pipeline.reconInsights;
+      pipeline.setReconInsights({
+        sourceKeyword:       base?.sourceKeyword    ?? name,
+        complaints:          base?.complaints        ?? [],
+        opportunities:       base?.opportunities     ?? [],
+        improvementSpecs:    base?.improvementSpecs  ?? result.product_improvements,
+        positioningAngles:   base?.positioningAngles ?? [],
+        qualityRisks:        base?.qualityRisks      ?? [],
+        createdAt:           base?.createdAt         ?? new Date().toISOString(),
+        differentiationAngles: result.niche_angles,
+        bundleIdeas:           result.bundle_ideas,
+        listingAngle:          result.listing_angle,
+        pricePositioning:      result.price_positioning,
+        differentiatedAt:      new Date().toISOString(),
+      });
     } catch (e: any) {
       setDiffError(e?.message ?? 'Could not generate strategy. Try again.');
     } finally {
       setDiffLoading(false);
     }
-  }, [revProductName, revCategory, revResult, can]);
-
-  const analyzeProductOpportunity = useCallback(async (item: ProductDisplay) => {
-    if (!can('research')) { setPaywallFeature('research'); setShowPaywall(true); return; }
-    const name = item.name;
-    const cat  = searchQuery.trim() || 'General';
-    setRevProductName(name);
-    setRevCategory(cat);
-    setRevLoading(true);
-    setRevLoadingProductId(item.id);
-    setRevError('');
-    setRevResult(null);
-    setDiffResult(null);
-    try {
-      const result = await api.analyzeReviews(name, cat, []);
-      setRevResult(result);
-      AsyncStorage.setItem(
-        STORAGE_KEYS.reviewIntelligence,
-        JSON.stringify({ name, cat, result, savedAt: new Date().toISOString() }),
-      ).catch(() => {});
-    } catch (e: any) {
-      setRevError(e?.message ?? 'Could not analyze reviews. Try again.');
-    } finally {
-      setRevLoading(false);
-      setRevLoadingProductId(null);
-    }
-  }, [can, searchQuery]);
+  }, [revProductName, revCategory, revResult, can, pipeline]);
 
   const handleDirectAnalysis = useCallback(async (input: string) => {
     const q = input.trim();
@@ -598,7 +498,7 @@ export default function ResearchWorkspaceScreen() {
 
       // If it looks like an ASIN or Amazon URL, resolve to a product name first
       const isAsinOrUrl =
-        /^[A-Z0-9]{10}$/i.test(q) ||
+        isASIN(q) ||
         /amazon\.(com|co\.uk|de|ca|co\.jp|com\.au|in|fr|es|it)/i.test(q);
 
       if (isAsinOrUrl) {
@@ -627,23 +527,63 @@ export default function ResearchWorkspaceScreen() {
     }
   }, [can]);
 
+  useEffect(() => {
+    if (pendingAutoRecon) {
+      handleDirectAnalysis(pendingAutoRecon);
+      setPendingAutoRecon(null);
+    }
+  }, [pendingAutoRecon, handleDirectAnalysis]);
+
+  const handleAmazonSearch = useCallback(async () => {
+    const q = searchQuery.trim();
+    if (!q) return;
+    if (!can('research')) {
+      track('paywall_shown', { feature: 'research', source: 'search' });
+      track('quota_exceeded', { feature: 'research' });
+      setPaywallFeature('research'); setShowPaywall(true); return;
+    }
+    if (mode === 'market') { addRecentMarket(q); await runMarketSearch(q); }
+    else                   { addRecentLookup(q); await handleDirectAnalysis(q); }
+  }, [searchQuery, mode, can, runMarketSearch, handleDirectAnalysis, addRecentMarket, addRecentLookup]);
+
+  const selectRecentQuery = useCallback(async (q: string) => {
+    setSearchQuery(q);
+    if (!can('research')) { setPaywallFeature('research'); setShowPaywall(true); return; }
+    if (mode === 'market') { addRecentMarket(q); await runMarketSearch(q); }
+    else                   { addRecentLookup(q); await handleDirectAnalysis(q); }
+  }, [mode, can, runMarketSearch, handleDirectAnalysis, addRecentMarket, addRecentLookup]);
+
   const handleSearchMarketInstead = useCallback(async () => {
     const q = searchQuery.trim();
     if (!q) return;
-    setLookupKeywordWarning(false);
     setMode('market');
     if (!can('research')) { setPaywallFeature('research'); setShowPaywall(true); return; }
     addRecentMarket(q);
     await runMarketSearch(q);
   }, [searchQuery, can, runMarketSearch, addRecentMarket]);
 
-  const handleSupplierSearch = useCallback(async () => {
-    const q = (supplierQuery.trim() || selectedProduct?.name || '').trim();
-    if (!q) return;
-    if (!can('suppliers')) { setPaywallFeature('suppliers'); setShowPaywall(true); return; }
-    addRecentSupplier(q);
-    await runSmartSupplierSearch(q, selectedProduct);
-  }, [supplierQuery, selectedProduct, can, runSmartSupplierSearch, addRecentSupplier]);
+  const handleSaveReconInsights = useCallback(() => {
+    if (!revResult) return;
+    const insights: PipelineReconInsights = {
+      sourceKeyword:     revProductName || searchQuery,
+      complaints:        revResult.top_complaints,
+      opportunities:     [...revResult.opportunities, ...revResult.bundling_ideas],
+      improvementSpecs:  [
+        ...revResult.recommended_improvements,
+        ...(diffResult?.product_improvements ?? []),
+      ],
+      positioningAngles: [
+        ...(diffResult?.niche_angles ?? []),
+        ...(diffResult?.listing_angle ? [diffResult.listing_angle] : []),
+      ],
+      qualityRisks:      revResult.top_complaints,
+      createdAt:         new Date().toISOString(),
+    };
+    pipeline.setReconInsights(insights);
+    pipeline.trackPipelineEvent('recon_insights_saved', { keyword: insights.sourceKeyword });
+    setReconSaved(true);
+    setTimeout(() => setReconSaved(false), 3000);
+  }, [revResult, diffResult, revProductName, searchQuery, pipeline]);
 
   const handleSaveProduct = useCallback(async (item: ProductDisplay) => {
     if (!savedIds.has(item.id) && !can('saves')) {
@@ -678,69 +618,85 @@ export default function ResearchWorkspaceScreen() {
     setAnalyzeProductError('');
     setAnalyzeProductModal(true);
     setAnalyzeProductLoading(true);
-    try {
-      const res = await api.analyzeProduct(
-        item.price ?? 0,
-        item.reviewCount ?? 0,
-        item.competition,
-        'Stable',
+
+    const hasRealAsin = REAL_ASIN_RE.test(item.id);
+    const userId      = user?.id ?? '';
+
+    // If we already know the free allowance is spent, go straight to the paywall
+    // instead of firing the (billable) AI + Keepa calls only to discard them on a 402.
+    if (tier === 'explorer' && hasRealAsin && freeAllowance && freeAllowance.used >= freeAllowance.limit) {
+      setAnalyzeProductModal(false);
+      setPaywallFeature('free_limit');
+      setPaywallResetDate(freeAllowance.resets_on || undefined);
+      setShowPaywall(true);
+      setAnalyzeProductLoading(false);
+      void enqueueEvent(
+        'hit_free_keepa_limit',
+        { used: freeAllowance.used, limit: freeAllowance.limit, asin: item.id },
+        'ResearchWorkspace',
       );
-      setAnalyzeProductResult({
-        verdict:    res.verdict,
-        confidence: res.confidence,
-        summary:    res.summary,
-        reasons:    res.reasons,
-        risk:       res.risk,
-        next_step:  res.next_step,
-      });
+      return;
+    }
+
+    try {
+      const [analysisSettled, keepaSettled] = await Promise.allSettled([
+        api.analyzeProduct(item.price ?? 0, item.reviewCount ?? 0, item.competition, 'Stable'),
+        hasRealAsin && userId
+          ? api.getProductData(item.id, userId, tier)
+          : Promise.resolve(null),
+      ]);
+
+      if (!isMountedRef.current) return;
+
+      // 402 free-limit: close loader, show paywall, return
+      if (keepaSettled.status === 'fulfilled' && keepaSettled.value?.kind === 'free_limit') {
+        const freeLimit = keepaSettled.value;
+        setAnalyzeProductModal(false);
+        setPaywallFeature('free_limit');
+        setPaywallResetDate(freeLimit.resets_on || undefined);
+        setShowPaywall(true);
+        void enqueueEvent(
+          'hit_free_keepa_limit',
+          { used: freeLimit.used, limit: freeLimit.limit, asin: item.id },
+          'ResearchWorkspace',
+        );
+        // Sync the allowance bar to its exhausted state after hitting the wall.
+        if (userId) void refreshAllowance(userId);
+        return;
+      }
+
+      const signals =
+        keepaSettled.status === 'fulfilled' && keepaSettled.value?.kind === 'success'
+          ? keepaSettled.value.signals
+          : undefined;
+
+      // Refresh allowance bar after a live Keepa call
+      if (keepaSettled.status === 'fulfilled' && keepaSettled.value?.kind === 'success' && userId) {
+        void refreshAllowance(userId);
+      }
+
+      if (analysisSettled.status === 'fulfilled') {
+        const res = analysisSettled.value;
+        setAnalyzeProductResult({
+          verdict:    res.verdict,
+          confidence: res.confidence,
+          summary:    res.summary,
+          reasons:    res.reasons,
+          risk:       res.risk,
+          next_step:  res.next_step,
+          signals,
+        });
+      } else {
+        throw (analysisSettled as PromiseRejectedResult).reason;
+      }
     } catch (err: any) {
+      if (!isMountedRef.current) return;
       setAnalyzeProductError(err?.message ?? 'Analysis failed. Please try again.');
     } finally {
-      setAnalyzeProductLoading(false);
+      if (isMountedRef.current) setAnalyzeProductLoading(false);
     }
-  }, []);
+  }, [user, tier, refreshAllowance, freeAllowance]);
 
-  const handleAnalyzeSupplier = useCallback(async (item: SupplierDisplay) => {
-    setAnalyzeSupplierResult(null);
-    setAnalyzeSupplierError('');
-    setAnalyzeSupplierModal(true);
-    setAnalyzeSupplierLoading(true);
-    try {
-      const res = await api.scoreSupplier({
-        supplier_name:  item.name,
-        price_per_unit: item.priceUSD ?? 0,
-        moq:            item.moqNum,
-        product_name:   selectedProduct?.name,
-      });
-      setAnalyzeSupplierResult({
-        total_score:            res.total_score,
-        grade:                  res.grade,
-        confidence_label:       res.confidence_label,
-        strengths:              res.strengths,
-        risk_flags:             res.risk_flags,
-        recommendation:         res.recommendation,
-        negotiation_strategy:   res.negotiation_strategy,
-      });
-    } catch (err: any) {
-      setAnalyzeSupplierError(err?.message ?? 'Analysis failed. Please try again.');
-    } finally {
-      setAnalyzeSupplierLoading(false);
-    }
-  }, [selectedProduct]);
-
-  const handleGenerateOutreach = useCallback(async (item: SupplierDisplay) => {
-    const productName = selectedProduct?.name || supplierQuery.trim() || 'your product';
-    setOutreachLoadingId(item.id);
-    setOutreachError('');
-    try {
-      const result = await api.getSupplierEmail(productName, 'Your Brand');
-      setOutreachEmail({ ...result, supplierUrl: item.url, supplierName: item.name });
-    } catch (err: any) {
-      setOutreachError(err?.message ?? 'Failed to generate email.');
-    } finally {
-      setOutreachLoadingId(null);
-    }
-  }, [selectedProduct, supplierQuery]);
 
   const toggleProductCompare = useCallback((id: string) => {
     setCompareProductIds(prev => {
@@ -750,106 +706,24 @@ export default function ResearchWorkspaceScreen() {
     });
   }, []);
 
-  const toggleSupplierCompare = useCallback((id: string) => {
-    setCompareSupplierIds(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) { next.delete(id); } else if (next.size < 3) { next.add(id); }
-      return next;
-    });
-  }, []);
 
   const handleSelectProduct = useCallback((item: ProductDisplay) => {
     setSelectedProduct(prev => prev?.id === item.id ? null : item);
   }, []);
 
-  const switchToSuppliers = useCallback(() => {
-    setMode('suppliers');
-    if (selectedProduct && !supplierQuery) {
-      setSupplierQuery(selectedProduct.name);
-    }
-  }, [selectedProduct, supplierQuery]);
 
-  const switchToFreight = useCallback(() => {
-    setMode('freight');
-    const productName = selectedProduct?.name || supplierQuery.trim() || searchQuery.trim();
-    if (productName && !freightProduct) {
-      setFreightProduct(productName);
-    }
-  }, [selectedProduct, supplierQuery, searchQuery, freightProduct]);
+  // ── Pipeline track handler ─────────────────────────────────────────────────
 
-  const handleFreightSearch = useCallback(async () => {
-    const name = freightProduct.trim();
-    if (!name) return;
-    setFreightLoading(true);
-    setFreightError('');
-    setFreightResult(null);
-    try {
-      const result = await api.estimateFreight({
-        product_name:       name,
-        marketplace,
-        units:              parseInt(freightUnits, 10)   || 200,
-        weight_kg_per_unit: parseFloat(freightWeightKg) || 0.5,
-        length_cm:          parseFloat(freightLengthCm) || 20,
-        width_cm:           parseFloat(freightWidthCm)  || 15,
-        height_cm:          parseFloat(freightHeightCm) || 10,
-      });
-      setFreightResult(result);
-    } catch (err: any) {
-      setFreightError(err?.message ?? 'Freight estimate failed. Please try again.');
-    } finally {
-      setFreightLoading(false);
-    }
-  }, [freightProduct, freightUnits, freightWeightKg, freightLengthCm, freightWidthCm, freightHeightCm, marketplace]);
-
-  const handleSaveForFeasibility = useCallback(async (item: ProductDisplay) => {
-    if (feasProductId === item.id) {
-      setActiveProduct(null);
-      setFeasProductId(null);
-      return;
-    }
-    const snapshot: FeasibilityProduct = {
-      id:          item.id,
-      name:        item.name,
-      price:       item.price,
-      rating:      item.rating,
-      reviewCount: item.reviewCount,
-      competition: item.competition,
-      url:         item.url,
-      savedAt:     new Date().toISOString(),
-    };
-    setActiveProduct(snapshot); // updates context + AsyncStorage atomically
-    setFeasProductId(item.id);
-    pipeline.setActiveProduct({
-      title:   item.name,
-      asin:    item.id,
-      price:   item.price ?? 0,
-      reviews: item.reviewCount ?? 0,
-      rating:  item.rating ?? 0,
-      url:     item.url,
-    });
-    pipeline.trackPipelineEvent('product_selected', { title: item.name, asin: item.id });
-    navigation.navigate('FeasibilityCheck' as any);
-  }, [feasProductId, navigation, setActiveProduct]);
-
-  const handleAttachSupplierFeasibility = useCallback(async (item: SupplierDisplay) => {
-    if (feasSupplierName === item.name) {
-      await AsyncStorage.removeItem(STORAGE_KEYS.feasibilitySupplier);
-      setFeasSupplierName(null);
-      return;
-    }
-    const snapshot: FeasibilitySupplier = {
-      name:       item.name,
-      platform:   item.platform,
-      priceUSD:   item.priceUSD,
-      moqNum:     item.moqNum,
-      moqDisplay: item.moq,
-      url:        item.url,
-      savedAt:    new Date().toISOString(),
-    };
-    await AsyncStorage.setItem(STORAGE_KEYS.feasibilitySupplier, JSON.stringify(snapshot));
-    setFeasSupplierName(item.name);
-    navigation.navigate('FeasibilityCheck' as any);
-  }, [feasSupplierName, navigation]);
+  const handleTrackInPipeline = useCallback((item: ProductDisplay) => {
+    pipeline.setActiveProduct(productToPipelinePayload(item));
+    setActiveProduct({
+      id: item.id, name: item.name, price: item.price, rating: item.rating,
+      reviewCount: item.reviewCount, competition: item.competition, url: item.url,
+      savedAt: new Date().toISOString(),
+    } as any);
+    pipeline.trackPipelineEvent('product_tracked', { title: item.name, asin: item.id });
+    navigation.navigate('LaunchDecision' as any);
+  }, [pipeline, setActiveProduct, navigation]);
 
   // ── Derived ────────────────────────────────────────────────────────────────
 
@@ -857,13 +731,6 @@ export default function ResearchWorkspaceScreen() {
     () => products.filter(p => compareProductIds.has(p.id)),
     [products, compareProductIds],
   );
-
-  const compareSupplierItems = useMemo(
-    () => suppliers.filter(s => compareSupplierIds.has(s.id)),
-    [suppliers, compareSupplierIds],
-  );
-
-  const featureContext = mode === 'suppliers' ? 'suppliers' : 'research';
 
   // ── Render helpers ─────────────────────────────────────────────────────────
 
@@ -880,12 +747,13 @@ export default function ResearchWorkspaceScreen() {
         <View style={xt.errBox}>
           <Text style={xt.errTxt}>{amazonError}</Text>
           <TouchableOpacity
-            style={xt.retryBtn}
+            style={[xt.retryBtn, !isOnline && xt.retryBtnDisabled]}
             onPress={handleAmazonSearch}
+            disabled={!isOnline}
             activeOpacity={0.8}
             accessibilityLabel="Retry search"
           >
-            <Text style={xt.retryTxt}>Try again</Text>
+            <Text style={xt.retryTxt}>{isOnline ? 'Try again' : 'Offline'}</Text>
           </TouchableOpacity>
         </View>
       );
@@ -916,30 +784,43 @@ export default function ResearchWorkspaceScreen() {
               item={p}
               onSelect={() => handleSelectProduct(p)}
               isSelected={selectedProduct?.id === p.id}
-              onSaveForFeasibility={p.url ? () => handleSaveForFeasibility(p) : undefined}
-              isFeasSaved={feasProductId === p.id}
               inCompare={compareProductIds.has(p.id)}
               canCompare={comparable}
               onToggleCompare={() => comparable ? toggleProductCompare(p.id) : undefined}
               onAnalyze={() => handleAnalyzeProduct(p)}
               analyzeLoading={analyzeProductLoading}
+              onTrackInPipeline={() => handleTrackInPipeline(p)}
+              isTracked={pipeline.activeProduct?.asin === p.id}
+              onSave={() => handleSaveProduct(p)}
+              isSaved={savedIds.has(p.id)}
+              saveLoading={saveLoadingId === p.id}
             />
           );
         })}
         {amazonSearched && savedIds.size > 0 && (
           <AppCard style={fl.card}>
             <Text style={fl.eye}>RESEARCH FLOW · STEP 2</Text>
-            <Text style={fl.title}>Find suppliers for your saved product</Text>
-            <Text style={fl.sub}>You've saved {savedIds.size} product{savedIds.size > 1 ? 's' : ''}. Select the one you want to source, then find matching suppliers.</Text>
+            <Text style={fl.title}>Continue to Supplier Sourcing</Text>
+            <Text style={fl.sub}>You've identified {savedIds.size} product {savedIds.size === 1 ? 'opportunity' : 'opportunities'}. Find manufacturers and lock in your unit cost.</Text>
+            {selectedProduct && (
+              <View style={fl.selectedHint}>
+                <Text style={fl.selectedHintTxt}>Selected: {selectedProduct.name.slice(0, 50)}</Text>
+                <Text style={fl.selectedHintPrice}>${selectedProduct.price?.toFixed(2)} · {selectedProduct.competition} competition</Text>
+              </View>
+            )}
             <TouchableOpacity
               style={fl.btn}
+              accessibilityRole="button"
               onPress={() => {
+                if (selectedProduct) {
+                  pipeline.setActiveProduct(productToPipelinePayload(selectedProduct));
+                }
                 pipeline.trackPipelineEvent('validate_handoff_suppliers', { query: searchQuery });
-                navigation.navigate('Suppliers' as any);
+                navigation.navigate('Main', { screen: 'Sourcing' } as any);
               }}
               activeOpacity={0.85}
             >
-              <Text style={fl.btnTxt}>Source This Product →</Text>
+              <Text style={fl.btnTxt}>Continue to Supplier Sourcing →</Text>
             </TouchableOpacity>
           </AppCard>
         )}
@@ -977,22 +858,32 @@ export default function ResearchWorkspaceScreen() {
 
         {/* ── Empty / loading state ─────────────────────────────────────── */}
         {revLoading && (
-          <View style={xt.center}>
-            <ActivityIndicator size="large" color={DS.accent} />
-            <Text style={xt.loadTxt}>Analyzing product...</Text>
-          </View>
+          <ReconLoadingView />
         )}
 
         {!revLoading && revError !== '' && (
-          <View style={xt.errBox}><Text style={xt.errTxt}>{revError}</Text></View>
+          <View style={xt.errBox}>
+            <Text style={xt.errTxt}>{revError}</Text>
+            {revProductName.trim() !== '' && (
+              <TouchableOpacity
+                style={[xt.retryBtn, !isOnline && xt.retryBtnDisabled]}
+                onPress={() => handleDirectAnalysis(revProductName)}
+                disabled={!isOnline}
+                activeOpacity={0.8}
+                accessibilityLabel="Retry analysis"
+              >
+                <Text style={xt.retryTxt}>{isOnline ? 'Try again' : 'Offline'}</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         )}
 
         {!revLoading && !revResult && revError === '' && (
           <AppCard style={ri.emptyCard}>
             <Text style={ri.emptyIcon}>◎</Text>
-            <Text style={ri.emptyTitle}>Recon</Text>
+            <Text style={ri.emptyTitle}>Teardown a Product</Text>
             <Text style={ri.emptyBody}>
-              Enter a product name, ASIN, or Amazon URL above and tap <Text style={{ fontWeight: '700', color: DS.accent }}>Analyze</Text>.{'\n\n'}
+              Enter a product name, ASIN, or Amazon URL above and tap <Text style={{ fontWeight: '700', color: DS.accent }}>Run Teardown</Text>.{'\n\n'}
               AI reads the reviews and tells you exactly what to fix — so your version beats the original.
             </Text>
           </AppCard>
@@ -1106,7 +997,18 @@ export default function ResearchWorkspaceScreen() {
                   icon="✦"
                 />
                 {diffError !== '' && (
-                  <View style={xt.errBox}><Text style={xt.errTxt}>{diffError}</Text></View>
+                  <View style={xt.errBox}>
+                    <Text style={xt.errTxt}>{diffError}</Text>
+                    <TouchableOpacity
+                      style={[xt.retryBtn, !isOnline && xt.retryBtnDisabled]}
+                      onPress={handleDifferentiation}
+                      disabled={!isOnline}
+                      activeOpacity={0.8}
+                      accessibilityLabel="Retry strategy generation"
+                    >
+                      <Text style={xt.retryTxt}>{isOnline ? 'Try again' : 'Offline'}</Text>
+                    </TouchableOpacity>
+                  </View>
                 )}
               </AppCard>
             )}
@@ -1163,247 +1065,35 @@ export default function ResearchWorkspaceScreen() {
           </>
         )}
 
-      </View>
-    );
-  }
-
-  function renderSuppliersTab() {
-    return (
-      <View style={xt.wrap}>
-        <ModeDescStrip mode="suppliers" />
-
-        {suppLoading && (
-          <View style={xt.center}>
-            <ActivityIndicator size="large" color={DS.accent} />
-            <Text style={xt.loadTxt}>Finding suppliers...</Text>
-          </View>
-        )}
-
-        {!suppLoading && suppError !== '' && (
-          <View style={xt.errBox}><Text style={xt.errTxt}>{suppError}</Text></View>
-        )}
-
-        {!suppLoading && suppError === '' && (
-          <>
-
-            {supplierSummary && <SmartSummaryCard summary={supplierSummary} />}
-
-            <SectionHeader
-              title="Supplier Platforms"
-              subtitle={suppSearched ? `${suppliers.length} sources · ranked by score` : 'Verified manufacturers'}
-              style={xt.sectionHead}
-            />
-
-            {suppSearched && suppliers.length === 0 && (
-              <EmptyState
-                icon="🏭"
-                title="No suppliers found"
-                sub={buildEmptySuggestion(supplierQuery || selectedProduct?.name || 'this product')}
-              />
-            )}
-            {!suppSearched && suppliers.length === 0 && (
-              <EmptyState icon="🏭" title="No suppliers yet" sub="Enter a product name above to find supplier platforms." />
-            )}
-
-            {suppliers.map(s => (
-              <SupplierCard
-                key={s.id}
-                item={s}
-                inCompare={compareSupplierIds.has(s.id)}
-                analyzeLoading={analyzeSupplierLoading && analyzeSupplierModal}
-                outreachLoading={outreachLoadingId === s.id}
-                onView={() => openURL(s.url)}
-                onAnalyze={() => handleAnalyzeSupplier(s)}
-                onToggleCompare={() => toggleSupplierCompare(s.id)}
-                onOutreach={() => handleGenerateOutreach(s)}
-                onAttachFeasibility={() => handleAttachSupplierFeasibility(s)}
-                isFeasAttached={feasSupplierName === s.name}
-              />
-            ))}
-
-            {suppSearched && suppliers.length > 0 && (
-              <AppCard style={[fl.card, { borderColor: DS.warning + '55', backgroundColor: DS.warning + '10' }]}>
-                <Text style={[fl.eye, { color: DS.warning }]}>RESEARCH FLOW · STEP 3</Text>
-                <Text style={fl.title}>Estimate your freight cost</Text>
-                <Text style={fl.sub}>
-                  You have a supplier. Now estimate shipping costs from China to FBA — air vs sea, cost per unit, transit time.
+        {/* ── Save insights to pipeline ─────────────────────────────────── */}
+        {revResult && (
+          <AppCard style={ri.saveInsightsCard}>
+            <View style={ri.saveInsightsHeader}>
+              <Text style={ri.saveInsightsIcon}>⬡</Text>
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text style={ri.saveInsightsTitle}>Use Recon Insights for Supplier Specs</Text>
+                <Text style={ri.saveInsightsSub}>
+                  Save pain points, improvements, and angles so your supplier sourcing and brand strategy target what customers actually want.
                 </Text>
-                <TouchableOpacity style={[fl.btn, { backgroundColor: DS.warning }]} onPress={switchToFreight} activeOpacity={0.85}>
-                  <Text style={fl.btnTxt}>✈️  Estimate Freight Cost →</Text>
-                </TouchableOpacity>
-              </AppCard>
-            )}
-
-            {outreachError !== '' && (
-              <View style={xt.errBox}><Text style={xt.errTxt}>{outreachError}</Text></View>
-            )}
-
-            {outreachEmail !== null && <OutreachEmailCard email={outreachEmail} />}
-          </>
+              </View>
+            </View>
+            <TouchableOpacity
+              style={[ri.saveInsightsBtn, reconSaved && ri.saveInsightsBtnSaved]}
+              onPress={handleSaveReconInsights}
+              activeOpacity={0.85}
+              accessibilityRole="button"
+            >
+              <Text style={[ri.saveInsightsBtnTxt, reconSaved && ri.saveInsightsBtnSavedTxt]}>
+                {reconSaved ? '✓  Insights Saved to Pipeline' : '▣  Save Insights to Pipeline →'}
+              </Text>
+            </TouchableOpacity>
+          </AppCard>
         )}
+
       </View>
     );
   }
 
-  // ── Freight tab ────────────────────────────────────────────────────────────
-
-  function renderFreightTab() {
-    const modes = freightResult
-      ? [freightResult.modes.air, freightResult.modes.sea_lcl, freightResult.modes.sea_fcl, freightResult.modes.express].filter(Boolean)
-      : [];
-
-    return (
-      <View style={{ gap: 16 }}>
-        {/* ── Input form ─────────────────────────────────────────────── */}
-        <AppCard padding={16} style={{ gap: 14 }}>
-          <Text style={fr.sectionTitle}>📦 Product Details</Text>
-
-          <InputField
-            label="Product name"
-            value={freightProduct}
-            onChangeText={setFreightProduct}
-            placeholder="e.g. portable blender"
-            containerStyle={{ flex: undefined }}
-          />
-
-          <View style={fr.row}>
-            <View style={fr.halfField}>
-              <InputField
-                label="Units to ship"
-                value={freightUnits}
-                onChangeText={setFreightUnits}
-                placeholder="200"
-                keyboardType="numeric"
-                containerStyle={{ flex: undefined }}
-              />
-            </View>
-            <View style={fr.halfField}>
-              <InputField
-                label="Weight/unit (kg)"
-                value={freightWeightKg}
-                onChangeText={setFreightWeightKg}
-                placeholder="0.5"
-                keyboardType="numeric"
-                containerStyle={{ flex: undefined }}
-              />
-            </View>
-          </View>
-
-          <Text style={fr.sectionTitle}>📐 Dimensions per unit (cm)</Text>
-          <View style={fr.row}>
-            <View style={fr.thirdField}>
-              <InputField
-                label="Length"
-                value={freightLengthCm}
-                onChangeText={setFreightLengthCm}
-                placeholder="20"
-                keyboardType="numeric"
-                containerStyle={{ flex: undefined }}
-              />
-            </View>
-            <View style={fr.thirdField}>
-              <InputField
-                label="Width"
-                value={freightWidthCm}
-                onChangeText={setFreightWidthCm}
-                placeholder="15"
-                keyboardType="numeric"
-                containerStyle={{ flex: undefined }}
-              />
-            </View>
-            <View style={fr.thirdField}>
-              <InputField
-                label="Height"
-                value={freightHeightCm}
-                onChangeText={setFreightHeightCm}
-                placeholder="10"
-                keyboardType="numeric"
-                containerStyle={{ flex: undefined }}
-              />
-            </View>
-          </View>
-
-          <PrimaryButton
-            label={freightLoading ? 'Calculating...' : 'Estimate Freight →'}
-            onPress={handleFreightSearch}
-            loading={freightLoading}
-            disabled={!freightProduct.trim() || freightLoading}
-            icon="✈"
-          />
-        </AppCard>
-
-        {/* ── Error ─────────────────────────────────────────────────── */}
-        {!!freightError && (
-          <AppCard padding={14}>
-            <Text style={{ color: DS.danger, fontSize: 13 }}>{freightError}</Text>
-          </AppCard>
-        )}
-
-        {/* ── Results ───────────────────────────────────────────────── */}
-        {freightResult && (
-          <View style={{ gap: 12 }}>
-            <View style={fr.summaryCard}>
-              <Text style={fr.summaryLabel}>SHIPMENT SUMMARY</Text>
-              <Text style={fr.summaryTitle}>{freightResult.product}</Text>
-              <Text style={fr.summarySub}>{freightResult.units.toLocaleString()} units · {freightResult.total_weight_kg} kg · {freightResult.total_cbm} CBM</Text>
-            </View>
-
-            {modes.map((m) => {
-              if (!m) return null;
-              const isRec = m.mode.toLowerCase().includes(freightResult.recommended.replace('_', ' '));
-              return (
-                <AppCard key={m.mode} padding={16} style={[fr.modeCard, isRec && fr.modeCardRec]}>
-                  {isRec && (
-                    <View style={fr.recBadge}>
-                      <Text style={fr.recBadgeTxt}>★ RECOMMENDED</Text>
-                    </View>
-                  )}
-                  <View style={fr.modeHeader}>
-                    <Text style={[fr.modeName, isRec && fr.modeNameRec]}>{m.mode}</Text>
-                    <Text style={fr.modeTransit}>{m.transit_days} days</Text>
-                  </View>
-                  <View style={fr.modePriceRow}>
-                    <View style={fr.modePriceBlock}>
-                      <Text style={fr.modePriceLabel}>TOTAL COST</Text>
-                      <Text style={[fr.modePrice, isRec && { color: DS.warning }]}>${m.total_cost.toLocaleString()}</Text>
-                    </View>
-                    <View style={fr.modePriceBlock}>
-                      <Text style={fr.modePriceLabel}>PER UNIT</Text>
-                      <Text style={[fr.modePrice, isRec && { color: DS.warning }]}>${m.cost_per_unit.toFixed(2)}</Text>
-                    </View>
-                  </View>
-                  <Text style={fr.modeNotes}>{m.notes}</Text>
-                </AppCard>
-              );
-            })}
-
-            <AppCard padding={14} style={{ gap: 6 }}>
-              <Text style={fr.sectionTitle}>Additional Costs</Text>
-              <View style={fr.extraRow}>
-                <Text style={fr.extraLabel}>FBA Inbound Handling</Text>
-                <Text style={fr.extraValue}>${freightResult.fba_inbound_est.toFixed(2)}</Text>
-              </View>
-              <View style={fr.extraRow}>
-                <Text style={fr.extraLabel}>China 3PL Prep / Labeling</Text>
-                <Text style={fr.extraValue}>${freightResult.prep_cost.toFixed(2)}</Text>
-              </View>
-            </AppCard>
-          </View>
-        )}
-
-        {/* ── Empty state ────────────────────────────────────────────── */}
-        {!freightResult && !freightLoading && (
-          <AppCard padding={28} style={{ alignItems: 'center', gap: 10 }}>
-            <Text style={{ fontSize: 36, textAlign: 'center' }}>✈️</Text>
-            <Text style={{ fontSize: 15, fontWeight: '800', color: DS.textPrimary, textAlign: 'center' }}>Freight Estimator</Text>
-            <Text style={{ fontSize: 13, color: DS.textMuted, lineHeight: 20, textAlign: 'center' }}>
-              Enter your product details to compare air, sea, and express shipping costs from China to FBA.
-            </Text>
-          </AppCard>
-        )}
-      </View>
-    );
-  }
 
   // ── Main render ────────────────────────────────────────────────────────────
 
@@ -1411,8 +1101,9 @@ export default function ResearchWorkspaceScreen() {
     <SafeAreaView style={s.safe} edges={['top']}>
       <PaywallModal
         visible={showPaywall}
-        onClose={() => setShowPaywall(false)}
+        onClose={() => { setShowPaywall(false); setPaywallResetDate(undefined); }}
         featureContext={paywallFeature}
+        resetDate={paywallResetDate}
       />
 
       <AnalyzeProductModal
@@ -1423,14 +1114,6 @@ export default function ResearchWorkspaceScreen() {
         onClose={() => setAnalyzeProductModal(false)}
       />
 
-      <AnalyzeSupplierModal
-        visible={analyzeSupplierModal}
-        loading={analyzeSupplierLoading}
-        result={analyzeSupplierResult}
-        error={analyzeSupplierError}
-        onClose={() => setAnalyzeSupplierModal(false)}
-      />
-
       <CompareProductsModal
         visible={showCompareProducts}
         items={compareProductItems}
@@ -1438,13 +1121,8 @@ export default function ResearchWorkspaceScreen() {
         onSaveWinner={(item) => { handleSaveProduct(item); setShowCompareProducts(false); }}
       />
 
-      <CompareSuppliersModal
-        visible={showCompareSuppliers}
-        items={compareSupplierItems}
-        onClose={() => setShowCompareSuppliers(false)}
-      />
-
-      <AppHeader helpKey={mode === 'suppliers' ? 'suppliers' : mode === 'market' ? 'research' : mode === 'freight' ? 'freight_tab' : 'smart_search'} />
+      <AppHeader helpKey={mode === 'market' ? 'research' : 'smart_search'} />
+      <OfflineBanner visible={!isOnline} />
       <PipelineProgressBar />
 
       <ScrollView
@@ -1452,84 +1130,157 @@ export default function ResearchWorkspaceScreen() {
         contentContainerStyle={s.content}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        removeClippedSubviews
+        overScrollMode="never"
       >
-        {/* ── Search input — market / lookup / suppliers only ── */}
-        {mode !== 'freight' && <AppCard padding={14} style={s.searchCard}>
+        {/* ── Search input ── */}
+        {<AppCard padding={14} style={s.searchCard}>
+          {sellerProfile && (
+            <TouchableOpacity style={pd.row} onPress={() => navigation.navigate('SellerProfile' as any)} activeOpacity={0.7}>
+              <Text style={pd.label}>Searching for:</Text>
+              <View style={pd.chip}><Text style={pd.chipTxt}>🌐 {sellerProfile.marketplace}</Text></View>
+              <View style={pd.chip}><Text style={pd.chipTxt}>💰 ${sellerProfile.priceMin}–${sellerProfile.priceMax}</Text></View>
+              <View style={pd.chip}><Text style={pd.chipTxt}>⭐ &lt;{sellerProfile.maxTopSellerReviews} rev</Text></View>
+            </TouchableOpacity>
+          )}
           <View style={s.searchRow}>
             <InputField
-              value={mode === 'suppliers' ? supplierQuery : searchQuery}
-              onChangeText={mode === 'suppliers' ? setSupplierQuery : setSearchQuery}
-              placeholder={
-                mode === 'lookup'    ? 'Product name, ASIN, or Amazon URL...'
-                : mode === 'suppliers' ? (selectedProduct ? `Suppliers for: ${selectedProduct.name.slice(0, 30)}…` : 'Search product name for suppliers...')
-                : 'Search a product idea or niche...'
-              }
-              leadingIcon={mode === 'suppliers' ? '🏭' : '◎'}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder={mode === 'lookup' ? 'Product name, ASIN, or Amazon URL...' : 'Search a product idea or niche...'}
+              leadingIcon="◎"
               containerStyle={s.searchInput}
               returnKeyType="search"
-              onSubmitEditing={mode === 'suppliers' ? handleSupplierSearch : mode === 'lookup' ? () => handleDirectAnalysis(searchQuery) : handleAmazonSearch}
+              onSubmitEditing={mode === 'lookup' ? () => handleDirectAnalysis(searchQuery) : handleAmazonSearch}
             />
           </View>
-          {(mode === 'suppliers'
-            ? (supplierQuery.trim().length > 0 || !!selectedProduct)
-            : searchQuery.length > 0
-          ) && (
+          {searchQuery.length > 0 && (
             <PrimaryButton
-              label={
-                mode === 'suppliers' ? (suppLoading  ? 'Searching...' : 'Find Suppliers')
-                : mode === 'lookup'  ? (revLoading ? 'Analyzing...' : 'Analyze')
-                :                     (amazonLoading ? 'Searching...' : 'Search Amazon')
-              }
-              onPress={mode === 'suppliers' ? handleSupplierSearch : mode === 'lookup' ? () => handleDirectAnalysis(searchQuery) : handleAmazonSearch}
+              label={!isOnline ? 'Offline' : mode === 'lookup' ? (revLoading ? 'Reading reviews…' : 'Run Teardown') : (amazonLoading ? 'Searching…' : 'Find Products')}
+              onPress={mode === 'lookup' ? () => handleDirectAnalysis(searchQuery) : handleAmazonSearch}
               size="sm"
-              icon={mode === 'suppliers' ? '⬡' : '◎'}
+              icon="◎"
               style={s.searchBtn}
-              loading={mode === 'suppliers' ? suppLoading : amazonLoading}
+              loading={amazonLoading}
+              disabled={!isOnline}
             />
           )}
+          <FreeAllowanceBar
+            tier={tier}
+            used={freeAllowance?.used ?? null}
+            limit={freeAllowance?.limit ?? 5}
+            resetsOn={freeAllowance?.resets_on ?? ''}
+            loading={allowanceLoading}
+            onUpgrade={() => {
+              setPaywallFeature('free_limit');
+              setPaywallResetDate(freeAllowance?.resets_on);
+              setShowPaywall(true);
+            }}
+          />
         </AppCard>}
 
-        {/* ── Recent searches — market / lookup / suppliers ─── */}
-        {mode !== 'freight' && (
-          <RecentSearches
-            items={mode === 'market' ? recentMarket : mode === 'lookup' ? recentLookup : recentSupplier}
-            accentColor={mode === 'market' ? DS.info : mode === 'lookup' ? DS.indigo : DS.accent}
-            onSelect={mode === 'suppliers' ? selectRecentSupplier : selectRecentQuery}
-            onClear={mode === 'market' ? clearRecentMarket : mode === 'lookup' ? clearRecentLookup : clearRecentSupplier}
-          />
-        )}
-
-        {/* ── Seller profile defaults ──────────────────────── */}
-        {sellerProfile && (
-          <View style={pd.row}>
-            <Text style={pd.label}>Your profile:</Text>
-            <View style={pd.chip}><Text style={pd.chipTxt}>🌐 {sellerProfile.marketplace}</Text></View>
-            <View style={pd.chip}><Text style={pd.chipTxt}>💰 ${sellerProfile.priceMin}–${sellerProfile.priceMax}</Text></View>
-            <View style={pd.chip}><Text style={pd.chipTxt}>⭐ &lt;{sellerProfile.maxTopSellerReviews} rev</Text></View>
-          </View>
-        )}
+        {/* ── Recent searches ─── */}
+        <RecentSearches
+          items={mode === 'market' ? recentMarket : recentLookup}
+          accentColor={mode === 'market' ? DS.info : DS.indigo}
+          onSelect={selectRecentQuery}
+          onClear={mode === 'market' ? clearRecentMarket : clearRecentLookup}
+        />
 
         {/* ── Mode selector ────────────────────────────────── */}
-        <ModeSegment value={mode} onChange={setMode} />
-        {mode !== 'suppliers' && mode !== 'freight' && <ModeDescStrip mode={mode} />}
+        <ModeSegment value={mode} onChange={setMode} exclude={['suppliers', 'freight']} />
+        <ModeDescStrip mode={mode} />
 
         {/* ── Selected product banner (all modes) ──────────── */}
         {selectedProduct && (
           <SelectedProductBanner
             product={selectedProduct}
-            onFindSuppliers={mode === 'suppliers'
-              ? () => { const q = supplierQuery.trim() || selectedProduct?.name || ''; if (q) handleSupplierSearch(); }
-              : switchToSuppliers}
-            onAskCoPilot={() => navigation.navigate('Copilot' as any)}
+            onFindSuppliers={() => {
+              if (selectedProduct) {
+                pipeline.setActiveProduct(productToPipelinePayload(selectedProduct));
+              }
+              pipeline.trackPipelineEvent('validate_handoff_suppliers_banner', { title: selectedProduct?.name });
+              navigation.navigate('Main', { screen: 'Sourcing' } as any);
+            }}
+            onAskCoPilot={() => navigation.navigate('Main', { screen: 'Home' } as any)}
             onClear={() => setSelectedProduct(null)}
           />
         )}
 
+        {/* ── Product Intelligence Preview ─────────────────────────────────── */}
+        {/* Only shown when an activeProduct is set in the pipeline — never blocks browsing */}
+        {intelProfile && (
+          <ProductQuickIntel
+            profile={intelProfile}
+            reconInsights={pipeline.reconInsights}
+          />
+        )}
+
+        {/* ── Financial Signal Card (shown when product selected + has price) ─── */}
+        {selectedProduct && selectedProduct.price != null && selectedProduct.price > 0 && (
+          <View style={fsc.card}>
+            <Text style={fsc.heading}>📊 Quick Financial Signals</Text>
+            <Text style={fsc.disclaimer}>Directional estimates — verify with Profit Lab before ordering.</Text>
+
+            <View style={fsc.grid}>
+              {/* Rough Margin */}
+              <View style={fsc.cell}>
+                <Text style={fsc.cellLbl}>Est. Margin Range</Text>
+                {(() => {
+                  const price = selectedProduct.price ?? 0;
+                  const landedCostLow  = price * 0.18 * FIN.ROUGH_LANDED_MULT;
+                  const landedCostHigh = price * 0.30 * FIN.ROUGH_LANDED_MULT;
+                  const marginLow  = Math.round(roughMarginPct(price, landedCostHigh));
+                  const marginHigh = Math.round(roughMarginPct(price, landedCostLow));
+                  const color = marginLow >= FIN.MARGIN_ACCEPTABLE ? DS.success : marginLow >= FIN.MARGIN_FLOOR ? DS.warning : DS.danger;
+                  return <Text style={[fsc.cellVal, { color }]}>{marginLow}–{marginHigh}%</Text>;
+                })()}
+                <Text style={fsc.cellSub}>after fees, based on typical landed unit cost 24–41% of price</Text>
+              </View>
+
+              {/* Sales estimate */}
+              {selectedProduct.salesEstMonthly && (
+                <View style={fsc.cell}>
+                  <Text style={fsc.cellLbl}>Est. Monthly Sales</Text>
+                  <Text style={[fsc.cellVal, { color: DS.accent }]}>{selectedProduct.salesEstMonthly}</Text>
+                  <Text style={fsc.cellSub}>{selectedProduct.salesEstDaily ?? ''}</Text>
+                </View>
+              )}
+
+              {/* Revenue band */}
+              {selectedProduct.revenueEstLow != null && selectedProduct.revenueEstHigh != null && (
+                <View style={fsc.cell}>
+                  <Text style={fsc.cellLbl}>Est. Monthly Revenue</Text>
+                  <Text style={[fsc.cellVal, { color: DS.success }]}>
+                    ~${selectedProduct.revenueEstLow.toLocaleString()}–${selectedProduct.revenueEstHigh.toLocaleString()}
+                  </Text>
+                  <Text style={fsc.cellSub}>gross, before Amazon fees</Text>
+                </View>
+              )}
+
+              {/* PPC Pressure */}
+              {selectedProduct.ppcPressure && (
+                <View style={fsc.cell}>
+                  <Text style={fsc.cellLbl}>PPC Pressure</Text>
+                  <Text style={[fsc.cellVal, { color: ppcColor(selectedProduct.ppcPressure as PPCPressure) }]}>
+                    {selectedProduct.ppcPressure}
+                  </Text>
+                  <Text style={fsc.cellSub}>
+                    {selectedProduct.ppcPressure === 'High'
+                      ? 'Expect high CPC — budget aggressively'
+                      : selectedProduct.ppcPressure === 'Medium'
+                      ? 'Moderate ad competition'
+                      : 'Good opportunity for low-cost launch'}
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+        )}
+
         {/* ── Mode content ─────────────────────────────────── */}
-        {mode === 'market'    && renderMarketTab()}
-        {mode === 'lookup'    && renderLookupTab()}
-        {mode === 'suppliers' && renderSuppliersTab()}
-        {mode === 'freight'   && renderFreightTab()}
+        {mode === 'market'  && renderMarketTab()}
+        {mode === 'lookup'  && renderLookupTab()}
       </ScrollView>
 
       {/* ── Floating compare bar ─────────────────────────────── */}
@@ -1538,13 +1289,13 @@ export default function ResearchWorkspaceScreen() {
           {compareProductIds.size === 1 ? (
             <View style={cfb.pillPending}>
               <Text style={cfb.pillIcon}>⊞</Text>
-              <Text style={cfb.pillTextPending}>1 selected — add 1 more to compare</Text>
-              <TouchableOpacity onPress={() => setCompareProductIds(new Set())} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Text style={cfb.pillTextPending}>1 selected — add up to 2 more to compare</Text>
+              <TouchableOpacity onPress={() => setCompareProductIds(new Set())} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} accessibilityRole="button" accessibilityLabel="Clear selection">
                 <Text style={cfb.clearPending}>✕</Text>
               </TouchableOpacity>
             </View>
           ) : (
-            <TouchableOpacity style={cfb.pill} onPress={() => setShowCompareProducts(true)} activeOpacity={0.88}>
+            <TouchableOpacity style={cfb.pill} onPress={() => setShowCompareProducts(true)} activeOpacity={0.88} accessibilityRole="button">
               <Text style={cfb.pillIcon}>⊞</Text>
               <Text style={cfb.pillText}>Compare {compareProductIds.size} Products</Text>
               <Text style={cfb.pillArrow}>→</Text>
@@ -1552,32 +1303,8 @@ export default function ResearchWorkspaceScreen() {
                 style={cfb.clearBtn}
                 onPress={() => setCompareProductIds(new Set())}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <Text style={cfb.clearText}>✕</Text>
-              </TouchableOpacity>
-            </TouchableOpacity>
-          )}
-        </View>
-      )}
-      {(compareSupplierIds.size >= 1 && mode === 'suppliers') && (
-        <View style={cfb.wrap} pointerEvents="box-none">
-          {compareSupplierIds.size === 1 ? (
-            <View style={cfb.pillPending}>
-              <Text style={cfb.pillIcon}>⊞</Text>
-              <Text style={cfb.pillTextPending}>1 selected — add 1 more to compare</Text>
-              <TouchableOpacity onPress={() => setCompareSupplierIds(new Set())} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Text style={cfb.clearPending}>✕</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <TouchableOpacity style={cfb.pill} onPress={() => setShowCompareSuppliers(true)} activeOpacity={0.88}>
-              <Text style={cfb.pillIcon}>⊞</Text>
-              <Text style={cfb.pillText}>Compare {compareSupplierIds.size} Suppliers</Text>
-              <Text style={cfb.pillArrow}>→</Text>
-              <TouchableOpacity
-                style={cfb.clearBtn}
-                onPress={() => setCompareSupplierIds(new Set())}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                accessibilityRole="button"
+                accessibilityLabel="Clear comparison"
               >
                 <Text style={cfb.clearText}>✕</Text>
               </TouchableOpacity>
@@ -1586,6 +1313,22 @@ export default function ResearchWorkspaceScreen() {
         </View>
       )}
     </SafeAreaView>
+  );
+}
+
+function ReconLoadingView() {
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setSlow(true), 7_000);
+    return () => clearTimeout(t);
+  }, []);
+  return (
+    <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 44, gap: 12 }}>
+      <ActivityIndicator size="large" color={DS.accent} />
+      <Text style={{ fontSize: 13, color: DS.textMuted, fontWeight: '600', textAlign: 'center' }}>
+        {slow ? 'Connecting to server… first request may take a moment.' : 'Analyzing product...'}
+      </Text>
+    </View>
   );
 }
 
@@ -1620,19 +1363,16 @@ const ri = StyleSheet.create({
   listRow:    { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
   dot:        { width: 7, height: 7, borderRadius: 4, marginTop: 6, flexShrink: 0 },
   listTxt:    { fontSize: 13, color: DS.textSecondary, lineHeight: 20, flex: 1 },
-});
 
-// ── Lookup keyword warning / hint styles ──────────────────────────────────────
-
-const lkw = StyleSheet.create({
-  card:      { gap: 14, borderWidth: 1.5, borderColor: DS.warning, backgroundColor: DS.warningBg },
-  icon:      { fontSize: 30, textAlign: 'center' },
-  title:     { fontSize: 15, fontWeight: '800', color: DS.textPrimary, letterSpacing: -0.3, textAlign: 'center' },
-  body:      { fontSize: 13, color: DS.textSecondary, lineHeight: 21, textAlign: 'center' },
-  mono:      { fontWeight: '700', color: DS.textPrimary },
-  hintCard:  { gap: 8, backgroundColor: DS.indigoLight, borderWidth: 1, borderColor: DS.border },
-  hintTitle: { fontSize: 13, fontWeight: '800', color: DS.indigo, letterSpacing: -0.2 },
-  hintBody:  { fontSize: 12, color: DS.textSecondary, lineHeight: 19 },
+  saveInsightsCard:      { gap: 12, borderWidth: 1.5, borderColor: DS.indigo + '50', backgroundColor: DS.indigoLight },
+  saveInsightsHeader:    { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  saveInsightsIcon:      { fontSize: 22, color: DS.indigo },
+  saveInsightsTitle:     { fontSize: 14, fontWeight: '800', color: DS.textPrimary, letterSpacing: -0.3 },
+  saveInsightsSub:       { fontSize: 12, color: DS.textSecondary, lineHeight: 17 },
+  saveInsightsBtn:       { backgroundColor: DS.indigo, borderRadius: DS.radiusButton, paddingVertical: 13, alignItems: 'center' },
+  saveInsightsBtnSaved:  { backgroundColor: DS.success },
+  saveInsightsBtnTxt:    { fontSize: 13, fontWeight: '800', color: '#fff', letterSpacing: -0.1 },
+  saveInsightsBtnSavedTxt: { color: '#fff' },
 });
 
 // ── Shared tab styles ─────────────────────────────────────────────────────────
@@ -1645,8 +1385,9 @@ const xt = StyleSheet.create({
   skeletonWrap: { paddingHorizontal: 16, paddingTop: 8 },
   errBox:      { backgroundColor: DS.dangerBg, borderRadius: 16, padding: 18, alignItems: 'center', gap: 12 },
   errTxt:      { fontSize: 13, color: DS.dangerText, textAlign: 'center' },
-  retryBtn:    { backgroundColor: DS.dangerText, borderRadius: 8, paddingHorizontal: 20, paddingVertical: 8 },
-  retryTxt:    { fontSize: 13, fontWeight: '700', color: '#fff' },
+  retryBtn:         { backgroundColor: DS.dangerText, borderRadius: 8, paddingHorizontal: 20, paddingVertical: 8 },
+  retryBtnDisabled: { backgroundColor: DS.textMuted },
+  retryTxt:         { fontSize: 13, fontWeight: '700', color: '#fff' },
   suppSearch:  { padding: 12 },
   compareBanner: {
     backgroundColor: DS.accentLight, borderRadius: 14, borderWidth: 1.5, borderColor: DS.accent,
@@ -1659,7 +1400,7 @@ const xt = StyleSheet.create({
 
 const cfb = StyleSheet.create({
   wrap:         { position: 'absolute', bottom: 16, left: 16, right: 16, alignItems: 'center' },
-  pill:         { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: DS.accent, borderRadius: 28, paddingVertical: 13, paddingLeft: 18, paddingRight: 12, shadowColor: '#0D1B4B', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 12, elevation: 10 },
+  pill:         { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: DS.accent, borderRadius: 28, paddingVertical: 13, paddingLeft: 18, paddingRight: 12, shadowColor: DS.textPrimary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 12, elevation: 10 },
   pillPending:  { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: DS.bgCard, borderRadius: 28, paddingVertical: 12, paddingLeft: 16, paddingRight: 14, borderWidth: 1.5, borderColor: DS.border, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 6 },
   pillIcon:     { fontSize: 15 },
   pillText:     { flex: 1, fontSize: 14, fontWeight: '800', color: '#fff', letterSpacing: -0.3 },
@@ -1671,49 +1412,22 @@ const cfb = StyleSheet.create({
 });
 
 const fl = StyleSheet.create({
-  card:  { gap: 8, borderWidth: 1.5, borderColor: DS.accent + '55', backgroundColor: DS.accentLight },
-  eye:   { fontSize: 8, fontWeight: '800', color: DS.accentDark, letterSpacing: 2 },
-  title: { fontSize: 14, fontWeight: '800', color: DS.textPrimary, letterSpacing: -0.3 },
-  sub:   { fontSize: 12, color: DS.textSecondary, lineHeight: 18 },
-  btn:   { backgroundColor: DS.accent, borderRadius: 12, paddingVertical: 10, alignItems: 'center' as const },
-  btnTxt:{ fontSize: 13, fontWeight: '800', color: '#fff', letterSpacing: -0.2 },
+  card:             { gap: 10, borderWidth: 1.5, borderColor: DS.accent + '55', backgroundColor: DS.accentLight },
+  eye:              { fontSize: 8, fontWeight: '800', color: DS.accentDark, letterSpacing: 2 },
+  title:            { fontSize: 14, fontWeight: '800', color: DS.textPrimary, letterSpacing: -0.3 },
+  sub:              { fontSize: 12, color: DS.textSecondary, lineHeight: 18 },
+  btn:              { backgroundColor: DS.accent, borderRadius: 12, paddingVertical: 12, alignItems: 'center' as const, shadowColor: DS.accent, shadowOpacity: 0.25, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
+  btnTxt:           { fontSize: 13, fontWeight: '900', color: '#fff', letterSpacing: -0.2 },
+  selectedHint:     { backgroundColor: DS.bgCard, borderRadius: 10, padding: 10, gap: 2, borderWidth: 1, borderColor: DS.border },
+  selectedHintTxt:  { fontSize: 12, fontWeight: '700', color: DS.textPrimary },
+  selectedHintPrice:{ fontSize: 11, color: DS.textMuted },
 });
 
 const pd = StyleSheet.create({
-  row:    { flexDirection: 'row' as const, alignItems: 'center' as const, flexWrap: 'wrap' as const, gap: 6 },
+  row:    { flexDirection: 'row' as const, alignItems: 'center' as const, flexWrap: 'wrap' as const, gap: 6, marginBottom: 10 },
   label:  { fontSize: 10, fontWeight: '700', color: DS.textMuted },
   chip:   { backgroundColor: DS.indigoLight, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: DS.indigo + '30' },
   chipTxt:{ fontSize: 10, fontWeight: '700', color: DS.indigo },
-});
-
-const fr = StyleSheet.create({
-  row:       { flexDirection: 'row' as const, gap: 10 },
-  halfField: { flex: 1 },
-  thirdField:{ flex: 1 },
-  sectionTitle: { fontSize: 11, fontWeight: '800', color: DS.textMuted, letterSpacing: 1.5, textTransform: 'uppercase' as const },
-
-  summaryCard:  { backgroundColor: DS.warning + '15', borderRadius: 16, borderWidth: 1.5, borderColor: DS.warning + '40', padding: 16, gap: 4 },
-  summaryLabel: { fontSize: 9, fontWeight: '800', color: DS.warning, letterSpacing: 2 },
-  summaryTitle: { fontSize: 17, fontWeight: '900', color: DS.textPrimary, letterSpacing: -0.4 },
-  summarySub:   { fontSize: 12, color: DS.textSecondary },
-
-  modeCard:    { gap: 10, borderWidth: 1.5, borderColor: DS.border },
-  modeCardRec: { borderColor: DS.warning, backgroundColor: DS.warning + '08' },
-  recBadge:    { alignSelf: 'flex-start' as const, backgroundColor: DS.warning, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
-  recBadgeTxt: { fontSize: 9, fontWeight: '900', color: '#fff', letterSpacing: 1.5 },
-  modeHeader:  { flexDirection: 'row' as const, justifyContent: 'space-between' as const, alignItems: 'center' as const },
-  modeName:    { fontSize: 15, fontWeight: '800', color: DS.textPrimary, letterSpacing: -0.3 },
-  modeNameRec: { color: DS.warning },
-  modeTransit: { fontSize: 12, fontWeight: '700', color: DS.textMuted, backgroundColor: DS.bgSubtle, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
-  modePriceRow:  { flexDirection: 'row' as const, gap: 20 },
-  modePriceBlock:{ gap: 2 },
-  modePriceLabel:{ fontSize: 9, fontWeight: '700', color: DS.textMuted, letterSpacing: 1.5 },
-  modePrice:   { fontSize: 22, fontWeight: '900', color: DS.textPrimary, letterSpacing: -0.8 },
-  modeNotes:   { fontSize: 12, color: DS.textMuted, lineHeight: 17, fontStyle: 'italic' as const },
-
-  extraRow:   { flexDirection: 'row' as const, justifyContent: 'space-between' as const, alignItems: 'center' as const },
-  extraLabel: { fontSize: 13, color: DS.textSecondary },
-  extraValue: { fontSize: 13, fontWeight: '700', color: DS.textPrimary },
 });
 
 // ── Screen-level styles ───────────────────────────────────────────────────────
@@ -1742,4 +1456,15 @@ const s = StyleSheet.create({
   searchRow:  { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
   searchInput:{ flex: 1 },
   searchBtn:  { marginTop: 10 },
+});
+
+const fsc = StyleSheet.create({
+  card:       { backgroundColor: DS.bgCard, borderRadius: DS.radiusCard, borderWidth: 1, borderColor: DS.border, padding: DS.cardPadding, gap: 12 },
+  heading:    { fontSize: 13, fontWeight: '800', color: DS.textPrimary, letterSpacing: -0.2 },
+  disclaimer: { fontSize: 11, color: DS.textMuted, fontStyle: 'italic' },
+  grid:       { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  cell:       { minWidth: '44%', flex: 1, backgroundColor: DS.bgSubtle, borderRadius: DS.radiusChip, padding: 10, gap: 3 },
+  cellLbl:    { fontSize: 9, fontWeight: '700', color: DS.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
+  cellVal:    { fontSize: 16, fontWeight: '900', color: DS.textPrimary, letterSpacing: -0.4 },
+  cellSub:    { fontSize: 10, color: DS.textMuted, lineHeight: 14 },
 });

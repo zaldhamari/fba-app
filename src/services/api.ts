@@ -1,7 +1,66 @@
+import {
+  validateSearchAmazon,
+  validateSearchNiche,
+  validateCreateBrand,
+  validateCreateLabel,
+  validateAnalyzeCopilot,
+  validateAnalyzeReviews,
+  validateEstimateFreight,
+  validateSearchSuppliers,
+  validateAnalyzeProduct,
+} from '../lib/apiValidation';
+
 const BASE_URL = 'https://fba-backend-production-6c44.up.railway.app/api';
 const API_KEY  = process.env.EXPO_PUBLIC_API_KEY ?? '';
 
-const REQUEST_TIMEOUT_MS = 15_000;
+const REQUEST_TIMEOUT_MS       = 15_000;
+const SLOW_ENDPOINT_TIMEOUT_MS = 25_000;
+
+// ── Keepa signal types ────────────────────────────────────────────────────────
+
+export interface KeepaSignals {
+  bsr?: {
+    trend:      'improving' | 'stable' | 'declining' | 'insufficient_data';
+    volatility: number | null;
+    spike_flag: boolean;
+  };
+  price?: {
+    direction:      'rising' | 'flat' | 'falling' | 'insufficient_data';
+    pct_change_90d: number | null;
+    floor_usd:      number | null;
+  };
+}
+
+export interface FreeLimitResult {
+  kind:      'free_limit';
+  used:      number;
+  limit:     number;
+  message:   string;
+  resets_on: string;
+}
+
+export interface ProductDataSuccess {
+  kind:           'success';
+  asin:           string;
+  title:          string | null;
+  category:       string | null;
+  sales_estimate: {
+    monthly_sales: number;
+    low:           number;
+    high:          number;
+    confidence:    'High' | 'Medium' | 'Low';
+    note:          string;
+  } | null;
+  opportunity: {
+    score: number;
+    grade: string;
+    label: string;
+  } | null;
+  signals: KeepaSignals;
+  source:  string;
+}
+
+export type ProductDataResult = ProductDataSuccess | FreeLimitResult;
 
 // Classify a raw fetch/network error into a user-friendly message.
 export function friendlyError(err: unknown): string {
@@ -18,9 +77,9 @@ export function friendlyError(err: unknown): string {
   return 'Something went wrong. Please try again.';
 }
 
-async function post<T>(endpoint: string, body: object): Promise<T> {
+async function post<T>(endpoint: string, body: object, timeoutMs = REQUEST_TIMEOUT_MS): Promise<T> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetch(`${BASE_URL}${endpoint}`, {
       method: 'POST',
@@ -40,11 +99,15 @@ async function post<T>(endpoint: string, body: object): Promise<T> {
     if (err?.name === 'AbortError') {
       throw new Error('Request timed out. Check your connection and try again.');
     }
-    // Re-wrap network errors with friendly messages
     throw new Error(friendlyError(err));
   } finally {
     clearTimeout(timer);
   }
+}
+
+// Slow endpoints (brand generation, AI copilot) run with a 25s timeout.
+function postSlow<T>(endpoint: string, body: object): Promise<T> {
+  return post<T>(endpoint, body, SLOW_ENDPOINT_TIMEOUT_MS);
 }
 
 export interface Product {
@@ -127,11 +190,17 @@ export const api = {
   lookupProduct: (input: string) =>
     post<{ asin: string; title: string | null; category: string | null; url: string; source: string; error?: string }>('/research/product', { input }),
 
-  searchAmazon: (keyword: string, marketplace = 'US', category = 'all') =>
-    post<{ products: Product[]; trends: TrendData; keyword: string }>('/research/amazon', { keyword, category, marketplace }),
+  searchAmazon: async (keyword: string, marketplace = 'US', category = 'all') => {
+    const data = await post<{ products: Product[]; trends: TrendData; keyword: string }>('/research/amazon', { keyword, category, marketplace });
+    validateSearchAmazon(data);
+    return data;
+  },
 
-  searchSuppliers: (product: string, marketplace = 'US', max_price?: number) =>
-    post<{ suppliers: Supplier[]; product: string }>('/research/suppliers', { product, max_price, marketplace }),
+  searchSuppliers: async (product: string, marketplace = 'US', max_price?: number) => {
+    const data = await post<{ suppliers: Supplier[]; product: string }>('/research/suppliers', { product, max_price, marketplace });
+    validateSearchSuppliers(data);
+    return data;
+  },
 
   calculateFBA: (body: {
     product_name: string;
@@ -143,8 +212,22 @@ export const api = {
     quantity?: number;
   }) => post<FBAResult>('/calculate/fba', body),
 
-  createBrand: (product_type: string, style = 'minimal', brand_name = '') =>
-    post<BrandResult>('/brand/create', { product_type, keywords: [], style, brand_name }),
+  createBrand: async (body: {
+    product_type:    string;
+    style?:          string;
+    brand_name?:     string;
+    brand_direction?: string;
+    color_palette?:  string;
+    font_style?:     string;
+    packaging_mood?: string;
+    tagline?:        string;
+    target_audience?: string;
+    brand_tone?:     string;
+  }) => {
+    const data = await postSlow<BrandResult>('/brand/create', { keywords: [], ...body });
+    validateCreateBrand(data);
+    return data;
+  },
 
   researchKeywords: (product: string) =>
     post<{
@@ -156,31 +239,27 @@ export const api = {
       top_ppc: string[];
     }>('/research/keywords', { product }),
 
-  scoreOpportunity: (body: {
-    amazon_price: number;
-    supplier_price: number;
-    review_count?: number;
-    trend_direction?: string;
-    weight_lbs?: number;
-    category?: string;
-  }) => post<{
-    score: number;
-    grade: string;
-    label: string;
-    color: string;
-    action: string;
-    breakdown: Record<string, number>;
-    profit_summary: { profit: number; margin_pct: number; roi_pct: number };
-  }>('/calculate/opportunity', body),
-
-  createLabel: (brand_name: string, product_name: string, weight: string, style: string) =>
-    post<{ label_svg: string; insert_svg: string }>('/brand/label', { brand_name, product_name, weight, style }),
+  createLabel: async (body: {
+    brand_name:       string;
+    product_name:     string;
+    weight:           string;
+    style?:           string;
+    brand_direction?: string;
+    color_palette?:   string;
+    font_style?:      string;
+    packaging_type?:  string;
+    tagline?:         string;
+  }) => {
+    const data = await postSlow<{ label_svg: string; insert_svg: string }>('/brand/label', body);
+    validateCreateLabel(data);
+    return data;
+  },
 
   getSupplierEmail: (product: string, brand_name: string) =>
     post<{ subject: string; body: string; tips: string[] }>('/supplier/email', { product, brand_name }),
 
   // ─── AI Copilot ────────────────────────────────────────────────────────────
-  analyzeCopilot: (body: {
+  analyzeCopilot: async (body: {
     product_name: string;
     amazon_price: number;
     supplier_price: number;
@@ -193,7 +272,8 @@ export const api = {
     marketplace?: string;
     currency?: string;
     financial_context?: Record<string, unknown>;
-  }) => post<{
+  }) => {
+    const data = await postSlow<{
     verdict: 'Launch' | 'Test First' | 'Avoid';
     confidence: number;
     summary: string;
@@ -203,11 +283,14 @@ export const api = {
     estimated_monthly_profit: number;
     opportunity_score: number;
     profit_summary: { profit: number; margin_pct: number; roi_pct: number };
-  }>('/ai/copilot', body),
+  }>('/ai/copilot', body);
+    validateAnalyzeCopilot(data);
+    return data;
+  },
 
   // ─── Review Analyzer ───────────────────────────────────────────────────────
-  analyzeReviews: (product_name: string, category: string, sample_reviews?: string[]) =>
-    post<{
+  analyzeReviews: async (product_name: string, category: string, sample_reviews?: string[]) => {
+    const data = await post<{
       top_complaints: string[];
       opportunities: string[];
       sentiment_score: number;
@@ -215,7 +298,10 @@ export const api = {
       recommended_improvements: string[];
       bundling_ideas: string[];
       source: string;
-    }>('/ai/reviews', { product_name, category, sample_reviews: sample_reviews || [] }),
+    }>('/ai/reviews', { product_name, category, sample_reviews: sample_reviews || [] });
+    validateAnalyzeReviews(data);
+    return data;
+  },
 
   // ─── Differentiation ───────────────────────────────────────────────────────
   getDifferentiation: (product_name: string, category: string, top_complaints?: string[]) =>
@@ -228,48 +314,15 @@ export const api = {
       source: string;
     }>('/ai/differentiate', { product_name, category, top_complaints: top_complaints || [] }),
 
-  // ─── Profit Simulator ──────────────────────────────────────────────────────
-  simulateProfit: (body: {
-    supplier_cost: number;
-    weight_lbs?: number;
-    category?: string;
-    price_min?: number;
-    price_max?: number;
-    monthly_units_est?: number;
-  }) => post<{
-    scenarios: {
-      price: number;
-      margin_pct: number;
-      profit_per_unit: number;
-      profit_after_ppc: number;
-      ppc_cost_per_unit: number;
-      monthly_revenue: number;
-      monthly_profit: number;
-      break_even_units: number;
-      verdict: string;
-      viable: boolean;
-    }[];
-    sweet_spot: object | null;
-    shipping_scenarios: {
-      method: string;
-      transit_days: string;
-      cost_per_unit: number;
-      monthly_cost: number;
-      impact_on_margin: string;
-    }[];
-    assumptions: object;
-  }>('/calculate/simulate', body),
-
-  // ─── Supplier Scorer ───────────────────────────────────────────────────────
   // ─── Analyze Product (Killer Feature) ────────────────────────────────────────
-  analyzeProduct: (
+  analyzeProduct: async (
     price: number,
     reviews: number,
     competition: string,
     trend: string,
     context?: { currency?: string; marketplace?: string },
-  ) =>
-    post<{
+  ) => {
+    const data = await post<{
       verdict: 'LAUNCH' | 'TEST' | 'AVOID';
       confidence: number;
       summary: string;
@@ -277,7 +330,10 @@ export const api = {
       risk: string;
       next_step: string;
       metrics: { price: number; margin: number; reviews: number; competition: string; trend: string };
-    }>('/ai/analyze-product', { price, reviews, competition, trend, ...(context ?? {}) }),
+    }>('/ai/analyze-product', { price, reviews, competition, trend, ...(context ?? {}) });
+    validateAnalyzeProduct(data);
+    return data;
+  },
 
   scoreSupplier: (body: {
     supplier_name: string;
@@ -307,6 +363,68 @@ export const api = {
     };
   }>('/suppliers/score', body),
 
+  // ─── Keepa product data (with 402 typed as FreeLimitResult) ─────────────────
+  getProductData: async (
+    asin:   string,
+    userId: string,
+    tier:   string,
+  ): Promise<ProductDataResult> => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    try {
+      const res = await fetch(`${BASE_URL}/product/data`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-API-Key': API_KEY },
+        body:    JSON.stringify({ asin, user_id: userId, tier }),
+        signal:  controller.signal,
+      });
+      if (res.status === 402) {
+        const body = await res.json().catch(() => ({}));
+        return {
+          kind:      'free_limit',
+          used:      body.used      ?? 0,
+          limit:     body.limit     ?? 5,
+          message:   body.message   ?? 'You have used all your free product lookups this month.',
+          resets_on: body.resets_on ?? '',
+        };
+      }
+      if (res.status === 401) throw new Error('API authentication failed. Please update the app.');
+      if (res.status === 429) throw new Error('Too many requests. Please wait a moment and try again.');
+      if (res.status >= 500) throw new Error('Our servers are having issues. Please try again shortly.');
+      if (!res.ok) throw new Error(`Unexpected error (${res.status}). Please try again.`);
+      const data = await res.json();
+      return { kind: 'success', ...data };
+    } catch (err: any) {
+      if (err?.name === 'AbortError') throw new Error('Request timed out. Check your connection and try again.');
+      throw new Error(friendlyError(err));
+    } finally {
+      clearTimeout(timer);
+    }
+  },
+
+  // ─── Free-tier allowance indicator ───────────────────────────────────────────
+  getFreeAllowance: async (
+    userId: string,
+  ): Promise<{ used: number; limit: number; resets_on: string }> => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    const url = `${BASE_URL}/product/free-allowance?user_id=${encodeURIComponent(userId)}`;
+    try {
+      const res = await fetch(url, {
+        method:  'GET',
+        headers: { 'X-API-Key': API_KEY },
+        signal:  controller.signal,
+      });
+      if (!res.ok) throw new Error(`Unexpected error (${res.status}).`);
+      return res.json();
+    } catch (err: any) {
+      if (err?.name === 'AbortError') throw new Error('Request timed out.');
+      throw new Error(friendlyError(err));
+    } finally {
+      clearTimeout(timer);
+    }
+  },
+
   // ─── General AI Ask ────────────────────────────────────────────────────────
   askAI: (question: string, context?: string | Record<string, unknown>) =>
     post<{ answer: string; available: boolean }>('/ai/ask', {
@@ -315,60 +433,68 @@ export const api = {
     }),
 
   // ─── Niche Intelligence ────────────────────────────────────────────────────
-  searchNiche: (body: {
+  searchNiche: async (body: {
     keyword: string;
     marketplace?: string;
     price_min?: number;
     price_max?: number;
     max_top_seller_reviews?: number;
     budget?: number;
-  }) => post<{
-    keyword: string;
-    marketplace: string;
-    verdict: {
-      label: string;
-      color: string;
-      score: number;
-      reasons: string[];
-      warnings: string[];
-    };
-    market_snapshot: {
-      avg_price: number;
-      avg_reviews: number;
-      avg_rating: number;
-      top_reviews: number;
-      total_products: number;
-      in_price_range: number;
-      low_competition: number;
-    };
-    the_gap: string[];
-    products_to_model: {
-      title: string;
-      price: number;
-      rating: number;
-      review_count: number;
-      asin: string;
-      url: string;
-    }[];
-    can_you_afford_it: {
-      budget: number;
-      target_unit_cost: number;
-      min_order_cost: number;
-      can_afford: boolean;
-      verdict: string;
-    };
-  }>('/research/niche', body),
+  }) => {
+    const data = await post<{
+      keyword: string;
+      marketplace: string;
+      verdict: {
+        label: string;
+        color: string;
+        score: number;
+        reasons: string[];
+        warnings: string[];
+      };
+      market_snapshot: {
+        avg_price: number;
+        avg_reviews: number;
+        avg_rating: number;
+        top_reviews: number;
+        total_products: number;
+        in_price_range: number;
+        low_competition: number;
+      };
+      the_gap: string[];
+      products_to_model: {
+        title: string;
+        price: number;
+        rating: number;
+        review_count: number;
+        asin: string;
+        url: string;
+      }[];
+      can_you_afford_it: {
+        budget: number;
+        target_unit_cost: number;
+        min_order_cost: number;
+        can_afford: boolean;
+        verdict: string;
+      };
+    }>('/research/niche', body);
+    validateSearchNiche(data);
+    return data;
+  },
 
   // ─── Suppliers v2 (real Alibaba API) ──────────────────────────────────────
-  searchSuppliersV2: (body: {
+  searchSuppliersV2: async (body: {
     product: string;
     marketplace?: string;
     max_unit_price?: number;
     max_moq?: number;
-  }) => post<{ suppliers: Supplier[]; product: string }>('/research/suppliers-v2', body),
+  }) => {
+    const data = await post<{ suppliers: Supplier[]; product: string }>('/research/suppliers-v2', body);
+    validateSearchSuppliers(data);
+    return data;
+  },
 
   // ─── Freight Estimates ─────────────────────────────────────────────────────
-  estimateFreight: (body: {
+  estimateFreight: async (body: {
     product_name: string;
     marketplace?: string;
     units?: number;
@@ -376,39 +502,25 @@ export const api = {
     length_cm?: number;
     width_cm?: number;
     height_cm?: number;
-  }) => post<{
-    product: string;
-    marketplace: string;
-    units: number;
-    total_weight_kg: number;
-    total_cbm: number;
-    modes: {
-      air:     { mode: string; total_cost: number; cost_per_unit: number; transit_days: number; notes: string };
-      sea_lcl: { mode: string; total_cost: number; cost_per_unit: number; transit_days: number; notes: string };
-      sea_fcl: { mode: string; total_cost: number; cost_per_unit: number; transit_days: number; notes: string } | null;
-      express: { mode: string; total_cost: number; cost_per_unit: number; transit_days: number; notes: string };
-    };
-    recommended: 'air' | 'sea_lcl' | 'sea_fcl' | 'express';
-    fba_inbound_est: number;
-    prep_cost: number;
-  }>('/research/freight', body),
+  }) => {
+    const data = await post<{
+      product: string;
+      marketplace: string;
+      units: number;
+      total_weight_kg: number;
+      total_cbm: number;
+      modes: {
+        air:     { mode: string; total_cost: number; cost_per_unit: number; transit_days: number; notes: string };
+        sea_lcl: { mode: string; total_cost: number; cost_per_unit: number; transit_days: number; notes: string };
+        sea_fcl: { mode: string; total_cost: number; cost_per_unit: number; transit_days: number; notes: string } | null;
+        express: { mode: string; total_cost: number; cost_per_unit: number; transit_days: number; notes: string };
+      };
+      recommended: 'air' | 'sea_lcl' | 'sea_fcl' | 'express';
+      fba_inbound_est: number;
+      prep_cost: number;
+    }>('/research/freight', body);
+    validateEstimateFreight(data);
+    return data;
+  },
 
-  // ─── Feasibility Report ────────────────────────────────────────────────────
-  generateFeasibilityReport: (body: {
-    product_name: string;
-    amazon_price?: number | null;
-    supplier_analysis?: Record<string, unknown> | null;
-    calculation?: Record<string, unknown> | null;
-    brand?: Record<string, unknown> | null;
-    keywords?: Record<string, unknown> | null;
-    freight?: Record<string, unknown> | null;
-    marketplace?: string;
-    currency?: string;
-  }) => post<{
-    verdict: 'GO' | 'CAUTION' | 'NO-GO';
-    confidence: number;
-    headline: string;
-    sections: { title: string; body?: string; items?: string[] }[];
-    data_completeness: 'full' | 'partial' | 'limited';
-  }>('/ai/feasibility-report', body),
 };

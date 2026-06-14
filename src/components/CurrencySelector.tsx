@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { DS } from '../theme/ds';
 import {
   View, Text, TouchableOpacity, StyleSheet, Modal, ScrollView,
 } from 'react-native';
@@ -10,10 +11,78 @@ import { colors, spacing, radius } from '../theme';
 export function CurrencyButton({ onPress }: { onPress: () => void }) {
   const { flag, currency } = useCurrency();
   return (
-    <TouchableOpacity style={s.btn} onPress={onPress} activeOpacity={0.75}>
+    <TouchableOpacity
+      style={s.btn}
+      onPress={onPress}
+      activeOpacity={0.75}
+      accessibilityRole="button"
+      accessibilityLabel={`Change region and currency, currently ${currency}`}
+    >
       <Text style={s.btnFlag}>{flag}</Text>
       <Text style={s.btnCode}>{currency}</Text>
     </TouchableOpacity>
+  );
+}
+
+// ─── Inline picker (for embedding in another sheet, e.g. settings) ────────────
+
+export function CurrencyRegionPicker() {
+  const { currency, marketplace, setCurrency, setMarketplace } = useCurrency();
+
+  return (
+    <View>
+      <Text style={s.sectionLabel}>MARKETPLACE</Text>
+      {MARKETPLACES.map(mp => {
+        const isActive = marketplace === mp.id;
+        return (
+          <TouchableOpacity
+            key={mp.id}
+            style={[s.option, isActive && s.optionActive]}
+            onPress={() => setMarketplace(mp.id as MarketplaceId)}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityState={{ selected: isActive }}
+          >
+            <Text style={s.optionFlag}>{mp.flag}</Text>
+            <View style={s.optionText}>
+              <Text style={[s.optionName, isActive && s.optionNameActive]}>{mp.name}</Text>
+              <Text style={s.optionSub}>
+                {CURRENCIES[mp.currency].name} · {mp.currency}
+              </Text>
+            </View>
+            {isActive && <Text style={s.check}>✓</Text>}
+          </TouchableOpacity>
+        );
+      })}
+
+      <Text style={[s.sectionLabel, { marginTop: spacing.md }]}>CURRENCY ONLY</Text>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={s.currencyRow}
+      >
+        {(Object.keys(CURRENCIES) as CurrencyCode[]).map(code => {
+          const c = CURRENCIES[code];
+          const isActive = currency === code;
+          return (
+            <TouchableOpacity
+              key={code}
+              style={[s.chip, isActive && s.chipActive]}
+              onPress={() => setCurrency(code)}
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityState={{ selected: isActive }}
+            >
+              <Text style={s.chipFlag}>{c.flag}</Text>
+              <Text style={[s.chipCode, isActive && s.chipCodeActive]}>{c.code}</Text>
+              <Text style={[s.chipSym, isActive && s.chipSymActive]}>{c.selectorSymbol}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+
+      <Text style={s.note}>Rates refresh daily · prices converted from USD</Text>
+    </View>
   );
 }
 
@@ -30,7 +99,7 @@ export function CurrencySelector() {
       <CurrencyButton onPress={() => setVisible(true)} />
 
       <Modal visible={visible} transparent animationType="slide" onRequestClose={close}>
-        <TouchableOpacity style={s.backdrop} activeOpacity={1} onPress={close} />
+        <TouchableOpacity style={s.backdrop} activeOpacity={1} onPress={close} accessibilityRole="button" accessibilityLabel="Close" />
 
         <View style={s.sheet}>
           <View style={s.handle} />
@@ -46,6 +115,8 @@ export function CurrencySelector() {
                 style={[s.option, isActive && s.optionActive]}
                 onPress={() => { setMarketplace(mp.id as MarketplaceId); close(); }}
                 activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityState={{ selected: isActive }}
               >
                 <Text style={s.optionFlag}>{mp.flag}</Text>
                 <View style={s.optionText}>
@@ -75,6 +146,8 @@ export function CurrencySelector() {
                   style={[s.chip, isActive && s.chipActive]}
                   onPress={() => { setCurrency(code); close(); }}
                   activeOpacity={0.8}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: isActive }}
                 >
                   <Text style={s.chipFlag}>{c.flag}</Text>
                   <Text style={[s.chipCode, isActive && s.chipCodeActive]}>{c.code}</Text>
@@ -134,9 +207,9 @@ const s = StyleSheet.create({
   optionFlag:       { fontSize: 22 },
   optionText:       { flex: 1 },
   optionName:       { fontSize: 14, fontWeight: '600', color: colors.textPrimary },
-  optionNameActive: { color: '#2563EB' },
+  optionNameActive: { color: DS.accent },
   optionSub:        { fontSize: 11, color: colors.textMuted, marginTop: 1 },
-  check:            { fontSize: 14, fontWeight: '800', color: '#2563EB' },
+  check:            { fontSize: 14, fontWeight: '800', color: DS.accent },
 
   currencyRow: { gap: 8, paddingVertical: spacing.xs },
   chip: {
@@ -145,12 +218,12 @@ const s = StyleSheet.create({
     backgroundColor: colors.bgElevated, borderRadius: radius.md,
     borderWidth: 1, borderColor: colors.border,
   },
-  chipActive:    { backgroundColor: 'rgba(37,99,235,0.10)', borderColor: '#2563EB' },
+  chipActive:    { backgroundColor: 'rgba(37,99,235,0.10)', borderColor: DS.accent },
   chipFlag:      { fontSize: 20 },
   chipCode:      { fontSize: 10, fontWeight: '800', color: colors.textSecondary },
-  chipCodeActive:{ color: '#2563EB' },
+  chipCodeActive:{ color: DS.accent },
   chipSym:       { fontSize: 11, color: colors.textMuted },
-  chipSymActive: { color: '#2563EB' },
+  chipSymActive: { color: DS.accent },
 
   note: {
     fontSize: 10, color: colors.textMuted, textAlign: 'center',

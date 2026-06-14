@@ -1,8 +1,9 @@
 import React, { useEffect, useRef } from 'react';
+import { DS } from '../theme/ds';
 import { View, Animated } from 'react-native';
 import { colors } from '../theme';
 
-export default function PulseDots({ color = '#2563EB' }: { color?: string }) {
+export default function PulseDots({ color = DS.accent }: { color?: string }) {
   const a = useRef(new Animated.Value(0.3)).current;
   const b = useRef(new Animated.Value(0.3)).current;
   const c = useRef(new Animated.Value(0.3)).current;

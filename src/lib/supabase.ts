@@ -2,8 +2,8 @@ import { createClient } from '@supabase/supabase-js';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
-const SUPABASE_URL  = 'https://dpokfcobmyxnufuudlkh.supabase.co';
-const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRwb2tmY29ibXl4bnVmdXVkbGtoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyMTQ4MTIsImV4cCI6MjA5Mzc5MDgxMn0.igo1b-0GiO5Lupb0VaXrPr6bKaZ3ada62BxElTHK8MQ';
+const SUPABASE_URL  = process.env.EXPO_PUBLIC_SUPABASE_URL  ?? '';
+const SUPABASE_ANON = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
 
 // SecureStore adapter with graceful fallback for locked-device Keychain errors.
 // iOS throws "User interaction is not allowed" when the app is launched from a

@@ -1,13 +1,18 @@
 import React, { useState } from 'react';
 import {
-  View, Text, Modal, ScrollView, StyleSheet, TouchableOpacity, Image,
+  View, Text, Modal, ScrollView, StyleSheet, TouchableOpacity,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppCard, DS } from '../../components/ds';
 import { useCurrency } from '../../context/CurrencyContext';
 import { ProductDisplay, SupplierDisplay } from './types';
-import { SmartBadgeStrip, ProductTopRow, ProductStatsRow, am } from './SharedComponents';
+import { SmartBadgeStrip, am } from './SharedComponents';
 import { openURL } from './utils';
+import { ppcColor, confidenceColor } from '../../lib/financialEngine';
+import type { PPCPressure, SalesConfidence } from '../../lib/financialEngine';
+import { buildOpportunitySignals } from './productHelpers';
+import type { SignalType } from './productHelpers';
 
 // ── Compare helpers ───────────────────────────────────────────────────────────
 
@@ -71,19 +76,24 @@ export const CMP_CELL_W  = 110;
 // ── Product card — Market mode ────────────────────────────────────────────────
 
 export function ProductMarketCard({
-  item, onSelect, isSelected, onSaveForFeasibility, isFeasSaved,
+  item, onSelect, isSelected,
   inCompare, canCompare, onToggleCompare, onAnalyze, analyzeLoading,
+  onTrackInPipeline, isTracked,
+  onSave, isSaved, saveLoading,
 }: {
   item: ProductDisplay;
   onSelect: () => void;
   isSelected: boolean;
-  onSaveForFeasibility?: () => void;
-  isFeasSaved?: boolean;
   inCompare?: boolean;
   canCompare?: boolean;
   onToggleCompare?: () => void;
   onAnalyze?: () => void;
   analyzeLoading?: boolean;
+  onTrackInPipeline?: () => void;
+  isTracked?: boolean;
+  onSave?: () => void;
+  isSaved?: boolean;
+  saveLoading?: boolean;
 }) {
   const { fmt } = useCurrency();
   const hasLink = !!item.url;
@@ -93,6 +103,7 @@ export function ProductMarketCard({
   const oppBg    = item.badge === 'Promising' ? DS.successBg   : item.badge === 'Saturated' ? DS.dangerBg  : DS.warningBg;
   const compColor = item.competition === 'Low' ? DS.successText : item.competition === 'High' ? DS.dangerText : DS.warningText;
   const compBg    = item.competition === 'Low' ? DS.successBg   : item.competition === 'High' ? DS.dangerBg  : DS.warningBg;
+  const oppSignals = buildOpportunitySignals(item);
 
   return (
     <AppCard padding={14} radius={18} style={[pmc.card, isSelected && pmc.cardSelected]}>
@@ -101,7 +112,7 @@ export function ProductMarketCard({
       <View style={pmc.header}>
         <View style={pmc.imgBox}>
           {item.image
-            ? <Image source={{ uri: item.image }} style={pmc.img} resizeMode="contain" />
+            ? <Image source={{ uri: item.image }} style={pmc.img} contentFit="contain" transition={150} accessibilityRole="image" accessibilityLabel={`Product photo: ${item.name}`} />
             : <Text style={pmc.imgPlaceholder}>🛒</Text>}
         </View>
         <View style={{ flex: 1, gap: 4 }}>
@@ -142,11 +153,82 @@ export function ProductMarketCard({
         <View style={pmc.div} />
         <View style={pmc.stat}>
           <Text style={pmc.statVal}>
-            {item.revenueUSD != null ? `${fmt(item.revenueUSD, 0)}/mo` : '—'}
+            {item.salesEstMonthly ?? (item.monthlySalesEst != null ? `~${item.monthlySalesEst}/mo` : '—')}
           </Text>
-          <Text style={pmc.statLbl}>Est. Rev.</Text>
+          <Text style={pmc.statLbl}>Est. Sales</Text>
+          {item.salesEstDaily && (
+            <Text style={pmc.statSub}>{item.salesEstDaily}</Text>
+          )}
         </View>
       </View>
+
+      {/* ── Sales intelligence strip ─── */}
+      {(item.salesConfidence || item.ppcPressure || oppSignals.length > 0) && (
+        <View style={pmc.intelStrip}>
+          {item.revenueEstLow != null && item.revenueEstHigh != null && (
+            <View style={pmc.intelChip}>
+              <Text style={pmc.intelIcon}>💰</Text>
+              <Text style={pmc.intelTxt}>
+                ~${item.revenueEstLow.toLocaleString()}–${item.revenueEstHigh.toLocaleString()}/mo est. revenue
+              </Text>
+            </View>
+          )}
+          {item.ppcPressure && (
+            <View style={[pmc.intelChip, { backgroundColor: ppcColor(item.ppcPressure) + '18' }]}>
+              <Text style={pmc.intelIcon}>📣</Text>
+              <Text style={[pmc.intelTxt, { color: ppcColor(item.ppcPressure) }]}>
+                {item.ppcPressure} PPC Pressure
+              </Text>
+            </View>
+          )}
+          {item.salesConfidence && (
+            <View style={[pmc.intelChip, { backgroundColor: confidenceColor(item.salesConfidence) + '18' }]}>
+              <Text style={pmc.intelIcon}>◎</Text>
+              <Text style={[pmc.intelTxt, { color: confidenceColor(item.salesConfidence) }]}>
+                {item.salesConfidence} confidence
+              </Text>
+            </View>
+          )}
+          {oppSignals.map((sig, i) => (
+            <View
+              key={i}
+              style={[pmc.intelChip, {
+                backgroundColor: sig.type === 'positive' ? DS.success + '14'
+                  : sig.type === 'warning' ? DS.warning + '14'
+                  : DS.bgSubtle,
+              }]}
+            >
+              <Text style={pmc.intelIcon}>
+                {sig.type === 'positive' ? '✓' : sig.type === 'warning' ? '⚠' : '◈'}
+              </Text>
+              <Text style={[pmc.intelTxt, {
+                color: sig.type === 'positive' ? DS.success
+                  : sig.type === 'warning' ? DS.warning
+                  : DS.textSecondary,
+              }]}>
+                {sig.label}
+              </Text>
+            </View>
+          ))}
+          <Text style={pmc.intelDisclaimer}>
+            Directional — review velocity model, not live BSR data
+          </Text>
+          {(item.competition === 'High' || (item.reviewCount ?? 0) > 500) && (
+            <View style={pmc.coachChip}>
+              <Text style={pmc.coachTxt}>
+                💡 High review markets usually require more PPC spend to rank — budget 15–20% of revenue.
+              </Text>
+            </View>
+          )}
+          {item.competition === 'Low' && (item.reviewCount ?? 999) < 100 && (
+            <View style={[pmc.coachChip, { backgroundColor: DS.success + '10', borderColor: DS.success + '20' }]}>
+              <Text style={[pmc.coachTxt, { color: DS.success }]}>
+                💡 Low competition with few reviews — strong early-mover opportunity. Validate demand before ordering.
+              </Text>
+            </View>
+          )}
+        </View>
+      )}
 
       <SmartBadgeStrip badges={item.badges} finalScore={item.finalScore} />
 
@@ -170,7 +252,7 @@ export function ProductMarketCard({
           activeOpacity={0.8}
           disabled={analyzeLoading || !onAnalyze}
         >
-          <Text style={pmc.analyzeTxt}>{analyzeLoading ? '…' : '⊛  Analyse'}</Text>
+          <Text style={pmc.analyzeTxt}>{analyzeLoading ? '…' : '⊛  Verdict'}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -193,17 +275,28 @@ export function ProductMarketCard({
             {isSelected ? '★  Selected' : '☆  Select'}
           </Text>
         </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[pmc.actionBtn, isSaved ? pmc.savedBtn : pmc.saveBtn, saveLoading && { opacity: 0.6 }]}
+          onPress={onSave}
+          activeOpacity={0.8}
+          disabled={saveLoading || !onSave}
+        >
+          <Text style={[pmc.saveTxt, isSaved && pmc.savedTxt]}>
+            {saveLoading ? '…' : isSaved ? '✓  Saved' : '🔖  Save'}
+          </Text>
+        </TouchableOpacity>
       </View>
 
-      {/* ── Feasibility ─── */}
-      {hasLink && onSaveForFeasibility && (
+      {/* ── Pipeline CTA ─── */}
+      {onTrackInPipeline && (
         <TouchableOpacity
-          style={[pmc.feasBtn, isFeasSaved && pmc.feasBtnSaved]}
-          onPress={onSaveForFeasibility}
+          style={[pmc.pipelineBtn, isTracked && pmc.pipelineBtnActive]}
+          onPress={onTrackInPipeline}
           activeOpacity={0.8}
         >
-          <Text style={[pmc.feasTxt, isFeasSaved && pmc.feasTxtSaved]}>
-            {isFeasSaved ? '✕  Remove' : '→  Run Feasibility Check'}
+          <Text style={[pmc.pipelineTxt, isTracked && pmc.pipelineTxtActive]}>
+            {isTracked ? '★  In Pipeline — View Launch Decision' : '→  Add to Pipeline'}
           </Text>
         </TouchableOpacity>
       )}
@@ -231,6 +324,15 @@ const pmc = StyleSheet.create({
   div:              { width: 1, height: 28, backgroundColor: DS.border },
   statVal:          { fontSize: 12, fontWeight: '800', color: DS.textPrimary, letterSpacing: -0.2 },
   statLbl:          { fontSize: 9, color: DS.textMuted, textTransform: 'uppercase' as const, letterSpacing: 0.3 },
+  statSub:          { fontSize: 9, color: DS.textMuted, marginTop: 1 },
+  // Intelligence strip
+  intelStrip:       { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  intelChip:        { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: DS.bgSubtle, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
+  intelIcon:        { fontSize: 11 },
+  intelTxt:         { fontSize: 10, fontWeight: '600', color: DS.textSecondary },
+  intelDisclaimer:  { fontSize: 9, color: DS.textMuted, fontStyle: 'italic', width: '100%' },
+  coachChip:        { width: '100%', backgroundColor: DS.warning + '10', borderRadius: 8, borderWidth: 1, borderColor: DS.warning + '20', paddingHorizontal: 8, paddingVertical: 5 },
+  coachTxt:         { fontSize: 10, color: DS.textSecondary, lineHeight: 14 },
   // Primary button
   amazonBtn:        { backgroundColor: '#FF9900', borderRadius: 12, paddingVertical: 10, alignItems: 'center' as const },
   amazonBtnDisabled:{ backgroundColor: DS.bgSubtle, borderWidth: 1, borderColor: DS.border },
@@ -249,163 +351,15 @@ const pmc = StyleSheet.create({
   selectedBtn:      { backgroundColor: DS.accentLight, borderWidth: 1, borderColor: DS.accent },
   selectTxt:        { fontSize: 12, fontWeight: '700', color: DS.textSecondary },
   selectedTxt:      { color: DS.accent },
-  // Feasibility
-  feasBtn:          { borderRadius: 10, paddingVertical: 7, alignItems: 'center' as const, backgroundColor: DS.indigoLight, borderWidth: 1, borderColor: DS.indigo + '44' },
-  feasBtnSaved:     { backgroundColor: DS.bgSubtle, borderColor: DS.border },
-  feasTxt:          { fontSize: 11, fontWeight: '700' as const, color: DS.indigo },
-  feasTxtSaved:     { color: DS.textMuted },
-});
-
-// ── Product card — Lookup mode (full actions) ─────────────────────────────────
-
-interface ProductLookupCardProps {
-  item:                     ProductDisplay;
-  inCompare:                boolean;
-  isSaved:                  boolean;
-  analyzeLoading:           boolean;
-  canCompare:               boolean;
-  onViewAmazon:             () => void;
-  onAnalyze:                () => void;
-  onToggleCompare:          () => void;
-  onSave:                   () => void;
-  onSelect:                 () => void;
-  isSelected:               boolean;
-  onSaveForFeasibility?:    () => void;
-  isFeasSaved?:             boolean;
-  onAnalyzeOpportunity?:    () => void;
-  opportunityLoading?:      boolean;
-}
-
-export function ProductLookupCard({
-  item, inCompare, isSaved, analyzeLoading, canCompare,
-  onViewAmazon, onAnalyze, onToggleCompare, onSave, onSelect, isSelected,
-  onSaveForFeasibility, isFeasSaved, onAnalyzeOpportunity, opportunityLoading,
-}: ProductLookupCardProps) {
-  const hasLink = !!item.url;
-  return (
-    <AppCard
-      padding={14}
-      radius={18}
-      style={[plc.card, isSelected && plc.cardSelected]}
-    >
-      <ProductTopRow item={item} />
-      <ProductStatsRow item={item} />
-      <SmartBadgeStrip badges={item.badges} finalScore={item.finalScore} />
-
-      {/* Primary action */}
-      <TouchableOpacity
-        style={[plc.amazonBtn, !hasLink && plc.disabledBtn]}
-        onPress={onViewAmazon}
-        activeOpacity={hasLink ? 0.8 : 1}
-        disabled={!hasLink}
-      >
-        <Text style={[plc.amazonTxt, !hasLink && plc.disabledTxt]}>
-          {hasLink ? '↗  View on Amazon' : 'Link unavailable'}
-        </Text>
-      </TouchableOpacity>
-
-      {/* Secondary actions row */}
-      <View style={plc.actionsRow}>
-        <TouchableOpacity
-          style={[plc.actionBtn, plc.analyzeBtn, analyzeLoading && { opacity: 0.6 }]}
-          onPress={onAnalyze}
-          activeOpacity={0.8}
-          disabled={analyzeLoading}
-        >
-          <Text style={plc.analyzeTxt}>{analyzeLoading ? '…' : '⊛  Analyze'}</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[plc.actionBtn, !canCompare ? plc.compareDisabled : inCompare ? plc.compareActive : plc.compareBtn]}
-          onPress={canCompare ? onToggleCompare : undefined}
-          activeOpacity={canCompare ? 0.8 : 1}
-          disabled={!canCompare}
-        >
-          <Text style={[plc.compareTxt, !canCompare && plc.compareTxtDisabled, canCompare && inCompare && plc.compareTxtActive]}>
-            {!canCompare ? '⊞ No data' : inCompare ? '✓  Added' : '⊞  Compare'}
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[plc.actionBtn, isSaved ? plc.savedBtn : plc.saveBtn]}
-          onPress={onSave}
-          activeOpacity={0.8}
-        >
-          <Text style={[plc.saveTxt, isSaved && plc.savedTxt]}>
-            {isSaved ? '✕ Unsave' : '✦ Save'}
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Select as context */}
-      <TouchableOpacity
-        style={[plc.selectBtn, isSelected && plc.selectBtnActive]}
-        onPress={onSelect}
-        activeOpacity={0.8}
-      >
-        <Text style={[plc.selectTxt, isSelected && plc.selectTxtActive]}>
-          {isSelected ? '★  Selected as context' : '☆  Select for suppliers & Co-Pilot'}
-        </Text>
-      </TouchableOpacity>
-
-      {!!item.url && onSaveForFeasibility && (
-        <TouchableOpacity
-          style={[plc.feasBtn, isFeasSaved && plc.feasBtnSaved]}
-          onPress={onSaveForFeasibility}
-          activeOpacity={0.8}
-        >
-          <Text style={[plc.feasTxt, isFeasSaved && plc.feasTxtSaved]}>
-            {isFeasSaved ? '✕  Remove' : '→  Run Feasibility Check'}
-          </Text>
-        </TouchableOpacity>
-      )}
-
-      {onAnalyzeOpportunity && (
-        <TouchableOpacity
-          style={[plc.opportunityBtn, opportunityLoading && { opacity: 0.6 }]}
-          onPress={onAnalyzeOpportunity}
-          activeOpacity={0.8}
-          disabled={opportunityLoading}
-        >
-          <Text style={plc.opportunityTxt}>
-            {opportunityLoading ? '◎  Analyzing reviews...' : '◎  Find Improvement Opportunities'}
-          </Text>
-        </TouchableOpacity>
-      )}
-    </AppCard>
-  );
-}
-const plc = StyleSheet.create({
-  card:            { gap: 10 },
-  cardSelected:    { borderWidth: 2, borderColor: DS.accent },
-  amazonBtn:       { backgroundColor: '#FF9900', borderRadius: 12, paddingVertical: 10, alignItems: 'center' },
-  disabledBtn:     { backgroundColor: DS.bgSubtle, borderWidth: 1, borderColor: DS.border },
-  amazonTxt:       { fontSize: 13, fontWeight: '800', color: '#fff', letterSpacing: -0.2 },
-  disabledTxt:     { color: DS.textMuted },
-  actionsRow:      { flexDirection: 'row', gap: 7 },
-  actionBtn:       { flex: 1, borderRadius: 10, paddingVertical: 8, alignItems: 'center' },
-  analyzeBtn:      { backgroundColor: DS.indigoLight },
-  analyzeTxt:      { fontSize: 11, fontWeight: '700', color: DS.indigo },
-  compareBtn:       { backgroundColor: DS.bgSubtle, borderWidth: 1, borderColor: DS.border },
-  compareActive:    { backgroundColor: DS.accentLight, borderWidth: 1, borderColor: DS.accent },
-  compareDisabled:  { backgroundColor: DS.bgSubtle, borderWidth: 1, borderColor: DS.borderLight, opacity: 0.5 },
-  compareTxt:       { fontSize: 11, fontWeight: '700', color: DS.textSecondary },
-  compareTxtActive: { color: DS.accent },
-  compareTxtDisabled:{ color: DS.textMuted },
-  saveBtn:         { backgroundColor: DS.indigoLight, borderWidth: 1, borderColor: DS.indigoLight },
-  savedBtn:        { backgroundColor: DS.accentLight, borderWidth: 1, borderColor: DS.accent },
-  saveTxt:         { fontSize: 11, fontWeight: '700', color: DS.indigo },
-  savedTxt:        { color: DS.accent },
-  selectBtn:       { backgroundColor: DS.bgSubtle, borderRadius: 10, paddingVertical: 7, alignItems: 'center', borderWidth: 1, borderColor: DS.border },
-  selectBtnActive: { backgroundColor: DS.accentLight, borderColor: DS.accent },
-  selectTxt:       { fontSize: 11, fontWeight: '600', color: DS.textMuted },
-  selectTxtActive: { color: DS.accent, fontWeight: '700' },
-  feasBtn:         { borderRadius: 10, paddingVertical: 7, alignItems: 'center' as const, backgroundColor: DS.indigoLight, borderWidth: 1, borderColor: DS.indigo + '44' },
-  feasBtnSaved:    { backgroundColor: DS.bgSubtle, borderColor: DS.border },
-  feasTxt:         { fontSize: 11, fontWeight: '700' as const, color: DS.indigo },
-  feasTxtSaved:    { color: DS.textMuted },
-  opportunityBtn:  { borderRadius: 12, paddingVertical: 11, alignItems: 'center' as const, backgroundColor: DS.accent, marginTop: 2 },
-  opportunityTxt:  { fontSize: 13, fontWeight: '800' as const, color: '#fff', letterSpacing: -0.2 },
+  saveBtn:          { backgroundColor: DS.bgSubtle, borderWidth: 1, borderColor: DS.border },
+  savedBtn:         { backgroundColor: DS.success + '18', borderWidth: 1, borderColor: DS.success },
+  saveTxt:          { fontSize: 12, fontWeight: '700', color: DS.textSecondary },
+  savedTxt:         { color: DS.success },
+  // Pipeline CTA
+  pipelineBtn:      { borderRadius: 10, paddingVertical: 9, alignItems: 'center' as const, backgroundColor: DS.bgElevated, borderWidth: 1, borderColor: DS.border },
+  pipelineBtnActive:{ backgroundColor: DS.accentLight, borderColor: DS.accent },
+  pipelineTxt:      { fontSize: 12, fontWeight: '700' as const, color: DS.textSecondary },
+  pipelineTxtActive:{ color: DS.accent, fontWeight: '800' as const },
 });
 
 // ── Premium Compare products modal ───────────────────────────────────────────
@@ -547,7 +501,7 @@ export function CompareProductsModal({
                       activeOpacity={0.75}
                     >
                       {p.image ? (
-                        <Image source={{ uri: p.image }} style={prm.colImg} />
+                        <Image source={{ uri: p.image }} style={prm.colImg} contentFit="contain" transition={150} accessibilityRole="image" accessibilityLabel={`Product photo: ${p.name}`} />
                       ) : (
                         <View style={prm.colImgFallback}>
                           <Text style={prm.colImgIcon}>◎</Text>

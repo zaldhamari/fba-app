@@ -46,7 +46,7 @@ function deriveFinancials(e: WinnerEntry) {
 
 function buildPdfHtml(e: WinnerEntry): string {
   const { netPerUnit, fbaFeeEst, unitsPerMonth } = deriveFinancials(e);
-  const mc = e.marginPct >= 35 ? '#10B981' : e.marginPct >= 25 ? '#F59E0B' : '#EF4444';
+  const mc = e.marginPct >= 35 ? DS.success : e.marginPct >= 25 ? DS.warning : DS.danger;
   const verdict = e.marginPct >= 35 ? 'STRONG LAUNCH' : e.marginPct >= 25 ? 'VIABLE' : 'REVIEW MARGINS';
 
   return `<!DOCTYPE html>

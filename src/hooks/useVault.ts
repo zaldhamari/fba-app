@@ -33,6 +33,19 @@ export function useVault() {
   const [vaultLoaded, setVaultLoaded] = useState(false);
   const userIdRef = useRef<string | null>(null);
 
+  // Mirror of `entries` for mutators to read synchronously. Lets us compute the
+  // next state and run side effects (storage + cloud sync) exactly once, outside
+  // the setState updater — updaters must stay pure or they double-fire under
+  // StrictMode / concurrent rendering and duplicate network writes.
+  const entriesRef = useRef<VaultEntry[]>([]);
+  useEffect(() => { entriesRef.current = entries; }, [entries]);
+
+  function commit(next: VaultEntry[]) {
+    entriesRef.current = next;
+    setEntries(next);
+    AsyncStorage.setItem(VAULT_KEY, JSON.stringify(next));
+  }
+
   // Keep userIdRef current via auth state listener — fires immediately with existing session
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -101,84 +114,67 @@ export function useVault() {
     currency: string,
     saveLimit: number = 9999,
   ): { success: boolean; reason?: string } => {
-    let result: { success: boolean; reason?: string } = { success: false };
-    setEntries(prev => {
-      const now = new Date().toISOString();
-      const isUpdate = prev.some(e => e.asin === product.asin);
-      // Enforce save limit only for new entries, not updates to existing ones
-      if (!isUpdate && prev.length >= saveLimit) {
-        result = { success: false, reason: 'save_limit_reached' };
-        return prev;
-      }
-      let entry: VaultEntry;
-      let next: VaultEntry[];
-      if (isUpdate) {
-        next = prev.map(e =>
-          e.asin === product.asin
-            ? { ...e, analysis: analysis ?? e.analysis, updatedAt: now }
-            : e,
-        );
-        entry = next.find(e => e.asin === product.asin)!;
-      } else {
-        entry = { asin: product.asin, product, analysis, status: 'researching', note: '', marketplace, currency, savedAt: now, updatedAt: now };
-        next = [entry, ...prev];
-      }
-      AsyncStorage.setItem(VAULT_KEY, JSON.stringify(next));
-      const uid = userIdRef.current;
-      if (uid) syncEntry(uid, entry);
-      result = { success: true };
-      return next;
-    });
-    return result;
+    const prev = entriesRef.current;
+    const now = new Date().toISOString();
+    const isUpdate = prev.some(e => e.asin === product.asin);
+    // Enforce save limit only for new entries, not updates to existing ones
+    if (!isUpdate && prev.length >= saveLimit) {
+      return { success: false, reason: 'save_limit_reached' };
+    }
+    let entry: VaultEntry;
+    let next: VaultEntry[];
+    if (isUpdate) {
+      next = prev.map(e =>
+        e.asin === product.asin
+          ? { ...e, analysis: analysis ?? e.analysis, updatedAt: now }
+          : e,
+      );
+      entry = next.find(e => e.asin === product.asin)!;
+    } else {
+      entry = { asin: product.asin, product, analysis, status: 'researching', note: '', marketplace, currency, savedAt: now, updatedAt: now };
+      next = [entry, ...prev];
+    }
+    commit(next);
+    const uid = userIdRef.current;
+    if (uid) syncEntry(uid, entry);
+    return { success: true };
   }, []);
 
   const removeEntry = useCallback((asin: string) => {
-    setEntries(prev => {
-      const next = prev.filter(e => e.asin !== asin);
-      AsyncStorage.setItem(VAULT_KEY, JSON.stringify(next));
-      const uid = userIdRef.current;
-      if (uid) deleteVaultEntry(uid, asin);
-      return next;
-    });
+    const next = entriesRef.current.filter(e => e.asin !== asin);
+    commit(next);
+    const uid = userIdRef.current;
+    if (uid) deleteVaultEntry(uid, asin);
   }, []);
 
   const updateStatus = useCallback((asin: string, status: VaultStatus) => {
-    setEntries(prev => {
-      const next = prev.map(e =>
-        e.asin === asin ? { ...e, status, updatedAt: new Date().toISOString() } : e,
-      );
-      AsyncStorage.setItem(VAULT_KEY, JSON.stringify(next));
-      const updated = next.find(e => e.asin === asin);
-      const uid = userIdRef.current;
-      if (updated && uid) syncEntry(uid, updated);
-      return next;
-    });
+    const next = entriesRef.current.map(e =>
+      e.asin === asin ? { ...e, status, updatedAt: new Date().toISOString() } : e,
+    );
+    commit(next);
+    const updated = next.find(e => e.asin === asin);
+    const uid = userIdRef.current;
+    if (updated && uid) syncEntry(uid, updated);
   }, []);
 
   const updateNote = useCallback((asin: string, note: string) => {
-    setEntries(prev => {
-      const next = prev.map(e =>
-        e.asin === asin ? { ...e, note, updatedAt: new Date().toISOString() } : e,
-      );
-      AsyncStorage.setItem(VAULT_KEY, JSON.stringify(next));
-      const updated = next.find(e => e.asin === asin);
-      const uid = userIdRef.current;
-      if (updated && uid) syncEntry(uid, updated);
-      return next;
-    });
+    const next = entriesRef.current.map(e =>
+      e.asin === asin ? { ...e, note, updatedAt: new Date().toISOString() } : e,
+    );
+    commit(next);
+    const updated = next.find(e => e.asin === asin);
+    const uid = userIdRef.current;
+    if (updated && uid) syncEntry(uid, updated);
   }, []);
 
   const updateAnalysis = useCallback((asin: string, analysis: AnalysisSnapshot) => {
-    setEntries(prev => {
-      const next = prev.map(e =>
-        e.asin === asin ? { ...e, analysis, updatedAt: new Date().toISOString() } : e,
-      );
-      AsyncStorage.setItem(VAULT_KEY, JSON.stringify(next));
-      const updated = next.find(e => e.asin === asin);
-      const uid = userIdRef.current;
-      if (updated && uid) syncEntry(uid, updated);
-      return next;
-    });
+    const next = entriesRef.current.map(e =>
+      e.asin === asin ? { ...e, analysis, updatedAt: new Date().toISOString() } : e,
+    );
+    commit(next);
+    const updated = next.find(e => e.asin === asin);
+    const uid = userIdRef.current;
+    if (updated && uid) syncEntry(uid, updated);
   }, []);
 
   function hasEntry(asin: string) {
@@ -190,19 +186,26 @@ export function useVault() {
   }
 
   function exportCSV(): string {
+    // Quote + escape, and neutralize spreadsheet formula injection by prefixing
+    // any cell that starts with = + - @ (or tab/CR) with a single quote.
+    const cell = (raw: unknown): string => {
+      let v = raw == null ? '' : String(raw);
+      if (/^[=+\-@\t\r]/.test(v)) v = `'${v}`;
+      return `"${v.replace(/"/g, '""')}"`;
+    };
     const header = 'Title,ASIN,Verdict,Confidence,Status,Price,Competition,Marketplace,Currency,Saved Date,Note';
     const rows = entries.map(e => [
-      `"${e.product.title.replace(/"/g, '""')}"`,
-      e.asin,
-      e.analysis?.verdict ?? '',
-      e.analysis?.confidence ?? '',
-      e.status,
-      e.product.price ?? '',
-      e.product.competition,
-      e.marketplace,
-      e.currency,
-      e.savedAt.slice(0, 10),
-      `"${(e.note ?? '').replace(/"/g, '""')}"`,
+      cell(e.product.title),
+      cell(e.asin),
+      cell(e.analysis?.verdict ?? ''),
+      cell(e.analysis?.confidence ?? ''),
+      cell(e.status),
+      cell(e.product.price ?? ''),
+      cell(e.product.competition),
+      cell(e.marketplace),
+      cell(e.currency),
+      cell(e.savedAt.slice(0, 10)),
+      cell(e.note ?? ''),
     ].join(','));
     return [header, ...rows].join('\n');
   }

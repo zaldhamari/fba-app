@@ -1,9 +1,8 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  SafeAreaView, ActivityIndicator, Alert, TextInput, Dimensions,
+  SafeAreaView, ActivityIndicator, Alert, TextInput,
 } from 'react-native';
-import { SvgXml } from 'react-native-svg';
 import { DS } from '../components/ds';
 import { useBuilderSession } from '../hooks/useBuilderSession';
 import { useSellerProfile } from '../hooks/useSellerProfile';
@@ -17,6 +16,7 @@ import { STAGE_ORDER, STAGE_LABELS, STAGE_ICONS } from '../types/builder';
 import { HelpButton } from '../components/HelpModal';
 import { AppHeader } from '../components/AppHeader';
 import { useNavigation } from '@react-navigation/native';
+import { track } from '../lib/analytics';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -25,9 +25,9 @@ const STAGE_ACCENT: Record<BuilderStage, string> = {
   analysis:     DS.indigo,
   supplier:     DS.accent,
   freight:      DS.warning,
-  calculations: '#059669',
+  calculations: DS.successText,
   brand:        '#7C3AED',
-  complete:     '#D97706',
+  complete:     DS.warningText,
 };
 
 function Field({
@@ -89,7 +89,7 @@ const btn = StyleSheet.create({
 });
 
 function GateCard({ passed, warning, label }: { passed: boolean; warning?: boolean; label: string }) {
-  const color = passed ? '#059669' : warning ? DS.warning : DS.danger;
+  const color = passed ? DS.successText : warning ? DS.warning : DS.danger;
   const icon  = passed ? '✓' : warning ? '⚠' : '✕';
   return (
     <View style={[gate.wrap, { borderColor: color + '40', backgroundColor: color + '10' }]}>
@@ -195,8 +195,8 @@ function StageDiscovery({ session, onComplete }: {
 
       {results.map(p => {
         const isSel = selected?.asin === p.asin;
-        const compColor = p.competition === 'Low' ? '#059669' : p.competition === 'High' ? DS.danger : DS.warning;
-        const compBg    = p.competition === 'Low' ? '#ECFDF5' : p.competition === 'High' ? DS.dangerBg : '#FFFBEB';
+        const compColor = p.competition === 'Low' ? DS.successText : p.competition === 'High' ? DS.danger : DS.warning;
+        const compBg    = p.competition === 'Low' ? DS.successBg : p.competition === 'High' ? DS.dangerBg : DS.warningBg;
         const priceMin  = profile?.priceMin ?? 0;
         const priceMax  = profile?.priceMax ?? 999;
         const maxRevs   = (profile as any)?.maxTopSellerReviews ?? 500;
@@ -232,8 +232,8 @@ function StageDiscovery({ session, onComplete }: {
 
             {/* Footer chips */}
             <View style={{ flexDirection: 'row', gap: 8, marginTop: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-              <View style={[stg.resultBadge, { backgroundColor: fitsProfile ? '#ECFDF5' : '#FFFBEB' }]}>
-                <Text style={{ fontSize: 10, fontWeight: '700', color: fitsProfile ? '#059669' : DS.warning }}>
+              <View style={[stg.resultBadge, { backgroundColor: fitsProfile ? DS.successBg : DS.warningBg }]}>
+                <Text style={{ fontSize: 10, fontWeight: '700', color: fitsProfile ? DS.successText : DS.warning }}>
                   {fitsProfile ? 'Fits profile ✓' : 'Outside profile'}
                 </Text>
               </View>
@@ -301,7 +301,7 @@ function StageAnalysis({ session, onComplete }: {
   const isAvoid   = result.verdict === 'AVOID';
   const isTest    = result.verdict === 'TEST';
   const isLaunch  = result.verdict === 'LAUNCH';
-  const gateColor = isLaunch ? '#059669' : isTest ? DS.warning : DS.danger;
+  const gateColor = isLaunch ? DS.successText : isTest ? DS.warning : DS.danger;
 
   function advance(override = false) {
     if (isAvoid && !override) return;
@@ -365,7 +365,7 @@ function StageAnalysis({ session, onComplete }: {
           <Btn label="Continue with Caution →" color={DS.warning} onPress={() => advance(false)} />
         </View>
       ) : (
-        <Btn label="Looks Good — Find Suppliers →" color="#059669" onPress={() => advance(false)} />
+        <Btn label="Looks Good — Find Suppliers →" color={DS.successText} onPress={() => advance(false)} />
       )}
     </View>
   );
@@ -437,10 +437,10 @@ function StageSupplier({ session, onComplete }: {
         const unitCost = s.price_range?.max ?? s.price_range?.min ?? 0;
         const maxUnitPrice = profile ? Math.round(profile.priceMin * 0.28) : 999;
         const fits = unitCost <= maxUnitPrice;
-        const platformColor = (s.supplier ?? '').toLowerCase().includes('alibaba') ? '#D97706'
+        const platformColor = (s.supplier ?? '').toLowerCase().includes('alibaba') ? DS.warningText
           : (s.supplier ?? '').toLowerCase().includes('dhgate') ? DS.info
           : DS.textMuted;
-        const platformBg = (s.supplier ?? '').toLowerCase().includes('alibaba') ? '#FFFBEB'
+        const platformBg = (s.supplier ?? '').toLowerCase().includes('alibaba') ? DS.warningBg
           : (s.supplier ?? '').toLowerCase().includes('dhgate') ? '#EFF6FF'
           : DS.bgElevated;
 
@@ -470,8 +470,8 @@ function StageSupplier({ session, onComplete }: {
 
             {/* Budget fit */}
             <View style={{ flexDirection: 'row', gap: 8, marginTop: 8, alignItems: 'center' }}>
-              <View style={[stg.resultBadge, { backgroundColor: fits ? '#ECFDF5' : '#FFFBEB' }]}>
-                <Text style={{ fontSize: 10, fontWeight: '700', color: fits ? '#059669' : DS.warning }}>
+              <View style={[stg.resultBadge, { backgroundColor: fits ? DS.successBg : DS.warningBg }]}>
+                <Text style={{ fontSize: 10, fontWeight: '700', color: fits ? DS.successText : DS.warning }}>
                   {fits ? 'Fits budget ✓' : 'Over budget'}
                 </Text>
               </View>
@@ -722,7 +722,7 @@ function StageCalculations({ session, onComplete }: {
   }
 
   const marginColor = !result ? DS.textMuted
-    : result.marginPct >= 20 ? '#059669'
+    : result.marginPct >= 20 ? DS.successText
     : result.marginPct >= 0  ? DS.warning
     : DS.danger;
 
@@ -742,7 +742,7 @@ function StageCalculations({ session, onComplete }: {
       <Field label="Est. Monthly Sales (units)" value={unitsEst} onChangeText={setUnitsEst} placeholder="150" keyboardType="numeric" />
       <Field label="PPC Cost per Unit ($)" value={ppcUnit} onChangeText={setPpcUnit} placeholder="1.50" keyboardType="decimal-pad" />
 
-      <Btn label="Run the Numbers →" color="#059669" onPress={calculate} />
+      <Btn label="Run the Numbers →" color={DS.successText} onPress={calculate} />
 
       {result && (
         <View style={{ gap: 10 }}>
@@ -796,7 +796,7 @@ function StageCalculations({ session, onComplete }: {
           />
 
           {result.verdict !== 'unprofitable' && (
-            <Btn label="Numbers Check Out — Build the Brand →" color="#059669" onPress={confirm} />
+            <Btn label="Numbers Check Out — Build the Brand →" color={DS.successText} onPress={confirm} />
           )}
           {result.verdict === 'unprofitable' && (
             <Btn label="Override and Continue Anyway" color={DS.danger} outline onPress={confirm} />
@@ -807,299 +807,54 @@ function StageCalculations({ session, onComplete }: {
   );
 }
 
-// ── Stage: Brand ──────────────────────────────────────────────────────────────
-
-const BRAND_STYLES = ['Modern', 'Minimalist', 'Bold', 'Premium', 'Playful'] as const;
-type BrandStyle = typeof BRAND_STYLES[number];
-
-const BRAND_ERROR_TIPS: Record<string, string[]> = {
-  default: [
-    'Try a shorter, simpler brand name (1–2 words work best)',
-    'Avoid special characters or numbers in your brand name',
-    'Make sure your product name is descriptive enough for AI to work with',
-    'Check your internet connection and try again',
-  ],
-  network: [
-    'You appear to be offline — check your connection and retry',
-    'The server may be busy — wait 10 seconds and try again',
-  ],
-};
-
-function BrandErrorCard({ message, onRetry }: { message: string; onRetry: () => void }) {
-  const tips = message.toLowerCase().includes('network') || message.toLowerCase().includes('fetch')
-    ? BRAND_ERROR_TIPS.network : BRAND_ERROR_TIPS.default;
-  return (
-    <View style={br.errorCard}>
-      <Text style={br.errorTitle}>Generation Failed</Text>
-      <Text style={br.errorMsg}>{message}</Text>
-      <Text style={br.errorTipsLabel}>How to fix it:</Text>
-      {tips.map((t, i) => (
-        <View key={i} style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
-          <Text style={{ color: DS.warning, fontSize: 12 }}>→</Text>
-          <Text style={br.errorTip}>{t}</Text>
-        </View>
-      ))}
-      <Btn label="Try Again" color={DS.warning} onPress={onRetry} />
-    </View>
-  );
-}
-
-function SvgAssetCard({ title, xml, height = 180 }: { title: string; xml: string; height?: number }) {
-  const w = Dimensions.get('window').width - 80;
-  return (
-    <View style={br.assetCard}>
-      <Text style={stg.eyebrow}>{title}</Text>
-      <View style={[br.svgBox, { height }]}>
-        <SvgXml xml={xml} width={w} height={height - 16} />
-      </View>
-    </View>
-  );
-}
+// ── Stage: Brand (redirects to Brand Studio) ──────────────────────────────────
 
 function StageBrand({ session, onComplete }: {
   session: BuilderSession;
   onComplete: (data: BrandData) => void;
 }) {
+  const navigation = useNavigation<any>();
   const productName = session.discovery?.product.title ?? '';
 
-  // Inputs
-  const [brandName,   setBrandName]   = useState('');
-  const [brandStyle,  setBrandStyle]  = useState<BrandStyle>('Modern');
-  const [audience,    setAudience]    = useState('');
-  const [colorNote,   setColorNote]   = useState('');
-  const [weight,      setWeight]      = useState('250g');
-
-  // Generation state
-  const [step,        setStep]        = useState<'idle' | 'brand' | 'label' | 'done'>('idle');
-  const [loading,     setLoading]     = useState(false);
-  const [error,       setError]       = useState('');
-  const [brandResult, setBrandResult] = useState<any | null>(null);
-  const [keywords,    setKeywords]    = useState<any | null>(null);
-  const [labelResult, setLabelResult] = useState<any | null>(null);
-
-  const canGenerate = brandName.trim().length >= 2;
-
-  async function generateBrand() {
-    setLoading(true); setError(''); setBrandResult(null); setLabelResult(null); setStep('brand');
-    try {
-      const styleHint = `${brandStyle.toLowerCase()} style, target: ${audience || 'general consumers'}, color preference: ${colorNote || 'professional'}`;
-      const [brand, kw] = await Promise.all([
-        api.createBrand(productName, styleHint, brandName.trim()),
-        api.researchKeywords(productName),
-      ]);
-      setBrandResult(brand);
-      setKeywords(kw);
-      setStep('label');
-      // Auto-generate label after brand
-      await generateLabel(brand);
-    } catch (e: any) {
-      setError(e?.message ?? 'Brand generation failed. Please try again.');
-      setStep('idle');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function generateLabel(brand?: any) {
-    const b = brand ?? brandResult;
-    if (!b) return;
-    setLoading(true);
-    try {
-      const label = await api.createLabel(brandName.trim(), productName, weight, brandStyle.toLowerCase());
-      setLabelResult(label);
-      setStep('done');
-    } catch {
-      // Label is optional — if it fails just move on
-      setStep('done');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  function confirm() {
-    if (!brandResult) return;
-    const b   = brandResult;
-    const kw  = keywords;
-    const listing = b.listing ?? {};
-    onComplete({
-      brandName:          brandName.trim(),
-      tagline:            b.tagline ?? '',
-      productTitle:       listing.title ?? b.brand_name ?? productName,
-      bulletPoints:       listing.bullet_points ?? [],
-      productDescription: listing.description ?? '',
-      backendKeywords:    kw?.head_terms ?? listing.backend_keywords ?? [],
-      logoSvg:            b.logo_svg ?? undefined,
-      insertSvg:          labelResult?.insert_svg ?? undefined,
-    });
-  }
-
   return (
-    <View style={{ gap: 16 }}>
-
-      {/* ── Input form ── */}
-      <View style={br.formCard}>
-        <Text style={br.formTitle}>Brand Details</Text>
-        <Field label="Brand Name *" value={brandName} onChangeText={setBrandName} placeholder="e.g. PureBlend, NovaCraft" />
-
-        <View style={{ gap: 6 }}>
-          <Text style={f.fieldLabel}>Brand Style</Text>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-            {BRAND_STYLES.map(s => (
-              <TouchableOpacity
-                key={s}
-                style={[br.stylePill, brandStyle === s && br.stylePillActive]}
-                onPress={() => setBrandStyle(s)}
-                activeOpacity={0.75}
-              >
-                <Text style={[br.stylePillTxt, brandStyle === s && br.stylePillTxtActive]}>{s}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        <Field label="Target Audience" value={audience} onChangeText={setAudience} placeholder="e.g. busy parents, fitness lovers, home cooks" />
-        <Field label="Color / Feel Preference" value={colorNote} onChangeText={setColorNote} placeholder="e.g. navy & gold, earthy tones, clean white" />
-        <Field label="Product Weight (for label)" value={weight} onChangeText={setWeight} placeholder="e.g. 250g, 1kg" />
-      </View>
-
-      {/* ── Generate button ── */}
-      {step === 'idle' && (
-        <Btn
-          label="Generate Brand + Logo + Label →"
-          color="#7C3AED"
-          onPress={generateBrand}
-          disabled={!canGenerate}
-        />
-      )}
-
-      {/* ── Loading states ── */}
-      {loading && (
-        <View style={br.loadingCard}>
-          <ActivityIndicator color="#7C3AED" size="large" />
-          <Text style={br.loadingTitle}>
-            {step === 'brand' ? 'Crafting your brand identity…' : 'Designing logo & label…'}
-          </Text>
-          <Text style={br.loadingSub}>
-            {step === 'brand' ? 'AI is writing your listing, tagline, and keywords' : 'Generating SVG assets for logo and packaging'}
-          </Text>
-        </View>
-      )}
-
-      {/* ── Error ── */}
-      {!!error && !loading && (
-        <BrandErrorCard message={error} onRetry={generateBrand} />
-      )}
-
-      {/* ── Results ── */}
-      {brandResult && !loading && (
-        <View style={{ gap: 14 }}>
-
-          {/* Brand identity header */}
-          <View style={br.identityCard}>
-            <Text style={br.bigBrandName}>{brandName.trim()}</Text>
-            {!!brandResult.tagline && (
-              <Text style={br.tagline}>"{brandResult.tagline}"</Text>
-            )}
-            <View style={[br.styleBadge]}>
-              <Text style={br.styleBadgeTxt}>{brandStyle}</Text>
-            </View>
-          </View>
-
-          {/* Logo SVG */}
-          {!!brandResult.logo_svg && (
-            <SvgAssetCard title="LOGO" xml={brandResult.logo_svg} height={160} />
-          )}
-
-          {/* Label + Packaging SVGs */}
-          {!!labelResult?.label_svg && (
-            <SvgAssetCard title="PRODUCT LABEL" xml={labelResult.label_svg} height={200} />
-          )}
-          {!!labelResult?.insert_svg && (
-            <SvgAssetCard title="PACKAGE INSERT" xml={labelResult.insert_svg} height={200} />
-          )}
-
-          {/* Listing title */}
-          {!!(brandResult.listing?.title) && (
-            <View style={br.assetCard}>
-              <Text style={stg.eyebrow}>AMAZON LISTING TITLE</Text>
-              <Text style={br.listingTitle}>{brandResult.listing.title}</Text>
-            </View>
-          )}
-
-          {/* Product description */}
-          {!!(brandResult.listing?.description) && (
-            <View style={br.assetCard}>
-              <Text style={stg.eyebrow}>PRODUCT DESCRIPTION</Text>
-              <Text style={br.description}>{brandResult.listing.description}</Text>
-            </View>
-          )}
-
-          {/* Bullet points */}
-          {(brandResult.listing?.bullet_points ?? []).length > 0 && (
-            <View style={br.assetCard}>
-              <Text style={stg.eyebrow}>LISTING BULLETS ({(brandResult.listing.bullet_points as string[]).length})</Text>
-              {(brandResult.listing.bullet_points as string[]).map((bp: string, i: number) => (
-                <View key={i} style={br.bulletRow}>
-                  <View style={br.bulletDot} />
-                  <Text style={br.bulletTxt}>{bp}</Text>
-                </View>
-              ))}
-            </View>
-          )}
-
-          {/* Backend keywords */}
-          {(keywords?.head_terms ?? []).length > 0 && (
-            <View style={br.assetCard}>
-              <Text style={stg.eyebrow}>SEO KEYWORDS</Text>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
-                {(keywords.head_terms as string[]).slice(0, 8).map((kw: string, i: number) => (
-                  <View key={i} style={stg.kwChip}>
-                    <Text style={stg.kwChipTxt}>{kw}</Text>
-                  </View>
-                ))}
-              </View>
-            </View>
-          )}
-
-          {/* Regenerate label if it failed */}
-          {!labelResult && step === 'done' && (
-            <Btn label="↻  Generate Label & Packaging" color="#7C3AED" outline onPress={() => generateLabel()} />
-          )}
-
-          <Btn label="Complete the Build →" color="#7C3AED" onPress={confirm} />
-        </View>
-      )}
+    <View style={brd.card}>
+      <Text style={brd.heading}>Brand Studio</Text>
+      <Text style={brd.body}>
+        Create your brand identity, logo, listing copy, and packaging in Brand Studio — Siftly's dedicated brand workspace.
+      </Text>
+      <TouchableOpacity
+        style={brd.primaryBtn}
+        onPress={() => navigation.navigate('BrandStudio')}
+        activeOpacity={0.85}
+      >
+        <Text style={brd.primaryBtnTxt}>Open Brand Studio →</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={brd.skipBtn}
+        onPress={() => onComplete({
+          brandName: productName,
+          tagline: '',
+          productTitle: productName,
+          bulletPoints: [],
+          productDescription: '',
+          backendKeywords: [],
+        })}
+        activeOpacity={0.7}
+      >
+        <Text style={brd.skipBtnTxt}>Skip for now — continue build</Text>
+      </TouchableOpacity>
     </View>
   );
 }
 
-const br = StyleSheet.create({
-  formCard:        { backgroundColor: DS.bgCard, borderRadius: 16, borderWidth: 1.5, borderColor: DS.border, padding: 16, gap: 14 },
-  formTitle:       { fontSize: 15, fontWeight: '800', color: DS.textPrimary, letterSpacing: -0.3 },
-  stylePill:       { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1.5, borderColor: DS.border, backgroundColor: DS.bgSubtle },
-  stylePillActive: { backgroundColor: '#7C3AED', borderColor: '#7C3AED' },
-  stylePillTxt:    { fontSize: 12, fontWeight: '700', color: DS.textSecondary },
-  stylePillTxtActive: { color: '#fff' },
-  loadingCard:     { backgroundColor: '#FAF5FF', borderRadius: 16, borderWidth: 1.5, borderColor: '#E9D5FF', padding: 28, alignItems: 'center', gap: 10 },
-  loadingTitle:    { fontSize: 15, fontWeight: '700', color: '#7C3AED', textAlign: 'center' },
-  loadingSub:      { fontSize: 12, color: '#9333EA', textAlign: 'center', lineHeight: 18 },
-  errorCard:       { backgroundColor: '#FFF7ED', borderRadius: 16, borderWidth: 1.5, borderColor: DS.warning + '55', padding: 16, gap: 8 },
-  errorTitle:      { fontSize: 14, fontWeight: '800', color: DS.warning },
-  errorMsg:        { fontSize: 13, color: DS.textSecondary, lineHeight: 19 },
-  errorTipsLabel:  { fontSize: 11, fontWeight: '700', color: DS.textMuted, marginTop: 4, letterSpacing: 0.5 },
-  errorTip:        { flex: 1, fontSize: 12, color: DS.textSecondary, lineHeight: 18 },
-  identityCard:    { backgroundColor: '#FAF5FF', borderRadius: 16, borderWidth: 1.5, borderColor: '#E9D5FF', padding: 20, alignItems: 'center', gap: 6 },
-  bigBrandName:    { fontSize: 32, fontWeight: '900', color: '#7C3AED', letterSpacing: -1 },
-  tagline:         { fontSize: 14, color: '#9333EA', fontStyle: 'italic', textAlign: 'center', lineHeight: 20 },
-  styleBadge:      { backgroundColor: '#7C3AED' + '20', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 3, marginTop: 4 },
-  styleBadgeTxt:   { fontSize: 11, fontWeight: '700', color: '#7C3AED' },
-  assetCard:       { backgroundColor: DS.bgCard, borderRadius: 14, borderWidth: 1.5, borderColor: DS.border, padding: 14, gap: 8 },
-  svgBox:          { backgroundColor: '#F8F4FF', borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginTop: 8, overflow: 'hidden' },
-  listingTitle:    { fontSize: 14, fontWeight: '700', color: DS.textPrimary, lineHeight: 21 },
-  description:     { fontSize: 13, color: DS.textSecondary, lineHeight: 20 },
-  bulletRow:       { flexDirection: 'row', gap: 10, alignItems: 'flex-start', marginTop: 6 },
-  bulletDot:       { width: 6, height: 6, borderRadius: 3, backgroundColor: '#7C3AED', marginTop: 7, flexShrink: 0 },
-  bulletTxt:       { flex: 1, fontSize: 13, color: DS.textSecondary, lineHeight: 19 },
+const brd = StyleSheet.create({
+  card:         { backgroundColor: DS.bgCard, borderRadius: DS.radiusCard, borderWidth: 1.5, borderColor: DS.border, padding: DS.cardPadding, gap: DS.cardGap },
+  heading:      { fontSize: 17, fontWeight: '800', color: DS.textPrimary, letterSpacing: -0.3 },
+  body:         { fontSize: 13, color: DS.textSecondary, lineHeight: 20 },
+  primaryBtn:   { backgroundColor: DS.accent, borderRadius: DS.radiusButton, paddingVertical: 14, alignItems: 'center', marginTop: 4 },
+  primaryBtnTxt:{ fontSize: 15, fontWeight: '700', color: '#fff' },
+  skipBtn:      { alignItems: 'center', paddingVertical: 8 },
+  skipBtnTxt:   { fontSize: 13, color: DS.textMuted, fontWeight: '500' },
 });
 
 // ── Stage: Complete ───────────────────────────────────────────────────────────
@@ -1160,11 +915,11 @@ function StageComplete({ session, onPublish }: {
           <>
             <View style={stg.summaryRow}>
               <Text style={stg.summaryLabel}>Margin</Text>
-              <Text style={[stg.summaryValue, { color: '#059669', fontWeight: '800' }]}>{c.marginPct}%</Text>
+              <Text style={[stg.summaryValue, { color: DS.successText, fontWeight: '800' }]}>{c.marginPct}%</Text>
             </View>
             <View style={[stg.summaryRow, { borderBottomWidth: 0 }]}>
               <Text style={stg.summaryLabel}>Est. Monthly Profit</Text>
-              <Text style={[stg.summaryValue, { color: '#059669', fontWeight: '800' }]}>${c.monthlyProfitEst.toLocaleString()}</Text>
+              <Text style={[stg.summaryValue, { color: DS.successText, fontWeight: '800' }]}>${c.monthlyProfitEst.toLocaleString()}</Text>
             </View>
           </>
         )}
@@ -1184,7 +939,7 @@ function PassedDiscoveryDetail({ session, onGoBack }: { session: BuilderSession;
   const d = session.discovery;
   if (!d) return null;
   const comp = d.product.competition;
-  const compColor = comp === 'Low' ? '#059669' : comp === 'High' ? DS.danger : DS.warning;
+  const compColor = comp === 'Low' ? DS.successText : comp === 'High' ? DS.danger : DS.warning;
   return (
     <View style={{ gap: 10 }}>
       <Text style={sc.summaryTxt} numberOfLines={2}>{d.product.title}</Text>
@@ -1202,7 +957,7 @@ function PassedAnalysisDetail({ session, onGoBack }: { session: BuilderSession; 
   const a = session.analysis;
   if (!a) return null;
   const isLaunch = a.verdict === 'LAUNCH'; const isTest = a.verdict === 'TEST';
-  const color = isLaunch ? '#059669' : isTest ? DS.warning : DS.danger;
+  const color = isLaunch ? DS.successText : isTest ? DS.warning : DS.danger;
   return (
     <View style={{ gap: 10 }}>
       <View style={[stg.verdictHero, { backgroundColor: color + '12', borderColor: color + '40', paddingVertical: 12 }]}>
@@ -1233,7 +988,7 @@ function PassedSupplierDetail({ session, onGoBack }: { session: BuilderSession; 
       <StatRow stats={[
         { label: 'Unit Price', value: `$${s.unitCost.toFixed(2)}` },
         { label: 'MOQ',        value: String(s.moq) },
-        { label: 'Budget fit', value: s.fitsProfileBudget ? 'Yes ✓' : 'Over', color: s.fitsProfileBudget ? '#059669' : DS.warning },
+        { label: 'Budget fit', value: s.fitsProfileBudget ? 'Yes ✓' : 'Over', color: s.fitsProfileBudget ? DS.successText : DS.warning },
       ]} />
       {onGoBack && <TouchableOpacity onPress={onGoBack}><Text style={sc.goBack}>Change supplier</Text></TouchableOpacity>}
     </View>
@@ -1259,7 +1014,7 @@ function PassedFreightDetail({ session, onGoBack }: { session: BuilderSession; o
 function PassedCalculationsDetail({ session, onGoBack }: { session: BuilderSession; onGoBack?: () => void }) {
   const c = session.calculations;
   if (!c) return null;
-  const marginColor = c.marginPct >= 20 ? '#059669' : c.marginPct >= 0 ? DS.warning : DS.danger;
+  const marginColor = c.marginPct >= 20 ? DS.successText : c.marginPct >= 0 ? DS.warning : DS.danger;
   return (
     <View style={{ gap: 10 }}>
       <Text style={[stg.calcBig, { color: marginColor }]}>${c.netProfit.toFixed(2)} <Text style={{ fontSize: 14, fontWeight: '600' }}>net profit/unit</Text></Text>
@@ -1387,7 +1142,7 @@ function StageCard({
         </View>
         <View style={{ flex: 1 }}>
           <Text style={[sc.stageName, isLocked && { color: DS.textMuted }]}>{label}</Text>
-          {isPassed && <Text style={[sc.stageStatus, { color: '#059669' }]}>✓ Complete{status === 'soft_fail' ? ' (override)' : ''}</Text>}
+          {isPassed && <Text style={[sc.stageStatus, { color: DS.successText }]}>✓ Complete{status === 'soft_fail' ? ' (override)' : ''}</Text>}
           {isActive  && <Text style={[sc.stageStatus, { color: accent }]}>Your turn →</Text>}
           {isLocked  && <Text style={[sc.stageStatus, { color: DS.textMuted }]}>Locked</Text>}
         </View>
@@ -1429,6 +1184,43 @@ function StageCard({
     </View>
   );
 }
+
+// ── Legacy Banner ─────────────────────────────────────────────────────────────
+
+function LegacyBanner({ navigation }: { navigation: any }) {
+  return (
+    <View style={lb.banner}>
+      <View style={lb.titleRow}>
+        <Text style={lb.badge}>LEGACY</Text>
+        <Text style={lb.title}>Legacy Builder</Text>
+      </View>
+      <Text style={lb.body}>
+        This older builder is kept for reference. For the full current workflow, use the main tabs: Niche → Research → Sourcing → Profit → Brand.
+      </Text>
+      <View style={lb.actions}>
+        <TouchableOpacity style={lb.btnPrimary} onPress={() => navigation.navigate('Main', { screen: 'Research' })} activeOpacity={0.85}>
+          <Text style={lb.btnPrimaryTxt}>Go to Research →</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={lb.btnSecondary} onPress={() => navigation.navigate('LaunchDecision')} activeOpacity={0.85}>
+          <Text style={lb.btnSecondaryTxt}>Go to Launch Decision</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
+const lb = StyleSheet.create({
+  banner:      { backgroundColor: DS.warning + '15', borderRadius: DS.radiusCard, borderWidth: 1.5, borderColor: DS.warning + '60', padding: 16, gap: 10 },
+  titleRow:    { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  badge:       { fontSize: 9, fontWeight: '900', color: DS.warning, backgroundColor: DS.warning + '25', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2, letterSpacing: 1.5 },
+  title:       { fontSize: 15, fontWeight: '800', color: DS.textPrimary, letterSpacing: -0.3 },
+  body:        { fontSize: 12, color: DS.textSecondary, lineHeight: 18 },
+  actions:     { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  btnPrimary:  { backgroundColor: DS.accent, borderRadius: DS.radiusButton, paddingHorizontal: 14, paddingVertical: 9 },
+  btnPrimaryTxt: { fontSize: 12, fontWeight: '800', color: '#fff' },
+  btnSecondary:  { backgroundColor: 'transparent', borderRadius: DS.radiusButton, paddingHorizontal: 14, paddingVertical: 9, borderWidth: 1.5, borderColor: DS.border },
+  btnSecondaryTxt: { fontSize: 12, fontWeight: '700', color: DS.textSecondary },
+});
 
 // ── Main Builder Screen ───────────────────────────────────────────────────────
 
@@ -1520,8 +1312,14 @@ export default function BuilderScreen() {
     return (
       <SafeAreaView style={bs.safe}>
         <AppHeader helpKey="launchpad" />
+        {navigation.canGoBack() && (
+          <TouchableOpacity style={bs.backBar} onPress={() => navigation.goBack()} activeOpacity={0.7}>
+            <Text style={bs.backTxt}>← Back</Text>
+          </TouchableOpacity>
+        )}
 
         <ScrollView style={{ flex: 1 }} contentContainerStyle={bs.emptyContent} showsVerticalScrollIndicator={false}>
+          <LegacyBanner navigation={navigation} />
           {/* Hero icon orb */}
           <View style={bs.heroOrb}>
             <View style={bs.heroOrbInner}>
@@ -1592,6 +1390,11 @@ export default function BuilderScreen() {
 
   return (
     <SafeAreaView style={bs.safe}>
+      {navigation.canGoBack() && (
+        <TouchableOpacity style={bs.backBar} onPress={() => navigation.goBack()} activeOpacity={0.7}>
+          <Text style={bs.backTxt}>← Back</Text>
+        </TouchableOpacity>
+      )}
       <View style={bs.header}>
         <View style={bs.headerTop}>
           <Text style={bs.eyebrow}>LAUNCHPAD · STEP {currentIdx + 1}/{STAGE_ORDER.length}</Text>
@@ -1615,6 +1418,7 @@ export default function BuilderScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
+        <LegacyBanner navigation={navigation} />
         {STAGE_ORDER.map((stage, i) => (
           <StageCard
             key={stage}
@@ -1642,7 +1446,7 @@ const sc = StyleSheet.create({
     backgroundColor: DS.bgCard, borderRadius: 16, borderWidth: 1.5, borderColor: DS.border,
     overflow: 'hidden',
   },
-  cardPassed: { borderColor: '#059669' + '50', backgroundColor: '#F0FDF4' },
+  cardPassed: { borderColor: DS.successText + '50', backgroundColor: '#F0FDF4' },
   cardLocked: { opacity: 0.5 },
 
   header:   { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16 },
@@ -1709,7 +1513,7 @@ const stg = StyleSheet.create({
 
   missionTitle: { fontSize: 22, fontWeight: '900', color: DS.textPrimary, textAlign: 'center', letterSpacing: -0.6 },
 
-  publishBtn:    { backgroundColor: '#D97706', borderRadius: 14, paddingVertical: 18, alignItems: 'center', width: '100%' },
+  publishBtn:    { backgroundColor: DS.warningText, borderRadius: 14, paddingVertical: 18, alignItems: 'center', width: '100%' },
   publishBtnTxt: { fontSize: 16, fontWeight: '900', color: '#fff', letterSpacing: -0.3 },
 });
 
@@ -1718,6 +1522,14 @@ const stg = StyleSheet.create({
 const bs = StyleSheet.create({
   safe:    { flex: 1, backgroundColor: DS.bgCanvas },
   content: { paddingHorizontal: 16, paddingBottom: 120, gap: 12 },
+  backBar: {
+    paddingHorizontal: DS.pagePadding,
+    paddingVertical:   8,
+    backgroundColor:   DS.bgCard,
+    borderBottomWidth: 1,
+    borderBottomColor: DS.border,
+  },
+  backTxt: { fontSize: 13, fontWeight: '700', color: DS.accent },
 
   header:          { paddingHorizontal: 20, paddingTop: 10, paddingBottom: 12, gap: 3, backgroundColor: DS.bgCard, borderBottomWidth: 1, borderBottomColor: DS.border },
   headerTop:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },

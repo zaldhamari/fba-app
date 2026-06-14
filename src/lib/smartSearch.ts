@@ -4,6 +4,7 @@
 
 import { Tier } from '../hooks/useSubscription';
 import { Product, Supplier } from '../services/api';
+import { estimateMonthlySales } from './financialEngine';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -270,8 +271,12 @@ export function scoreProduct(
 
   // ── Opportunity ───────────────────────────────────────────────────────────
   let opportunity = 0;
-  const revEst = p.price && p.review_count
-    ? Math.round(p.price * p.review_count * 0.05) : 0;
+  const comp2: 'Low' | 'Medium' | 'High' =
+    p.competition === 'High' ? 'High' : p.competition === 'Low' ? 'Low' : 'Medium';
+  const salesEst2 = (p.price && p.review_count && p.price > 0 && p.review_count > 0)
+    ? estimateMonthlySales(p.review_count, comp2, p.price)
+    : null;
+  const revEst = salesEst2 ? Math.round(salesEst2.mid * p.price!) : 0;
   if      (revEst > 10000) opportunity += 30;
   else if (revEst > 5000)  opportunity += 22;
   else if (revEst > 2000)  opportunity += 12;

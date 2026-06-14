@@ -49,7 +49,7 @@ const s = StyleSheet.create({
     borderColor:  DS.border,
   },
   shadow: {
-    shadowColor:   '#0D1B4B',
+    shadowColor:   DS.textPrimary,
     shadowOffset:  { width: 0, height: 2 },
     shadowOpacity: 0.06,
     shadowRadius:  12,

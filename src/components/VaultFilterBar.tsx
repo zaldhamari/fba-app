@@ -1,4 +1,5 @@
 import React from 'react';
+import { DS } from '../theme/ds';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView,
 } from 'react-native';
@@ -115,10 +116,10 @@ const s = StyleSheet.create({
     backgroundColor: colors.bgElevated,
   },
   chipActive: {
-    borderColor: '#2563EB',
+    borderColor: DS.accent,
     backgroundColor: 'rgba(37,99,235,0.10)',
   },
   chipDot: { width: 6, height: 6, borderRadius: 3 },
   chipText: { fontSize: 10, fontWeight: '600', color: colors.textMuted },
-  chipTextActive: { color: '#2563EB', fontWeight: '700' },
+  chipTextActive: { color: DS.accent, fontWeight: '700' },
 });

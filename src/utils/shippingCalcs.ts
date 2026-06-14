@@ -1,3 +1,5 @@
+import { fbaFulfillmentFee } from '../lib/financialEngine';
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export type ShipOrigin = 'CN' | 'VN' | 'IN' | 'TR';
@@ -105,15 +107,10 @@ const TRANSIT: Record<ShipMode, Record<string, string>> = {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
+// FBA fee here = canonical weight-based fulfillment (shared with the cost model)
+// plus the 15% referral, since this calculator reports an all-in Amazon fee.
 function estimateFbaFee(unitWeightKg: number, sellingPrice: number): number {
-  const lb = unitWeightKg * 2.205;
-  let fulfillment: number;
-  if (lb <= 0.5)       fulfillment = 3.22;
-  else if (lb <= 1)    fulfillment = 4.18;
-  else if (lb <= 2)    fulfillment = 5.09;
-  else if (lb <= 3)    fulfillment = 6.00;
-  else                 fulfillment = 6.00 + (lb - 3) * 0.50;
-  return fulfillment + sellingPrice * 0.15;
+  return fbaFulfillmentFee(unitWeightKg) + sellingPrice * 0.15;
 }
 
 function calcMode(mode: ShipMode, inputs: ShippingInputs): ShipModeResult {
@@ -153,9 +150,11 @@ function calcMode(mode: ShipMode, inputs: ShippingInputs): ShipModeResult {
   const dutyTotal   = productCostTotal * (inputs.dutyPct   / 100);
   const tariffTotal = productCostTotal * (inputs.tariffPct / 100);
 
-  const shippingPerUnit  = shippingUsd     / inputs.units;
-  const dutyPerUnit      = dutyTotal       / inputs.units;
-  const tariffPerUnit    = tariffTotal     / inputs.units;
+  // Guard against units=0 → Infinity/NaN per-unit costs.
+  const u = Math.max(inputs.units, 1);
+  const shippingPerUnit  = shippingUsd     / u;
+  const dutyPerUnit      = dutyTotal       / u;
+  const tariffPerUnit    = tariffTotal     / u;
   const landedCostPerUnit = inputs.productCostUsd + shippingPerUnit + dutyPerUnit + tariffPerUnit;
 
   const fbaFeePerUnit = estimateFbaFee(inputs.unitWeightKg, inputs.sellingPriceUsd);

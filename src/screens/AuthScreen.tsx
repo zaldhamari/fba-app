@@ -51,7 +51,7 @@ const soc = StyleSheet.create({
     borderColor:     DS.border,
     borderRadius:    DS.radiusButton,
     paddingVertical: 13,
-    shadowColor:     '#0D1B4B',
+    shadowColor:     DS.textPrimary,
     shadowOffset:    { width: 0, height: 1 },
     shadowOpacity:   0.05,
     shadowRadius:    4,
@@ -293,6 +293,12 @@ export default function AuthScreen({ navigation }: Props) {
         data.url,
         'siftly://auth/callback',
       );
+
+      if (result.type === 'cancel' || result.type === 'dismiss') {
+        // User closed the browser — not an error. finally() resets loading.
+        oauthPending.current = false;
+        return;
+      }
 
       if (result.type === 'success' && result.url) {
         // Implicit flow returns tokens in the URL fragment (#access_token=...&refresh_token=...)

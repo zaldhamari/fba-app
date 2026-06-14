@@ -80,3 +80,26 @@ export async function identifyUser(userId: string): Promise<void> {
 export async function anonymizeUser(): Promise<void> {
   await Purchases.logOut();
 }
+
+// Live prices from StoreKit via the current RC offering.
+// Returns null for each product if RC is unavailable or the offering
+// doesn't include tier-specific package identifiers.
+export interface LivePrices {
+  builderMonthly:  string | null;
+  builderAnnual:   string | null;
+  operatorMonthly: string | null;
+  operatorAnnual:  string | null;
+}
+
+export async function fetchLivePrices(): Promise<LivePrices> {
+  const offerings = await Purchases.getOfferings();
+  const pkgs = offerings.current?.availablePackages ?? [];
+  const find = (id: string) =>
+    pkgs.find(p => p.identifier === id)?.product.priceString ?? null;
+  return {
+    builderMonthly:  find('builder_monthly'),
+    builderAnnual:   find('builder_annual'),
+    operatorMonthly: find('operator_monthly'),
+    operatorAnnual:  find('operator_annual'),
+  };
+}

@@ -539,7 +539,7 @@ const s = StyleSheet.create({
     borderWidth:   1.5,
     padding:       DS.cardPadding,
     gap:           14,
-    shadowColor:   '#0D1B4B',
+    shadowColor:   DS.textPrimary,
     shadowOffset:  { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius:  8,

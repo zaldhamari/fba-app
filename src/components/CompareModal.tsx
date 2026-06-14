@@ -1,4 +1,5 @@
 import React from 'react';
+import { DS } from '../theme/ds';
 import { View, Text, StyleSheet, TouchableOpacity, Modal, ScrollView } from 'react-native';
 import { colors, spacing, radius } from '../theme';
 import { useCurrency } from '../context/CurrencyContext';
@@ -52,14 +53,14 @@ export default function CompareModal({
 
         {unanalyzed > 0 && (
           <Text style={cmp.unanalyzedNote}>
-            {`${unanalyzed} product${unanalyzed > 1 ? 's' : ''} not yet analyzed — tap Analyze Product on each to include them`}
+            {`${unanalyzed} product${unanalyzed > 1 ? 's' : ''} not yet analyzed — tap Get Verdict on each to include them`}
           </Text>
         )}
 
         {scored.length === 0 ? (
           <View style={cmp.emptyState}>
             <Text style={cmp.emptyStateText}>
-              {'Analyze each product first\nto see a side-by-side comparison.'}
+              {'Get a verdict on each product first\nto see a side-by-side comparison.'}
             </Text>
           </View>
         ) : (
@@ -120,7 +121,7 @@ const cmp = StyleSheet.create({
   bestPickBanner: {
     backgroundColor: colors.greenLight, borderRadius: radius.xl,
     padding: spacing.md, borderWidth: 1.5, borderColor: `${colors.green}50`, gap: 4,
-    shadowColor: '#059669', shadowOffset: { width: 0, height: 4 },
+    shadowColor: DS.successText, shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.18, shadowRadius: 12, elevation: 5,
   },
   bestPickHeader:    { flexDirection: 'row', alignItems: 'center', gap: 8 },
@@ -140,7 +141,7 @@ const cmp = StyleSheet.create({
   cardBest: {
     borderColor: colors.green, borderWidth: 2,
     backgroundColor: colors.greenLight,
-    shadowColor: '#059669', shadowOffset: { width: 0, height: 4 },
+    shadowColor: DS.successText, shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.18, shadowRadius: 12, elevation: 6,
   },
   bestBadge:    { backgroundColor: colors.green, borderRadius: radius.full, paddingHorizontal: 10, paddingVertical: 3, alignSelf: 'flex-start' },
@@ -154,7 +155,7 @@ const cmp = StyleSheet.create({
   riskBox:      { borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 7, marginTop: 2 },
   riskLabel:    { fontSize: 8, fontWeight: '800', color: colors.red, letterSpacing: 1.5, marginBottom: 2 },
   riskText:     { fontSize: 10, color: colors.textMuted, lineHeight: 14 },
-  closeBtn:     { backgroundColor: '#2563EB', borderRadius: radius.full, paddingVertical: spacing.md, alignItems: 'center' },
+  closeBtn:     { backgroundColor: DS.accent, borderRadius: radius.full, paddingVertical: spacing.md, alignItems: 'center' },
   closeBtnText: { fontSize: 15, fontWeight: '700', color: colors.white },
   emptyState:     { alignItems: 'center', paddingVertical: spacing.lg },
   emptyStateText: { fontSize: 13, color: colors.textMuted, textAlign: 'center', lineHeight: 20 },

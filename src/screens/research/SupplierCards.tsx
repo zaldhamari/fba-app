@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import {
-  View, Text, Modal, ScrollView, StyleSheet, TouchableOpacity, Clipboard, Linking,
+  View, Text, Modal, ScrollView, StyleSheet, TouchableOpacity, Linking,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppCard, DS } from '../../components/ds';
 import { useCurrency } from '../../context/CurrencyContext';
@@ -9,6 +10,16 @@ import { SupplierDisplay, OutreachEmail } from './types';
 import { SmartBadgeStrip, am } from './SharedComponents';
 import { prm, numHL, hlBg, hlTxt, scoreSupplierForCompare, buildSupplierReasons, CMP_LABEL_W, CMP_CELL_W, HL } from './ProductCards';
 import { openURL } from './utils';
+
+// ── Grade colors ──────────────────────────────────────────────────────────────
+
+export const GRADE_COLOR: Record<string, string> = {
+  A: DS.success,
+  B: DS.info,
+  C: DS.warning,
+  D: DS.danger,
+  F: DS.danger,
+};
 
 // ── Platform colors ───────────────────────────────────────────────────────────
 
@@ -18,8 +29,8 @@ export const PLATFORM_COLORS: Record<string, { bg: string; color: string }> = {
   'DHgate':                { bg: DS.infoBg,     color: DS.info   },
   'Made-in-China':         { bg: '#F0FDF4',     color: '#16A34A' },
   'Global Sources':        { bg: DS.indigoLight, color: DS.indigo },
-  '1688 (Domestic China)': { bg: '#FFF7ED', color: '#D97706' },
-  '1688':                  { bg: '#FFF7ED', color: '#D97706' },
+  '1688 (Domestic China)': { bg: '#FFF7ED', color: DS.warningText },
+  '1688':                  { bg: '#FFF7ED', color: DS.warningText },
 };
 
 // ── Supplier card ─────────────────────────────────────────────────────────────
@@ -35,17 +46,22 @@ interface SupplierCardProps {
   onOutreach:            () => void;
   onAttachFeasibility?:  () => void;
   isFeasAttached?:       boolean;
+  onSelect?:             () => void;
+  isSelected?:           boolean;
+  grade?:                string;
 }
 
 export function SupplierCard({
   item, inCompare, analyzeLoading, outreachLoading,
   onView, onAnalyze, onToggleCompare, onOutreach, onAttachFeasibility, isFeasAttached,
+  onSelect, isSelected, grade,
 }: SupplierCardProps) {
   const { fmt } = useCurrency();
   const hasLink      = !!item.url;
   const isGold       = item.badge === 'Gold Supplier';
   const priceDisplay = item.priceUSD != null ? `${fmt(item.priceUSD)}/unit` : item.price;
   const pStyle       = PLATFORM_COLORS[item.platform] ?? { bg: DS.bgSubtle, color: DS.textSecondary };
+  const gradeColor   = grade ? (GRADE_COLOR[grade] ?? DS.textMuted) : null;
 
   return (
     <AppCard padding={14} radius={18} style={sc.card}>
@@ -60,10 +76,17 @@ export function SupplierCard({
             </View>
           </View>
         </View>
-        <View style={[sc.trustBadge, isGold ? sc.trustGold : sc.trustVerified]}>
-          <Text style={[sc.trustText, isGold ? sc.trustTextGold : sc.trustTextVerified]}>
-            {isGold ? '★ Gold' : '✓ Verified'}
-          </Text>
+        <View style={{ gap: 4 }}>
+          <View style={[sc.trustBadge, isGold ? sc.trustGold : sc.trustVerified]}>
+            <Text style={[sc.trustText, isGold ? sc.trustTextGold : sc.trustTextVerified]}>
+              {isGold ? '★ Gold' : '✓ Verified'}
+            </Text>
+          </View>
+          {gradeColor && (
+            <View style={[sc.trustBadge, { backgroundColor: gradeColor + '18' }]}>
+              <Text style={[sc.trustText, { color: gradeColor }]}>Grade {grade}</Text>
+            </View>
+          )}
         </View>
       </View>
 
@@ -142,7 +165,18 @@ export function SupplierCard({
           activeOpacity={0.8}
         >
           <Text style={[sc.feasTxt, isFeasAttached && sc.feasTxtSaved]}>
-            {isFeasAttached ? '✕  Remove' : '→  Run Feasibility Check'}
+            {isFeasAttached ? '✕  Remove' : '→  Attach to Pipeline'}
+          </Text>
+        </TouchableOpacity>
+      )}
+      {onSelect && (
+        <TouchableOpacity
+          style={[sc.feasBtn, isSelected ? sc.selectBtnSelected : sc.selectBtn]}
+          onPress={onSelect}
+          activeOpacity={0.8}
+        >
+          <Text style={[sc.feasTxt, isSelected && sc.selectTxtSelected]}>
+            {isSelected ? '✓  Supplier Selected' : '→  Lock in This Supplier'}
           </Text>
         </TouchableOpacity>
       )}
@@ -151,7 +185,7 @@ export function SupplierCard({
 }
 const sc = StyleSheet.create({
   card:             { gap: 12 },
-  rangeNote:        { backgroundColor: '#FFFBEB', borderRadius: 8, padding: 8, borderWidth: 1, borderColor: '#FDE68A' },
+  rangeNote:        { backgroundColor: DS.warningBg, borderRadius: 8, padding: 8, borderWidth: 1, borderColor: '#FDE68A' },
   rangeNoteTxt:     { fontSize: 11, color: '#92400E', lineHeight: 16 },
   header:           { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 },
   nameLine:         { flexDirection: 'row', alignItems: 'flex-start', gap: 8, flex: 1 },
@@ -188,6 +222,9 @@ const sc = StyleSheet.create({
   feasBtnSaved:     { backgroundColor: DS.bgSubtle, borderColor: DS.border },
   feasTxt:          { fontSize: 11, fontWeight: '700' as const, color: DS.indigo },
   feasTxtSaved:     { color: DS.textMuted },
+  selectBtn:        { borderRadius: 10, paddingVertical: 9, alignItems: 'center' as const, backgroundColor: DS.accentLight, borderWidth: 1.5, borderColor: DS.accent + '44' },
+  selectBtnSelected:{ borderRadius: 10, paddingVertical: 9, alignItems: 'center' as const, backgroundColor: DS.success + '12', borderWidth: 1.5, borderColor: DS.success },
+  selectTxtSelected:{ color: DS.success },
 });
 
 // ── Premium Compare suppliers modal ──────────────────────────────────────────
@@ -362,7 +399,7 @@ export function OutreachEmailCard({ email }: { email: OutreachEmail }) {
 
   function handleCopy() {
     const full = `Subject: ${email.subject}\n\n${email.body}`;
-    Clipboard.setString(full);
+    Clipboard.setStringAsync(full).catch(() => {});
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }

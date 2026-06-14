@@ -1,3 +1,6 @@
+import type { KeepaSignals } from '../../services/api';
+export type { KeepaSignals };
+
 // ── Display types ─────────────────────────────────────────────────────────────
 
 export type Mode = 'market' | 'lookup' | 'suppliers' | 'freight';
@@ -10,11 +13,21 @@ export interface ProductDisplay {
   image: string;
   revenue: string;
   revenueUSD: number | null;
+  monthlySalesEst: number | null;
   reviews: string;
   reviewCount: number | null;
   competition: 'Low' | 'Medium' | 'High';
   badge: 'Promising' | 'Moderate' | 'Saturated';
   url?: string;
+  // Sales estimates (directional, review-model based)
+  salesEstLow?:      number;
+  salesEstHigh?:     number;
+  salesEstMonthly?:  string;   // "~120–280/mo"
+  salesEstDaily?:    string;   // "~4–9/day"
+  salesConfidence?:  'Low' | 'Medium';
+  ppcPressure?:      'Low' | 'Medium' | 'High';
+  revenueEstLow?:    number;
+  revenueEstHigh?:   number;
   // Smart search scores
   relevanceScore?:    number;
   opportunityScore?:  number;
@@ -60,12 +73,13 @@ export interface EnrichedKeyword {
 }
 
 export interface AnalyzeProductResult {
-  verdict: 'LAUNCH' | 'TEST' | 'AVOID';
+  verdict:    'LAUNCH' | 'TEST' | 'AVOID';
   confidence: number;
-  summary: string;
-  reasons: string[];
-  risk: string;
-  next_step: string;
+  summary:    string;
+  reasons:    string[];
+  risk:       string;
+  next_step:  string;
+  signals?:   KeepaSignals;
 }
 
 export interface AnalyzeSupplierResult {

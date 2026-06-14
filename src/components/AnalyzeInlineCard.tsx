@@ -1,8 +1,10 @@
 import React, { useEffect, useRef } from 'react';
+import { DS } from '../theme/ds';
 import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
 import { colors, spacing, radius, shadow, motion } from '../theme';
 import { useCurrency } from '../context/CurrencyContext';
 import PulseDots from './PulseDots';
+import VerdictFeedback from './VerdictFeedback';
 import { AnalyzeResult } from '../types/research';
 
 export type { AnalyzeResult };
@@ -99,7 +101,7 @@ export default function AnalyzeInlineCard({
         </View>
       ) : loading ? (
         <View style={ai.loadingWrap}>
-          <PulseDots color={'#2563EB'} />
+          <PulseDots color={DS.accent} />
           <View style={ai.loadingTextWrap}>
             <Text style={ai.loadingTitle}>Analyzing market signals…</Text>
             <Text style={ai.loadingSub}>Margin · competition · trend · risk</Text>
@@ -188,6 +190,9 @@ export default function AnalyzeInlineCard({
             </TouchableOpacity>
           )}
 
+          {/* Reality-Check feedback — captures trust/utility/influence into analytics */}
+          <VerdictFeedback verdict={result.verdict} confidence={result.confidence} />
+
           {/* Action row: save button only shown for TEST/AVOID; compare always shown */}
           <View style={ai.footer}>
             {result.verdict !== 'LAUNCH' && (
@@ -245,7 +250,7 @@ const ai = StyleSheet.create({
   },
   limitTitle:     { fontSize: 14, fontWeight: '800', color: colors.textPrimary },
   limitSub:       { fontSize: 12, color: colors.textSecondary, lineHeight: 18 },
-  upgradeBtn:     { backgroundColor: '#2563EB', borderRadius: radius.full, paddingVertical: 12, alignItems: 'center' },
+  upgradeBtn:     { backgroundColor: DS.accent, borderRadius: radius.full, paddingVertical: 12, alignItems: 'center' },
   upgradeBtnText: { fontSize: 14, fontWeight: '700', color: colors.white },
   upgradePerks:   { fontSize: 10, color: colors.textMuted, textAlign: 'center' },
   verdictCard: {
@@ -281,9 +286,9 @@ const ai = StyleSheet.create({
   riskText:  { fontSize: 12, color: colors.textPrimary, lineHeight: 18 },
   nextCard: {
     backgroundColor: 'rgba(37,99,235,0.10)', borderRadius: radius.lg,
-    padding: spacing.sm + 4, borderLeftWidth: 3, borderLeftColor: '#2563EB',
+    padding: spacing.sm + 4, borderLeftWidth: 3, borderLeftColor: DS.accent,
   },
-  nextLabel: { fontSize: 8, fontWeight: '800', color: '#2563EB', letterSpacing: 1.8, marginBottom: 3 },
+  nextLabel: { fontSize: 8, fontWeight: '800', color: DS.accent, letterSpacing: 1.8, marginBottom: 3 },
   nextText:  { fontSize: 13, fontWeight: '600', color: colors.textPrimary, lineHeight: 18 },
   metricsRow: {
     flexDirection: 'row', backgroundColor: colors.bgElevated,
@@ -297,7 +302,7 @@ const ai = StyleSheet.create({
     backgroundColor: colors.green, borderRadius: radius.full,
     paddingVertical: 15, alignItems: 'center', justifyContent: 'center',
     flexDirection: 'row', gap: 8,
-    shadowColor: '#059669', shadowOffset: { width: 0, height: 6 },
+    shadowColor: DS.successText, shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.32, shadowRadius: 16, elevation: 8,
   },
   launchCtaSaved:    { backgroundColor: colors.greenLight, shadowOpacity: 0, elevation: 0 },
@@ -305,12 +310,12 @@ const ai = StyleSheet.create({
   launchCtaText:     { fontSize: 15, fontWeight: '800', color: colors.white, letterSpacing: -0.3 },
   footer:            { flexDirection: 'row', gap: spacing.sm, alignItems: 'center' },
   saveBtn: {
-    flex: 1, borderWidth: 1, borderColor: '#2563EB',
+    flex: 1, borderWidth: 1, borderColor: DS.accent,
     borderRadius: radius.full, paddingVertical: 9, alignItems: 'center',
     backgroundColor: 'rgba(37,99,235,0.10)',
   },
   saveBtnDone:         { backgroundColor: colors.greenLight, borderColor: colors.green },
-  saveBtnText:         { fontSize: 12, fontWeight: '700', color: '#2563EB' },
+  saveBtnText:         { fontSize: 12, fontWeight: '700', color: DS.accent },
   saveBtnTextDone:     { color: colors.green, fontWeight: '700' },
   compareBtn: {
     borderWidth: 1, borderColor: colors.border, borderRadius: radius.full,

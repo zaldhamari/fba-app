@@ -1,4 +1,5 @@
 import React, { useRef } from 'react';
+import { DS } from '../theme/ds';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
   Share, Linking, StatusBar,
@@ -164,7 +165,7 @@ const s = StyleSheet.create({
     opacity: 0.5,
   },
   eyebrow: {
-    fontSize: 10, fontWeight: '800', color: '#2563EB',
+    fontSize: 10, fontWeight: '800', color: DS.accent,
     letterSpacing: 2.8, marginBottom: spacing.sm,
   },
   title: {
@@ -198,7 +199,7 @@ const s = StyleSheet.create({
     shadowOpacity: 0.06, shadowRadius: 8, elevation: 2,
   },
   sectionNumber: {
-    fontSize: 9, fontWeight: '900', color: '#2563EB',
+    fontSize: 9, fontWeight: '900', color: DS.accent,
     letterSpacing: 1.5, opacity: 0.7,
   },
   sectionTitle: {
@@ -223,17 +224,17 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(37,99,235,0.22)',
     gap: spacing.sm,
-    shadowColor: '#2563EB',
+    shadowColor: DS.accent,
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.10, shadowRadius: 10, elevation: 3,
   },
   emailChipLabel: {
-    fontSize: 9, fontWeight: '800', color: '#2563EB', letterSpacing: 2,
+    fontSize: 9, fontWeight: '800', color: DS.accent, letterSpacing: 2,
   },
   emailChipValue: {
     flex: 1, fontSize: 14, fontWeight: '600', color: colors.textPrimary,
   },
-  emailChipArrow: { fontSize: 16, color: '#2563EB', fontWeight: '700' },
+  emailChipArrow: { fontSize: 16, color: DS.accent, fontWeight: '700' },
 
   // ── Bottom actions
   actions: {
@@ -254,7 +255,7 @@ const s = StyleSheet.create({
     paddingVertical: spacing.md + 2,
     gap: 4,
   },
-  actionIcon: { fontSize: 16, color: '#2563EB' },
+  actionIcon: { fontSize: 16, color: DS.accent },
   actionText: { fontSize: 11, fontWeight: '700', color: colors.textSecondary },
   actionDivider: { width: 1, backgroundColor: colors.border, marginVertical: spacing.sm },
 

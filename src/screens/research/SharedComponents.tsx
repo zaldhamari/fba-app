@@ -1,16 +1,16 @@
 import React, { useState } from 'react';
 import {
   View, Text, Modal, ScrollView, StyleSheet, TouchableOpacity,
-  ActivityIndicator, Image, TextInput,
+  ActivityIndicator, TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   AppCard,
-  StatusBadge,
   PrimaryButton,
   DS,
 } from '../../components/ds';
 import FeasibilityHeart from '../../components/FeasibilityHeart';
+import VerdictFeedback from '../../components/VerdictFeedback';
 import { useCurrency } from '../../context/CurrencyContext';
 import { SmartSearchSummary } from '../../lib/smartSearch';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -23,6 +23,7 @@ import {
   EnrichedKeyword,
   AnalyzeProductResult,
   AnalyzeSupplierResult,
+  KeepaSignals,
 } from './types';
 import { buildKeywordCSV } from './productHelpers';
 
@@ -78,16 +79,17 @@ const recent = StyleSheet.create({
 // ── Mode segmented control (3 tabs) ──────────────────────────────────────────
 
 export const MODE_TABS: { id: Mode; label: string; color: string }[] = [
-  { id: 'lookup',    label: 'Recon',     color: DS.indigo  },
-  { id: 'market',   label: 'Amazon',    color: DS.info    },
+  { id: 'lookup',    label: 'Teardown',  color: DS.indigo  },
+  { id: 'market',   label: 'Products',  color: DS.info    },
   { id: 'suppliers', label: 'Suppliers', color: DS.accent  },
-  { id: 'freight',   label: 'Freight',   color: DS.warning },
+  { id: 'freight',   label: 'Shipping',  color: DS.warning },
 ];
 
-export function ModeSegment({ value, onChange }: { value: Mode; onChange: (v: Mode) => void }) {
+export function ModeSegment({ value, onChange, exclude }: { value: Mode; onChange: (v: Mode) => void; exclude?: Mode[] }) {
+  const tabs = exclude ? MODE_TABS.filter(t => !exclude.includes(t.id)) : MODE_TABS;
   return (
     <View style={seg.wrap}>
-      {MODE_TABS.map(t => {
+      {tabs.map(t => {
         const active = value === t.id;
         return (
           <TouchableOpacity
@@ -120,10 +122,10 @@ const seg = StyleSheet.create({
 // ── Mode description strip ────────────────────────────────────────────────────
 
 const MODE_DESC: Record<Mode, string> = {
-  market:    'Search any keyword to discover product opportunities ranked by demand and competition.',
-  lookup:    'Enter any product, ASIN, or Amazon URL — AI reads the reviews and surfaces every flaw you can fix in your version.',
-  suppliers: 'Find matching suppliers on Alibaba, DHgate, and 1688. Select a product in Market first for better results.',
-  freight:   'Estimate shipping costs from China to your FBA warehouse. Select units, weight, and dimensions to compare air vs sea.',
+  market:    'Find products: search any keyword to discover opportunities ranked by demand and competition.',
+  lookup:    'Teardown a product: paste any product, ASIN, or Amazon URL — AI reads the reviews and surfaces every flaw you can fix to beat it.',
+  suppliers: 'Find suppliers: matching factories on Alibaba, DHgate, and 1688. Pick a product in the Products tab first for better matches.',
+  freight:   'Estimate shipping: costs from China to your FBA warehouse. Enter units, weight, and dimensions to compare air vs sea.',
 };
 
 export function ModeDescStrip({ mode }: { mode: Mode }) {
@@ -240,11 +242,11 @@ const BADGE_STYLE: Record<string, { bg: string; color: string }> = {
   'Smart Pick':             { bg: DS.indigoLight,   color: DS.indigo    },
   'Low Competition':        { bg: DS.accentLight,   color: DS.accentDark },
   'High Demand':            { bg: DS.warningBg,     color: DS.warningText },
-  'Quick Win':              { bg: '#ECFDF5',        color: '#047857'    },
+  'Quick Win':              { bg: DS.successBg,        color: '#047857'    },
   'Well Rated':             { bg: DS.goldLight,     color: DS.gold      },
   'Low MOQ':                { bg: DS.accentLight,   color: DS.accentDark },
   'Great Price':            { bg: DS.accentLight,   color: DS.accentDark },
-  'Verified':               { bg: '#EFF6FF',        color: '#1D4ED8'    },
+  'Verified':               { bg: '#EFF6FF',        color: DS.accentDark    },
   'Private Label Friendly': { bg: '#F5F3FF',        color: '#6D28D9'    },
 };
 
@@ -274,92 +276,6 @@ const sbs = StyleSheet.create({
   badgeTxt: { fontSize: 9, fontWeight: '800', letterSpacing: 0.3 },
   scorePill:{ backgroundColor: DS.bgSubtle, borderRadius: DS.radiusBadge, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: DS.border },
   scoreTxt: { fontSize: 9, fontWeight: '700', color: DS.textMuted },
-});
-
-// ── Product image + info shared layout helper ─────────────────────────────────
-
-export function ProductTopRow({ item }: { item: ProductDisplay }) {
-  const { fmt } = useCurrency();
-  const badgeVariant: 'success' | 'warning' | 'neutral' =
-    item.badge === 'Promising' ? 'success' : item.badge === 'Saturated' ? 'neutral' : 'warning';
-  const compColor = item.competition === 'Low' ? DS.successText : item.competition === 'High' ? DS.danger : DS.warning;
-  const compBg    = item.competition === 'Low' ? DS.successBg   : item.competition === 'High' ? DS.dangerBg : DS.warningBg;
-  return (
-    <View style={ptr.row}>
-      <View style={ptr.imgBox}>
-        {item.image ? (
-          <Image source={{ uri: item.image }} style={ptr.img} resizeMode="contain" />
-        ) : (
-          <Text style={ptr.placeholder}>🛒</Text>
-        )}
-      </View>
-      <View style={ptr.info}>
-        <Text style={ptr.name} numberOfLines={2}>{item.name}</Text>
-        <View style={ptr.badges}>
-          <StatusBadge label={item.badge} variant={badgeVariant} dot />
-          <View style={[ptr.compBadge, { backgroundColor: compBg }]}>
-            <Text style={[ptr.compText, { color: compColor }]}>{item.competition} Comp</Text>
-          </View>
-          <Text style={ptr.estNote}>AI est.</Text>
-        </View>
-        {item.price != null
-          ? <Text style={ptr.price}>{fmt(item.price)}</Text>
-          : <Text style={ptr.priceNA}>Price unavailable</Text>}
-        {item.rating != null && <StarRating rating={item.rating} />}
-      </View>
-    </View>
-  );
-}
-const ptr = StyleSheet.create({
-  row:         { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
-  imgBox:      { width: 68, height: 68, borderRadius: 14, backgroundColor: DS.bgSubtle, borderWidth: 1, borderColor: DS.border, alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' },
-  img:         { width: 66, height: 66, borderRadius: 13 },
-  placeholder: { fontSize: 26 },
-  info:        { flex: 1, gap: 5 },
-  name:        { fontSize: 13, fontWeight: '700', color: DS.textPrimary, letterSpacing: -0.2, lineHeight: 19 },
-  badges:      { flexDirection: 'row', gap: 5, flexWrap: 'wrap', alignItems: 'center' },
-  compBadge:   { borderRadius: DS.radiusBadge, paddingHorizontal: 7, paddingVertical: 2 },
-  compText:    { fontSize: 10, fontWeight: '700' },
-  estNote:     { fontSize: 9, color: DS.textMuted, fontStyle: 'italic' },
-  price:       { fontSize: 15, fontWeight: '900', color: DS.textPrimary, letterSpacing: -0.4 },
-  priceNA:     { fontSize: 11, color: DS.textMuted, fontStyle: 'italic' },
-});
-
-// ── Product stats row ─────────────────────────────────────────────────────────
-
-export function ProductStatsRow({ item }: { item: ProductDisplay }) {
-  const { fmt } = useCurrency();
-  const revenueDisplay = item.revenueUSD != null ? `${fmt(item.revenueUSD, 0)}/mo` : item.revenue;
-  const isMockId = item.id === '1' || item.id === '2' || item.id === '3';
-  return (
-    <View style={psr.wrap}>
-      <View style={psr.stat}>
-        <Text style={psr.val}>{item.reviews !== 'N/A' ? item.reviews : 'Reviews unavailable'}</Text>
-        <Text style={psr.lbl}>Reviews</Text>
-      </View>
-      <View style={psr.div} />
-      <View style={psr.stat}>
-        <Text style={psr.val}>{revenueDisplay}</Text>
-        <Text style={psr.lbl}>Est. Revenue</Text>
-      </View>
-      {!isMockId && (
-        <>
-          <View style={psr.div} />
-          <View style={psr.stat}>
-            <Text style={psr.val} numberOfLines={1}>{item.id}</Text>
-            <Text style={psr.lbl}>ASIN</Text>
-          </View>
-        </>
-      )}
-    </View>
-  );
-}
-const psr = StyleSheet.create({
-  wrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: DS.bgSubtle, borderRadius: 12, padding: 11 },
-  stat: { flex: 1, alignItems: 'center', gap: 2 },
-  val:  { fontSize: 11, fontWeight: '800', color: DS.textPrimary, letterSpacing: -0.2 },
-  lbl:  { fontSize: 8, fontWeight: '600', color: DS.textMuted, textTransform: 'uppercase', letterSpacing: 0.4, textAlign: 'center' },
-  div:  { width: 1, height: 26, backgroundColor: DS.border },
 });
 
 // ── Ask AI Panel ──────────────────────────────────────────────────────────────
@@ -496,6 +412,72 @@ const es = StyleSheet.create({
   sub:   { fontSize: 12, color: DS.textMuted, textAlign: 'center', lineHeight: 18, paddingHorizontal: 20 },
 });
 
+// ── Signals block (honesty gate — must appear above verdict, never below) ─────
+
+function SignalsBlock({ signals }: { signals: KeepaSignals }) {
+  type Item = { variant: 'warning' | 'neutral' | 'info'; text: string };
+  const items: Item[] = [];
+
+  const bsr   = signals.bsr;
+  const price = signals.price;
+
+  if (bsr) {
+    if (bsr.spike_flag) {
+      items.push({ variant: 'warning', text: '⚠ Possible one-time spike — demand may not be durable.' });
+    }
+    if (bsr.trend === 'declining') {
+      items.push({ variant: 'warning', text: '⚠ Demand trending down over 90 days.' });
+    } else if (bsr.trend === 'improving') {
+      items.push({ variant: 'info',    text: 'Rank improving — demand has been building.' });
+    } else if (bsr.trend === 'stable') {
+      items.push({ variant: 'neutral', text: 'Rank stable — consistent demand signal.' });
+    } else {
+      items.push({ variant: 'neutral', text: 'Not enough BSR history to assess trend.' });
+    }
+  }
+
+  if (price) {
+    if (price.direction === 'falling') {
+      const pctStr = price.pct_change_90d != null
+        ? ` (${Math.abs(price.pct_change_90d).toFixed(1)}% over 90d)`
+        : '';
+      items.push({ variant: 'warning', text: `⚠ Prices falling${pctStr} — possible race to the bottom.` });
+    } else if (price.direction === 'insufficient_data') {
+      items.push({ variant: 'neutral', text: 'Not enough price history to assess trend.' });
+    }
+    if (price.floor_usd != null) {
+      items.push({ variant: 'neutral', text: `90-day price floor: $${price.floor_usd.toFixed(2)}` });
+    }
+  }
+
+  if (items.length === 0) return null;
+
+  return (
+    <View style={sig.wrap}>
+      <Text style={sig.eyebrow}>MARKET SIGNALS</Text>
+      {items.map((item, i) => {
+        const isWarn = item.variant === 'warning';
+        const isInfo = item.variant === 'info';
+        const bg     = isWarn ? DS.warningBg  : isInfo ? DS.indigoLight : DS.bgSubtle;
+        const border = isWarn ? DS.warning    : isInfo ? DS.indigo      : DS.border;
+        const color  = isWarn ? DS.warningText : isInfo ? DS.indigo     : DS.textSecondary;
+        return (
+          <View key={i} style={[sig.row, { backgroundColor: bg, borderColor: border }]}>
+            <Text style={[sig.txt, { color }]}>{item.text}</Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+const sig = StyleSheet.create({
+  wrap:    { gap: 8 },
+  eyebrow: { fontSize: 9, fontWeight: '800', color: DS.textMuted, textTransform: 'uppercase', letterSpacing: 1.2 },
+  row:     { borderRadius: DS.radiusChip, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 9 },
+  txt:     { fontSize: 13, fontWeight: '600', lineHeight: 19 },
+});
+
 // ── Analyze Product modal ─────────────────────────────────────────────────────
 
 export function AnalyzeProductModal({
@@ -511,7 +493,7 @@ export function AnalyzeProductModal({
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <SafeAreaView style={am.sheet}>
         <View style={am.toolbar}>
-          <Text style={am.title}>Product Analysis</Text>
+          <Text style={am.title}>Product Verdict</Text>
           <TouchableOpacity style={am.closeBtn} onPress={onClose} activeOpacity={0.7}>
             <Text style={am.closeTxt}>Done</Text>
           </TouchableOpacity>
@@ -531,6 +513,9 @@ export function AnalyzeProductModal({
             const verdictIcon  = result.verdict === 'LAUNCH' ? '✓' : result.verdict === 'TEST' ? '◉' : '✕';
             return (
               <>
+                {/* Signals — always above verdict so risk can't be missed */}
+                {result.signals && <SignalsBlock signals={result.signals} />}
+
                 {/* Go / No-Go verdict card */}
                 <View style={[am.verdictCard, { borderColor: verdictColor + '50', backgroundColor: verdictColor + '08' }]}>
                   <View style={am.verdictTop}>
@@ -579,6 +564,9 @@ export function AnalyzeProductModal({
                     <Text style={[am.bullet, { color: DS.accent, fontWeight: '600' }]}>{result.next_step}</Text>
                   </View>
                 )}
+
+                {/* Reality-Check feedback — trust / utility / influence → analytics */}
+                <VerdictFeedback verdict={result.verdict} confidence={result.confidence} />
 
                 <View style={am.disclaimer}>
                   <Text style={am.disclaimerText}>Based on estimated market data. Always verify before ordering.</Text>

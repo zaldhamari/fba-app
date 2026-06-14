@@ -7,9 +7,12 @@ export type FeatureKey =
   // Main screens
   | 'advisor'
   | 'copilot'
+  | 'niche'
   | 'research'
+  | 'sourcing'
   | 'profit_lab'
   | 'brand_studio'
+  | 'launch_decision'
   | 'launch_checklist'
   | 'launchpad'
   | 'winner_vault'
@@ -28,14 +31,10 @@ export type FeatureKey =
   | 'launch_readiness'
   // Profit Lab calculators
   | 'calc_fba'
-  | 'calc_landed'
   | 'calc_breakeven'
   | 'calc_ppc'
   | 'calc_freight'
   | 'calc_duties'
-  | 'calc_reorder'
-  | 'calc_roi'
-  | 'calc_unit_econ'
   // Brand Studio tabs
   | 'brand_logo'
   | 'brand_label'
@@ -105,160 +104,246 @@ export const FEATURE_HELP: Record<FeatureKey, FeatureHelpEntry> = {
     ],
   },
 
-  copilot: {
-    name:    'Copilot',
-    tagline: 'Your FBA command centre — AI tools, live pipeline, Winner Vault, and launch checklist.',
-    quickTip: 'Use the three AI tools at the top for quick answers, then scroll down to track your active build or review your vault entries.',
-    recommendation: '1. Tap "Analyze a Product" to get an instant AI verdict on any keyword before opening Research.\n2. Start a build in LaunchPad — your active build progress appears here automatically.\n3. When you publish from LaunchPad, your product appears in the Winner Vault. Tap any card to view the full breakdown and export a report.',
+  niche: {
+    name:    'Niche Research',
+    tagline: 'Score a market before you pick a product — demand, competition, price range, and the gap.',
+    quickTip: 'Run a niche search before opening Research. A niche with a score above 60 and a clear "gap" is worth investigating at the product level.',
+    recommendation: '1. Enter a product category or keyword and tap Analyze Niche.\n2. Read the market snapshot — avg price, avg reviews, low competition count.\n3. Read "The Gap" — these are the unmet buyer needs your product version should solve.\n4. Add strong niches to your watchlist to compare across sessions.',
     sections: [
       {
-        title:   'Analyze a Product',
-        content: 'Tap the 🔍 card to open the AI product analyser. Enter any keyword — Siftly pulls live Amazon data, checks competition, and returns a LAUNCH / TEST / AVOID verdict with a confidence score, reasons, and review gaps you can exploit. Try one of the example chips to see it in action.',
+        title:   'Market Score',
+        content: 'A 0–100 score combining demand signals, competition level, review count, and price range. Above 60 is a worthwhile niche to research further. Below 40 usually means the market is either saturated or too thin. The score is a signal, not a verdict — always read the breakdown.',
       },
       {
-        title:   'Find Opportunities',
-        content: 'Tap 💡 to generate AI-curated product niches matched to your seller profile — budget, marketplace, experience, and price range. Switch to "Search" to run a custom niche report on any keyword: verdict, market snapshot, the gap, and affordability check.',
+        title:   'Market Snapshot',
+        content: 'Six metrics from live Amazon data: average price, average reviews, average rating, top competitor review count, total products found, and the number of products with low competition. The "top competitor reviews" number tells you the ceiling you need to beat — under 500 is an accessible entry point.',
+      },
+      {
+        title:   'The Gap',
+        content: 'The most actionable part of the niche report. These are the unmet needs — features buyers want but the current top products don\'t deliver. Your product version should address at least two gaps to have a differentiation angle. Copy the best gap points into Research → Review Intelligence for a deeper analysis.',
+      },
+      {
+        title:   'Products to Model',
+        content: 'A short list of the best-performing products in this niche — the ones worth studying for price positioning, review strategy, and listing structure. These are not products to copy; they are benchmarks to beat.',
+      },
+      {
+        title:   'Affordability Check',
+        content: 'A quick check against your seller profile budget. If the minimum launch capital for this niche exceeds your stated budget, you\'ll see a flag here. Update your budget in Settings → Seller Profile if your situation has changed.',
+      },
+      {
+        title:   'Watchlist',
+        content: 'Tap the star on any niche report to save it to your watchlist. Use the watchlist to compare 3–4 niches side by side before committing to one. Watchlisted niches persist between sessions.',
+      },
+    ],
+  },
+
+  copilot: {
+    name:    'Copilot',
+    tagline: 'Your AI intelligence advisor — pipeline summary, product intelligence, and on-demand answers.',
+    quickTip: 'Copilot reads your entire active pipeline — niche, product, supplier, freight, and profit data — so every answer it gives is specific to your current build, not generic advice.',
+    recommendation: '1. Set your active product in Research first — track a product to your pipeline so Copilot has context.\n2. Ask about anything in your build: margins, supplier negotiation, freight modes, listing strategy, PPC bids.\n3. Use the intelligence summary at the top to spot blockers before they become problems.',
+    sections: [
+      {
+        title:   'Pipeline Intelligence',
+        content: 'The card at the top shows Product Intelligence for your currently tracked product — seller fit score, risk blockers, revenue estimate, freight sensitivity, and recon insights. This updates automatically as you add data across other tabs. No action needed here; it is a live read of your pipeline.',
       },
       {
         title:   'Ask Copilot',
-        content: 'Tap 🤖 to ask any FBA question and get an instant AI answer. Use the quick-question chips or type anything — margins, supplier negotiation, PPC strategy, listing copy, import duties. Each answer is generated fresh; include your product details for the most specific advice.',
+        content: 'Type any FBA question and get an AI answer that is aware of your current product, supplier, cost model, and market data. Ask about margins, supplier negotiation, PPC strategy, listing angles, import duties — anything. Include your product details in each message for the most specific response.',
       },
       {
-        title:   'Active Build Card',
-        content: 'If you have an active LaunchPad build, a progress card appears below the AI tools showing your current stage and overall completion %. Tap it to jump directly into your pipeline. There is only ever one active build at a time.',
+        title:   'Seller Fit Score',
+        content: 'A 0–100 score rating how well the tracked product fits your seller profile (budget, experience, marketplace). Below 50 shows specific blockers — tap each blocker to understand what needs to change. Scores above 70 are strong entry signals.',
       },
       {
-        title:   'Winner Vault',
-        content: 'Every product you publish from LaunchPad appears here as a vault card — colour-coded by margin (green = strong, amber = viable, red = review). Tap any card to open the full detail view: unit economics, P&L waterfall, supply chain, and PDF export. Tap "?" next to the section title for more.',
+        title:   'Revenue & Freight Sensitivity',
+        content: 'Revenue estimate uses real sales velocity modelling — not a simple formula. Freight sensitivity (Low / Medium / High / Extreme) is derived from your product\'s weight category and price point. High sensitivity means freight cost swings dramatically affect your margin; confirm your freight estimate before committing.',
       },
       {
-        title:   'Quick Actions',
-        content: 'Four shortcut buttons to the main tools: Start a Build (LaunchPad), Research Market, Profit Lab, and Brand Studio. These are the same tabs in the bottom navigation — just faster to reach from here.',
-      },
-      {
-        title:   'Launch Checklist',
-        content: 'A 7-phase, 35-task launch roadmap that lives at the bottom of this screen. Tap any phase tab to see its tasks and check them off as you complete them. Progress saves automatically and feeds into your overall readiness score.',
+        title:   'Recon Insights',
+        content: 'Once you run Review Intelligence in Research and save insights to your pipeline, they appear here as competitive angles and differentiation opportunities. These feed into your sourcing brief and listing angle in Brand Studio.',
       },
       {
         title:   'Seller Profile',
-        content: 'Tap your profile strip (marketplace, budget, price range) to open profile settings. Your profile controls the AI\'s product suggestions, the "For You" niche recommendations, and the LaunchPad discovery fit check. Keep it up to date as your business grows.',
+        content: 'Your marketplace, budget, and price range preferences control how Copilot scores products and what advice it gives. Keep it updated as your business grows — the seller fit score uses these directly.',
       },
     ],
   },
 
   research: {
     name:    'Research',
-    tagline: 'Search Amazon live data — products, suppliers, and freight — all in one workspace.',
-    quickTip: 'Amazon tab searches by keyword. Lookup fetches a product by ASIN. Suppliers finds sourcing options. Freight estimates your shipping cost. Run all four for the same idea before committing to a product.',
+    tagline: 'Search Amazon live data, deep-dive reviews, and build product intelligence for your pipeline.',
+    quickTip: 'Market mode finds opportunities by keyword. Review Intelligence (Lookup mode) reads customer pain points for a specific product — run both before tracking a product to your pipeline.',
+    recommendation: '1. Search a keyword in Market mode. Find a product with Low competition and under 300 reviews.\n2. Tap "Track in Pipeline" on the best product — this sets it as your active product across all tabs.\n3. Switch to Lookup mode and enter the product name or ASIN to run Review Intelligence. Save insights to your pipeline.',
     sections: [
       {
-        title:   'Amazon Tab',
-        content: 'Live Amazon keyword search. Enter any product keyword and tap Search Amazon — results return matching listings with price, reviews, rating, and a competition badge. Low competition + under 300 reviews is your entry window. Each card has Analyse (AI verdict), Compare (side-by-side), and Select (attach to LaunchPad).',
+        title:   'Market Mode',
+        content: 'Live Amazon keyword search with smart ranking. Results are scored by demand, competition, and keyword relevance — the best opportunities appear first, not just the most popular listings. Low competition + under 300 reviews is your entry window. Each card has Track (add to pipeline), Analyse (AI verdict), and Compare.',
       },
       {
-        title:   'Lookup Tab',
-        content: 'Fetch a single Amazon product by ASIN or URL. Use this to deep-dive a specific listing you found manually. Results show the same detail as Amazon tab cards — price, review count, competition, and all three action buttons.',
+        title:   'Review Intelligence (Lookup Mode)',
+        content: 'Enter a product name, ASIN, or Amazon URL. AI reads thousands of customer reviews and returns: what customers hate, what they love, unmet market gaps, improvement specs, and bundle ideas. This is your sourcing brief — the exact features your version needs to include to beat the competition.',
       },
       {
-        title:   'Suppliers Tab',
-        content: 'Sourcing search across Alibaba, DHgate, and 1688. Enter a product keyword to find matching suppliers. Each card shows platform, unit price range, MOQ, and a Private Label badge when OEM/ODM is available. Attach the best match before running the LaunchPad pipeline.',
+        title:   'Differentiation Strategy',
+        content: 'After Review Intelligence runs, tap "Generate Strategy" to get niche angles, listing hook, and price positioning recommendations. These are auto-saved to your pipeline so Copilot and Brand Studio can use them when you get to those tabs.',
       },
       {
-        title:   'Freight Tab',
-        content: 'Instant freight cost estimates for sea, air, express, and sea FCL. Enter product dimensions and order quantity — results show cost per unit and transit time for each mode. Use the output as your "freight per unit" input in LaunchPad Calculations.',
+        title:   'Product Intelligence Strip',
+        content: 'Once you track a product to your pipeline, a Product Intelligence card appears at the top of Research. It shows your seller fit score, revenue estimate, freight sensitivity, and risk blockers — all derived from your live pipeline data. It updates automatically as you add more information.',
       },
       {
-        title:   'Compare Feature',
-        content: 'Tap ⊞ Compare on any Amazon result to add it to the compare tray. A floating pill appears once you add at least one product — add a second and tap it to open the side-by-side comparison table. Highlighted cells show which product wins each metric.',
+        title:   'Track in Pipeline',
+        content: 'Tap "Track in Pipeline" on any product card to set it as your active product. This carries the product\'s price, competition level, reviews, and sales estimates through to Sourcing, Profit Lab, Copilot, and Launch Decision — you don\'t re-enter this data in each tab.',
       },
       {
-        title:   'Analyse Feature',
-        content: 'Tap ⊛ Analyse on any Amazon card to instantly run an AI verdict — pulls live Amazon data, checks competition, and returns a LAUNCH / TEST / AVOID decision with reasons. Same engine as the Copilot "Analyze a Product" tool.',
+        title:   'Compare',
+        content: 'Tap ⊞ on any product to add it to the compare tray. Add 2–3 products and tap the floating Compare bar to see a side-by-side table. Highlighted cells show which product wins each metric. Use Compare before deciding which product to track.',
+      },
+    ],
+  },
+
+  sourcing: {
+    name:    'Sourcing & Logistics',
+    tagline: 'Find suppliers, estimate freight, and lock in your cost model before running profit calculations.',
+    quickTip: 'Save your freight estimate to the pipeline before opening Profit Lab — it auto-fills your freight field so you aren\'t guessing.',
+    recommendation: '1. Search for suppliers using your product keyword. Compare unit prices at the same MOQ tier.\n2. Run the freight estimate for your order size. Tap "Save Freight Estimate to Pipeline."\n3. Open Profit Lab — your freight cost will auto-fill in the calculator.',
+    sections: [
+      {
+        title:   'Supplier Search',
+        content: 'Searches across Alibaba, DHgate, and 1688. Each card shows platform, price range, MOQ, and a Private Label Friendly badge. Compare at least 2–3 suppliers at the same MOQ before choosing. Alibaba with Trade Assurance is the safest option for first orders.',
+      },
+      {
+        title:   'Freight Estimator',
+        content: 'Enter your product dimensions and order quantity to see cost per unit for sea LCL, sea FCL, air, and express. The recommended mode is highlighted. Sea LCL is cheapest for most first orders — air makes sense when a stockout costs more than the premium.',
+      },
+      {
+        title:   'Save Freight to Pipeline',
+        content: 'Tap "Save Freight Estimate to Pipeline" to persist your freight cost. Once saved, Profit Lab will auto-fill your freight field — no re-entry needed. The saved estimate is marked as "Estimated" until you replace it with a real freight quote from a forwarder.',
+      },
+      {
+        title:   'Freight Sensitivity',
+        content: 'Sourcing shows your product\'s freight sensitivity level: Low / Medium / High / Extreme. Derived from your product\'s weight and price point. High sensitivity means a $0.50 change in freight per unit moves your margin by several percentage points — double-check your freight figure before ordering.',
+      },
+      {
+        title:   'Supplier Quotes',
+        content: 'Tap "Add Quote" to manually save a supplier quote (name, platform, unit price, MOQ). Saved quotes persist in your pipeline and appear in Copilot\'s intelligence summary so you don\'t lose track of them between sessions.',
+      },
+    ],
+  },
+
+  launch_decision: {
+    name:    'Launch Decision',
+    tagline: 'Your full pipeline intelligence — seller fit, product score, simulation, and export.',
+    quickTip: 'This screen assembles everything from your pipeline into one decision view. Fill in more data in Research, Sourcing, and Profit Lab to improve the accuracy of every signal shown here.',
+    recommendation: '1. Track a product in Research and save freight in Sourcing first — this unlocks the most complete intelligence view.\n2. Read your Seller Fit score and blockers. Fix any blockers before proceeding.\n3. Use Decision Simulation to stress-test what happens if unit cost rises or sales velocity drops.',
+    sections: [
+      {
+        title:   'Product Intelligence',
+        content: 'Assembles your seller fit score, revenue estimate, freight sensitivity, and recon insights into one view. The score uses your seller profile, pipeline product data, and any insights saved from Review Intelligence. Higher scores mean the product fits your profile well — blockers explain what to fix.',
+      },
+      {
+        title:   'Seller Fit Score',
+        content: 'Rates product fit against your budget, marketplace, experience level, and price range. Blockers are specific — "Estimated capital exceeds your budget" means the MOQ × unit cost is above your stated limit. Update your seller profile if your situation has changed, not the score.',
+      },
+      {
+        title:   'Decision Simulation',
+        content: 'Test what happens to your key metrics when conditions change — increase unit cost, lower selling price, or reduce expected sales velocity. Simulation runs against your pipeline data without changing it. Use it to find your breaking point before committing to an order.',
+      },
+      {
+        title:   'Revenue & Sales Estimate',
+        content: 'Revenue is estimated using a review-velocity model, not a simple formula. It shows a low/high band and a directional confidence level. Treat it as a relative signal — "Higher Confidence" means the data behind the estimate is stronger, not that the number is guaranteed.',
+      },
+      {
+        title:   'Export',
+        content: 'Tap "Export Decision Report" to generate a text file with your full pipeline state — product, supplier, freight, cost model, intelligence scores, and recon insights. Share it with a business partner or use it as a decision record before placing an order.',
       },
     ],
   },
 
   profit_lab: {
     name:    'Profit Lab',
-    tagline: '9 standalone financial calculators for every stage of your FBA business.',
-    quickTip: 'Run Landed Cost first, then FBA Profit using that landed cost as your product cost — this single sequence fixes the most common financial error in FBA planning.',
+    tagline: '9 standalone financial calculators — auto-filled from your pipeline where possible.',
+    quickTip: 'Save your freight estimate in Sourcing before opening Profit Lab — it auto-fills the freight field so you\'re working with real numbers, not guesses.',
+    recommendation: '1. Save freight in Sourcing first — the FBA Profit freight field auto-fills from your pipeline.\n2. Run Landed Cost, then use that result as product cost in FBA Profit.\n3. Check Break-even last — compare it against your first order quantity before committing.',
     sections: [
       {
         title:   'Calculator Grid',
-        content: 'Nine tiles at the top — tap any to open it: FBA Profit, Landed Cost, Break-even, PPC/ACoS, Freight, Import Duties, Reorder Point, ROI, Unit Economics. Your inputs in the current calculator are preserved until you switch.',
+        content: 'Nine calculators: FBA Profit, Landed Cost, Break-even, PPC/ACoS, Freight, Import Duties, Reorder Point, ROI, Unit Economics. Tap any tile to open it. Your inputs are preserved while you switch between calculators in the same session.',
       },
       {
-        title:   'Input Fields',
-        content: 'Enter numbers in the fields below the active calculator. Results update live as you type — no submit button. Use the landed cost output (from Landed Cost calculator) as the product cost input in FBA Profit and Feasibility Check.',
+        title:   'Pipeline Auto-Fill',
+        content: 'If you tracked a product in Research and saved a freight estimate in Sourcing, the FBA Profit calculator auto-fills selling price and freight per unit on first open. Auto-filled values are clearly labelled — override them at any time if you have better data.',
       },
       {
         title:   'Results Display',
-        content: 'Key metrics shown prominently below the inputs. Sensitivity analysis appears beneath some calculators — FBA Profit shows how ±10% changes in selling price affect your margin. Read the sensitivity table before committing to a price.',
+        content: 'Results update live as you type — no submit button. FBA Profit shows a sensitivity table below the main result: how ±10% changes in selling price affect your margin. Read this before setting your price — a small price move often moves margin significantly.',
       },
       {
-        title:   'Save Button',
-        content: 'FBA Profit has a Save button — tap it to store the result permanently. The AI Co-Pilot reads your latest saved result and gives product-specific analysis. Without a saved result, AI output is generic.',
+        title:   'Confirmed vs Estimated',
+        content: 'Freight values auto-filled from Sourcing are labelled "Estimated" until you replace them with a real forwarder quote. Confirmed values (from an actual quote) are labelled accordingly. Profit Lab always shows which inputs are estimates — treat estimated results as directional, not final.',
       },
       {
         title:   'Recommended order',
-        content: 'Landed Cost → FBA Profit → Break-even → PPC. Use Reorder Point only after 30+ days of real sales data. Freight and Import Duties when planning your first order. ROI and Unit Economics to evaluate the full picture before committing.',
+        content: 'Run in this order: Landed Cost → FBA Profit → Break-even → PPC. Use Reorder Point only after 30+ days of real sales data. Freight and Import Duties when planning your first order. ROI and Unit Economics to see the full capital picture before committing.',
       },
     ],
   },
 
   brand_studio: {
     name:    'Brand Studio',
-    tagline: 'AI-generates logos, product labels, and packaging inserts as exportable SVG files.',
-    quickTip: 'Fill Brand Identity once, then generate all three assets — logo, label, insert — using the same inputs for a consistent brand kit.',
+    tagline: 'AI-generates logos, product labels, and packaging inserts — all based on your brand identity.',
+    quickTip: 'Fill Brand Identity once, then generate all three assets — logo, label, insert — using the same inputs for a consistent brand kit. Export immediately; assets are not saved between sessions.',
+    recommendation: '1. Complete Brand Identity (brand name, audience, tone) — be specific with tone.\n2. Select a style that matches your product category, then tap Generate.\n3. Export the SVG right after reviewing — tap Export to share or save to Files.',
     sections: [
       {
         title:   'Asset Tabs',
-        content: 'Three tabs at the top: Logo, Label, Insert. Each generates a different brand asset. Switch between them freely — your Brand Identity inputs are shared across all three tabs, so you only fill them in once.',
+        content: 'Three tabs: Logo, Label, Insert. Each generates a different brand asset using the same Brand Identity inputs. Switch freely — inputs are shared across all three tabs so you only fill them in once.',
       },
       {
         title:   'Brand Identity Form',
-        content: 'Brand name, target audience, and brand tone. Be specific with tone — "clean and sustainable" produces a different result than "bold and energetic." These inputs drive the AI\'s content, color, and typography decisions.',
+        content: 'Brand name, target audience, and tone. Be specific — "eco-conscious parents" produces a different result than "buyers." Tone examples: "clean and minimal," "bold and energetic," "premium and understated." If you saved recon insights in Research, your niche angles and listing hook can inform the tone here.',
+      },
+      {
+        title:   'AI Draft Label',
+        content: 'Logo and listing outputs are AI-generated concept drafts. They are starting points — not production-ready assets. The "AI CONCEPT DRAFT" badge on generated content is a reminder to review and refine before sending to a supplier or designer.',
       },
       {
         title:   'Style Selector',
-        content: 'Five styles: Minimal, Premium, Eco, Bold, Luxury. Choose what fits your product category — Eco for sustainable goods, Bold for sports/outdoor, Premium for cosmetics. Eco and Minimal scale best at thumbnail size, which is how most Amazon buyers see your product.',
+        content: 'Five styles: Minimal (clean lines), Premium (refined), Eco (earthy, sustainable), Bold (high contrast), Luxury (dark palette). Choose what fits your product category, not personal taste. Eco and Minimal scale best at thumbnail size — how most buyers see your product.',
       },
       {
-        title:   'Generate & Preview',
-        content: 'Tap the Generate button on any tab. SVG renders on screen in 5–15 seconds. If the output misses the mark, adjust one input (style or tone) and regenerate. Each generation is independent — previous outputs are not saved.',
-      },
-      {
-        title:   'Export',
-        content: 'Tap Export to share the SVG file. SVGs are vector files — they scale without quality loss. Send to your listing designer or print supplier. Assets are not saved between sessions — export before closing the app.',
+        title:   'Generate & Export',
+        content: 'Tap Generate — SVG renders in 5–15 seconds. If the result misses the mark, change one input (style or tone) and regenerate. Tap Export to share the SVG file. SVGs are vector files — they scale without quality loss. Assets are not saved between sessions; export before closing.',
       },
     ],
   },
 
   launch_checklist: {
-    name:    'Launch Checklist',
-    tagline: '7-phase, 35-step structured launch roadmap with milestone tracking and AI guidance.',
-    quickTip: 'Work phases in order — skipping ahead is the most common cause of failed launches. Select a phase to see its specific tasks and guidance.',
-    recommendation: '1. Select Phase 01 from the stage chips and complete all 5 research tasks before anything else.\n2. Use the ✦ AI button on any task you\'re unsure about — it gives step-specific guidance.\n3. Complete Phases 01 and 04 fully before ordering inventory — these two phases prevent the most expensive mistakes.',
+    name:    'Launch Plan',
+    tagline: '7-phase, 35-task launch roadmap — with auto-completion from your pipeline data.',
+    quickTip: 'Some tasks auto-complete based on your pipeline progress — if you\'ve tracked a product, saved a supplier, or run Profit Lab, those steps may already be marked done when you open this screen.',
+    recommendation: '1. Check what\'s already auto-completed from your pipeline before starting.\n2. Work phases in order — Phase 01 (Research) and Phase 04 (Sourcing) have the highest impact.\n3. Use ✦ AI on any task you\'re unsure about — guidance is specific to that task, not generic advice.',
     sections: [
       {
-        title:   'Stage Chips',
-        content: 'Seven phase tabs at the top: Research, Brand, Keywords, Source, Listing, Logistics, Launch. Tap any chip to jump to that phase. The chip shows your completion % for each phase — aim for 100% before moving to the next.',
+        title:   'Pipeline Auto-Completion',
+        content: 'Tasks that correspond to actions you\'ve already taken across Siftly are auto-marked complete with a green "Auto" badge. For example: if you tracked a product in Research, "Select a product" is auto-completed; if you saved a freight estimate in Sourcing, "Confirm freight costs" is auto-completed. Your manual progress stacks on top of auto-completions.',
       },
       {
-        title:   'Task List',
-        content: '35 tasks across 7 phases. Each task has a checkbox — tap to mark complete. Progress saves automatically. The two highest-impact phases are Research (Phase 01) and Sourcing (Phase 04) — do not skip steps in either.',
+        title:   'Phase Tabs',
+        content: 'Seven phases: Research, Brand, Keywords, Source, Listing, Logistics, Launch. Each chip shows your completion %. Tap any to see its tasks. Work in order — each phase builds on the previous one. Do not start Phase 05 (Listing) before Phase 03 (Keywords) is done.',
       },
       {
-        title:   'AI Guidance Button',
-        content: 'Every task has a ✦ AI button. Tap it for step-specific direction from the AI advisor — not generic advice, but instruction tailored to exactly that task. Most useful in Phase 03 (Keywords) and Phase 05 (Listing), where the guidance is especially detailed.',
+        title:   'AI Guidance',
+        content: 'Every task has a ✦ AI button. Tap it for step-specific direction — not generic FBA advice, but guidance tailored to that exact task. Most useful in Phase 03 (Keywords) and Phase 05 (Listing), where the guidance is especially detailed.',
       },
       {
-        title:   'Milestone Cards',
-        content: 'Five milestones unlock automatically when their required tasks are complete: Product Selected (Phase 01), Brand Setup, Keyword Strategy, Supplier Confirmed, Listing Live. Each milestone feeds into your Launch Readiness Score in Feasibility Check.',
+        title:   'Milestones',
+        content: 'Five milestones unlock automatically when required tasks are complete: Product Selected, Brand Setup, Keyword Strategy, Supplier Confirmed, Listing Live. Milestones are prerequisites — you need Product Selected before Supplier Confirmed is meaningful.',
       },
       {
-        title:   'Launch Readiness connection',
-        content: 'Completing 50%+ of the checklist (18 tasks) adds +15 to your Launch Readiness Score and can upgrade the Go/No-Go decision from WAIT to TEST. At 100%, execute Phase 07 — the structured launch plan.',
+        title:   'High-impact phases',
+        content: 'Phase 01 (Research) and Phase 04 (Sourcing) prevent the most expensive mistakes. Do not move to inventory ordering until both are 100% complete. Phase 07 (Launch) is the structured execution plan — follow it for the first 30 days on Amazon.',
       },
     ],
   },
@@ -578,31 +663,6 @@ export const FEATURE_HELP: Record<FeatureKey, FeatureHelpEntry> = {
     ],
   },
 
-  calc_landed: {
-    name:    'Landed Cost',
-    tagline: 'True unit cost across sea, air, and express shipping — freight and customs included.',
-    quickTip: 'Always run this before FBA Profit. Freight + customs typically add 20–40% on top of the supplier quote.',
-    recommendation: '1. Enter supplier unit cost, order quantity, weight, and duty % — all four fields matter.\n2. Use the sea freight landed cost as the product cost in FBA Profit and Feasibility Check.\n3. Revisit this when you get actual freight quotes — the estimate can differ by 20-30%.',
-    sections: [
-      {
-        title:   'Inputs',
-        content: 'Supplier unit cost ($), order quantity (units), unit weight (kg), product dimensions (cm), and import duty %. Fill all fields — missing weight or duty produces an underestimate.',
-      },
-      {
-        title:   'Results',
-        content: 'Landed cost per unit for three shipping modes: sea (28 days), air (7 days), and express (3 days). Displayed side by side so you can compare true unit cost vs transit time.',
-      },
-      {
-        title:   'Which mode to use',
-        content: 'Sea freight for orders over 200kg — it\'s 5–10× cheaper than air. Air makes sense when stockout risk outweighs the premium. Always get actual freight quotes to validate these estimates.',
-      },
-      {
-        title:   'Where to use the output',
-        content: 'Take the sea freight landed cost → enter it as "product cost" in FBA Profit and Feasibility Check. This single input affects every margin and profit calculation downstream.',
-      },
-    ],
-  },
-
   calc_breakeven: {
     name:    'Break-even',
     tagline: 'Units required to recover total investment — inventory, shipping, fees, and launch costs.',
@@ -695,73 +755,6 @@ export const FEATURE_HELP: Record<FeatureKey, FeatureHelpEntry> = {
       {
         title:   'Where to use the output',
         content: 'Import duty % → enter into Feasibility Check and Landed Cost for accurate per-unit cost projections.',
-      },
-    ],
-  },
-
-  calc_reorder: {
-    name:    'Reorder Point',
-    tagline: 'Calculate when to place your next order to avoid running out of stock.',
-    quickTip: 'Only use this after 30+ days of live sales. Launch-week velocity is inflated and will produce a dangerously optimistic reorder point.',
-    recommendation: '1. Pull your actual daily sales velocity from Seller Central (30-day average, not launch week).\n2. Enter current inventory, velocity, and your supplier lead time including production + shipping.\n3. Set a calendar reminder for the reorder point date — don\'t rely on memory.',
-    sections: [
-      {
-        title:   'Inputs',
-        content: 'Current inventory (units), daily sales velocity (units/day), supplier lead time (days), and safety stock buffer (days). Sea freight lead time is 28–35 days from order placement — not from departure.',
-      },
-      {
-        title:   'Results',
-        content: 'Reorder point (the unit count at which you must place a new order), recommended reorder date, and estimated days of stock remaining at your current velocity.',
-      },
-      {
-        title:   'Safety stock guidance',
-        content: 'Add 7–10 days for sea freight orders. During Q4 (peak season), double your safety stock — delays and velocity spikes are common. Running out of stock resets your BSR ranking and takes weeks to recover.',
-      },
-    ],
-  },
-
-  calc_roi: {
-    name:    'ROI',
-    tagline: 'Return on capital invested — profit as a percentage of total launch investment.',
-    quickTip: 'A 30% margin product that turns inventory 4× per year has a 120% annualised ROI. Turn rate matters as much as margin.',
-    recommendation: '1. Get total investment from Capital Estimator and profit per unit from FBA Profit.\n2. Estimate inventory turns — most FBA sellers achieve 3-5 cycles per year at steady state.\n3. If annualised ROI is below 50%, either cut costs (landed cost, PPC) or raise selling price and re-run.',
-    sections: [
-      {
-        title:   'Inputs',
-        content: 'Total investment ($) — include inventory, freight, duties, PPC, and samples; net profit per unit ($); expected sales volume (units); inventory turn rate (times/year).',
-      },
-      {
-        title:   'Results',
-        content: 'ROI % per inventory cycle and annualised ROI at your stated turn rate. Target ≥ 50% per cycle as a minimum. Above 100% annually is strong for FBA.',
-      },
-      {
-        title:   'ROI vs Margin',
-        content: 'Margin % measures profitability per sale. ROI measures how efficiently you deploy capital. A high-margin, slow-moving product can have worse ROI than a lower-margin product that turns 6× per year.',
-      },
-    ],
-  },
-
-  calc_unit_econ: {
-    name:    'Unit Economics',
-    tagline: 'Per-unit cost waterfall showing exactly where your revenue goes.',
-    quickTip: 'Any cost category consuming more than 25% of revenue is your primary optimisation target.',
-    recommendation: '1. Enter selling price, landed cost (not supplier quote), weight, and PPC per unit.\n2. Read the waterfall — find the single biggest cost category as a % of revenue.\n3. That category is your optimisation target: negotiate cost, reduce weight, or adjust bid strategy.',
-    sections: [
-      {
-        title:   'Inputs',
-        content: 'Selling price ($), product cost (use landed cost, not supplier quote), unit weight (oz), and PPC allocation per unit ($). PPC per unit = monthly ad spend ÷ monthly units sold.',
-      },
-      {
-        title:   'Cost Waterfall',
-        content: 'Shows the full path from selling price to net profit: selling price → referral fee → FBA fee → landed cost → PPC allocation → net profit. Each step shows the dollar amount and % of revenue it consumes.',
-      },
-      {
-        title:   'Contribution Margin',
-        content: 'Shown before PPC — your margin if you ran no ads. Useful for understanding the structural profitability of the product separate from launch costs.',
-      },
-      {
-        title:   'What to look for',
-        content: 'FBA fee over 25%: a lighter or smaller product variant could transform your margin. PPC over 20%: your ACoS or bid strategy needs work. Landed cost over 40%: renegotiate with your supplier or switch to sea freight.',
       },
     ],
   },
@@ -1023,10 +1016,10 @@ export const FEATURE_HELP: Record<FeatureKey, FeatureHelpEntry> = {
   // ─── LAUNCHPAD & WINNER VAULT ─────────────────────────────────────────────
 
   launchpad: {
-    name:    'LaunchPad',
-    tagline: 'Your guided 7-stage pipeline from product idea to launch-ready brand.',
-    quickTip: 'Work stage by stage — every collapsed card saves your choices and you can tap any completed stage to revisit or change a decision.',
-    recommendation: '1. Start with Discovery — paste an Amazon search or use one from Research. AI Analysis runs automatically.\n2. Lock in your Supplier and Freight, then run Calculations to get your margin and ROI.\n3. Build your Brand, then tap Publish to Winner Vault to save the full product record.',
+    name:    'Legacy Builder',
+    tagline: 'An older 7-stage guided pipeline — kept for reference. The main workflow is Niche → Research → Sourcing → Profit → Brand.',
+    quickTip: 'The main Siftly workflow is the five-tab pipeline: Niche, Research, Sourcing, Profit Lab, and Brand Studio. This Legacy Builder is preserved for users who started a build here.',
+    recommendation: '1. For new builds, use the main tabs: Niche → Research → Sourcing → Profit → Brand.\n2. If you have an active build here, complete it stage by stage — your progress is saved.\n3. When done, return to the main workflow for future products.',
     sections: [
       {
         title:   'Stage Pipeline',

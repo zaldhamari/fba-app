@@ -1,4 +1,5 @@
 import React from 'react';
+import { DS } from '../theme/ds';
 import {
   View, Text, StyleSheet, TouchableOpacity, Modal, Share,
 } from 'react-native';
@@ -161,7 +162,7 @@ const s = StyleSheet.create({
   brandName: {
     fontSize: 11,
     fontWeight: '900',
-    color: '#2563EB',
+    color: DS.accent,
     letterSpacing: 2.5,
   },
   brandSub: {
@@ -249,7 +250,7 @@ const s = StyleSheet.create({
 
   // ── Bottom actions
   shareBtn: {
-    backgroundColor: '#2563EB',
+    backgroundColor: DS.accent,
     borderRadius: radius.lg,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.xl,

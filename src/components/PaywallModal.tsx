@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
+import { DS } from '../theme/ds';
 import {
   Modal, View, Text, StyleSheet, TouchableOpacity,
-  ScrollView,
+  ScrollView, Alert,
 } from 'react-native';
 import { colors, spacing, radius } from '../theme';
 import { useSubscription, Tier, PLANS, PLAN_FEATURES } from '../hooks/useSubscription';
@@ -9,19 +10,20 @@ import { useSubscription, Tier, PLANS, PLAN_FEATURES } from '../hooks/useSubscri
 interface Props {
   visible: boolean;
   onClose?: () => void;
-  // Which feature triggered the paywall — used for contextual headline
+  onSuccess?: () => void;
   featureContext?: string;
-  // Pre-select a specific tier
   defaultTier?: Tier;
+  resetDate?: string;
 }
 
 const CONTEXT_HEADLINES: Record<string, string> = {
-  research:  'You\'ve used your free searches.',
-  suppliers: 'Supplier sourcing is a Builder feature.',
-  keywords:  'Keyword intelligence is a Builder feature.',
-  brands:    'You\'ve used your free brand kits.',
-  saves:     'Opportunity vault is a Builder feature.',
-  default:   'Unlock the full platform.',
+  research:   'You\'ve used your free searches.',
+  suppliers:  'Supplier sourcing is a Builder feature.',
+  keywords:   'Keyword intelligence is a Builder feature.',
+  brands:     'You\'ve used your free brand kits.',
+  saves:      'Opportunity vault is a Builder feature.',
+  free_limit: 'You\'ve used all your free product lookups this month.',
+  default:    'Unlock the full platform.',
 };
 
 const TIER_SUBTITLES: Record<Tier, string> = {
@@ -31,7 +33,7 @@ const TIER_SUBTITLES: Record<Tier, string> = {
 };
 
 export default function PaywallModal({
-  visible, onClose, featureContext = 'default', defaultTier = 'builder',
+  visible, onClose, onSuccess, featureContext = 'default', defaultTier = 'builder', resetDate,
 }: Props) {
   const { purchasePlan, restorePurchases } = useSubscription();
   const [selected, setSelected]   = useState<Tier>(defaultTier);
@@ -39,14 +41,27 @@ export default function PaywallModal({
   const [purchasing, setPurchasing] = useState(false);
   const [restoring, setRestoring]  = useState(false);
   const [error, setError]          = useState('');
+  const [succeeded, setSucceeded]  = useState(false);
 
   const headline = CONTEXT_HEADLINES[featureContext] ?? CONTEXT_HEADLINES.default;
+  const formattedResetDate = resetDate
+    ? (() => {
+        try {
+          return new Date(resetDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+        } catch {
+          return resetDate;
+        }
+      })()
+    : undefined;
   const plan = PLANS[selected];
   const displayPrice = annual && selected !== 'explorer'
     ? plan.annualMonthly.toFixed(2)
     : plan.monthly.toFixed(0);
+  const annualSavings = selected !== 'explorer'
+    ? Math.round(plan.monthly * 12 - plan.annual)
+    : 0;
   const billingNote = annual && selected !== 'explorer'
-    ? `Billed $${plan.annual}/year`
+    ? `Billed $${plan.annual}/year — save $${annualSavings}`
     : 'Billed monthly';
 
   async function handlePurchase() {
@@ -55,7 +70,9 @@ export default function PaywallModal({
     setPurchasing(true);
     try {
       await purchasePlan(selected, annual);
-      onClose?.();
+      setSucceeded(true);
+      onSuccess?.();
+      setTimeout(() => onClose?.(), 1800);
     } catch (e: any) {
       if (!e?.userCancelled) {
         setError(e?.message ?? 'Purchase failed. Please try again.');
@@ -69,8 +86,17 @@ export default function PaywallModal({
     setError('');
     setRestoring(true);
     try {
-      await restorePurchases();
-      onClose?.();
+      const restoredTier = await restorePurchases();
+      if (restoredTier === 'explorer') {
+        Alert.alert(
+          'No Subscription Found',
+          'No active purchases were found for this Apple ID. If you believe this is an error, check that you are signed in with the correct Apple ID.',
+        );
+        return;
+      }
+      setSucceeded(true);
+      onSuccess?.();
+      setTimeout(() => onClose?.(), 1800);
     } catch (e: any) {
       setError(e?.message ?? 'Restore failed. Please try again.');
     } finally {
@@ -89,8 +115,21 @@ export default function PaywallModal({
         <View style={s.sheet}>
           <View style={s.handle} />
 
+          {succeeded ? (
+            <View style={s.successBox}>
+              <Text style={s.successIcon}>✓</Text>
+              <Text style={s.successTitle}>You're all set!</Text>
+              <Text style={s.successBody}>Your plan is now active. Continue where you left off.</Text>
+            </View>
+          ) : (
+            <>
           {/* Header */}
           <Text style={s.context}>{headline}</Text>
+          {formattedResetDate ? (
+            <Text style={s.resetNote}>
+              Your free lookups reset on {formattedResetDate}.
+            </Text>
+          ) : null}
           <Text style={s.title}>Unlock more{'\n'}opportunity.</Text>
 
           {/* Billing period selector */}
@@ -188,6 +227,8 @@ export default function PaywallModal({
               <Text style={s.dismissText}>Maybe later</Text>
             </TouchableOpacity>
           )}
+            </>
+          )}
         </View>
       </View>
     </Modal>
@@ -214,7 +255,8 @@ const s = StyleSheet.create({
     width: 40, height: 4, borderRadius: 2,
     backgroundColor: colors.bgElevated, alignSelf: 'center', marginBottom: spacing.lg,
   },
-  context: { fontSize: 9, fontWeight: '800', color: '#2563EB', letterSpacing: 2, marginBottom: spacing.xs },
+  context:   { fontSize: 9, fontWeight: '800', color: DS.accent, letterSpacing: 2, marginBottom: spacing.xs },
+  resetNote: { fontSize: 11, color: colors.textMuted, marginBottom: spacing.xs, fontStyle: 'italic' },
   title: {
     fontSize: 28, fontWeight: '900', color: colors.textPrimary,
     letterSpacing: -1, lineHeight: 34, marginBottom: spacing.md,
@@ -229,9 +271,9 @@ const s = StyleSheet.create({
     borderRadius: radius.md, paddingVertical: spacing.sm + 2,
     backgroundColor: colors.bgElevated,
   },
-  billingBtnActive: { borderColor: '#2563EB', backgroundColor: 'rgba(37,99,235,0.08)' },
+  billingBtnActive: { borderColor: DS.accent, backgroundColor: 'rgba(37,99,235,0.08)' },
   billingBtnLabel: { fontSize: 14, fontWeight: '700', color: colors.textMuted },
-  billingBtnLabelActive: { color: '#2563EB' },
+  billingBtnLabelActive: { color: DS.accent },
   saveBadge: {
     backgroundColor: 'rgba(52,211,153,0.15)', borderRadius: radius.full,
     paddingHorizontal: spacing.sm, paddingVertical: 2,
@@ -245,28 +287,28 @@ const s = StyleSheet.create({
     borderRadius: radius.md, padding: spacing.md, gap: 4,
     backgroundColor: colors.bgElevated,
   },
-  tierCardActive: { borderColor: '#2563EB', backgroundColor: 'rgba(37,99,235,0.10)' },
+  tierCardActive: { borderColor: DS.accent, backgroundColor: 'rgba(37,99,235,0.10)' },
   popularBadge: {
-    backgroundColor: '#2563EB', borderRadius: radius.full,
+    backgroundColor: DS.accent, borderRadius: radius.full,
     paddingHorizontal: 6, paddingVertical: 2, alignSelf: 'flex-start',
     marginBottom: 4,
   },
   popularText: { fontSize: 8, fontWeight: '800', color: colors.white, letterSpacing: 0.5 },
   tierName: { fontSize: 13, fontWeight: '800', color: colors.textMuted },
-  tierNameActive: { color: '#2563EB' },
+  tierNameActive: { color: DS.accent },
   tierPrice: { fontSize: 22, fontWeight: '900', color: colors.textPrimary, letterSpacing: -0.5 },
-  tierPriceActive: { color: '#2563EB' },
+  tierPriceActive: { color: DS.accent },
   tierPer: { fontSize: 13, fontWeight: '400' },
   tierSub: { fontSize: 11, color: colors.textMuted, lineHeight: 15 },
-  tierSubActive: { color: '#2563EB' },
+  tierSubActive: { color: DS.accent },
 
   featureScroll: { maxHeight: 160, marginBottom: spacing.md },
   featureRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: 5 },
-  featureDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#2563EB' },
+  featureDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: DS.accent },
   featureText: { fontSize: 13, color: colors.textSecondary, flex: 1, lineHeight: 18 },
 
   cta: {
-    backgroundColor: '#2563EB', borderRadius: radius.md,
+    backgroundColor: DS.accent, borderRadius: radius.md,
     paddingVertical: spacing.md + 2, alignItems: 'center', marginBottom: spacing.sm,
   },
   ctaDisabled: { opacity: 0.5 },
@@ -277,4 +319,8 @@ const s = StyleSheet.create({
   restoreText: { fontSize: 12, color: colors.textMuted, fontWeight: '500' },
   dismiss: { alignItems: 'center', paddingVertical: spacing.sm },
   dismissText: { fontSize: 14, color: colors.textMuted, fontWeight: '500' },
+  successBox: { alignItems: 'center', paddingVertical: 48, gap: 12 },
+  successIcon: { fontSize: 48, color: colors.green },
+  successTitle: { fontSize: 22, fontWeight: '900', color: colors.textPrimary, letterSpacing: -0.5 },
+  successBody: { fontSize: 14, color: colors.textSecondary, textAlign: 'center', lineHeight: 20 },
 });

@@ -5,11 +5,11 @@ import { DS } from '../theme/ds';
 import { usePipeline } from '../context/PipelineContext';
 
 const STAGES = [
-  { id: 'niche',     label: 'Niche',    icon: '◎' },
-  { id: 'validate',  label: 'Validate', icon: '✦' },
-  { id: 'suppliers', label: 'Source',   icon: '⬡' },
-  { id: 'costs',     label: 'Costs',    icon: '✈' },
-  { id: 'label',     label: 'Label',    icon: '▣' },
+  { id: 'niche',    label: 'Niche',    icon: '◎' },
+  { id: 'validate', label: 'Research', icon: '✦' },
+  { id: 'sourcing', label: 'Source',   icon: '⬡' },
+  { id: 'costs',    label: 'Profit',   icon: '✈' },
+  { id: 'brand',    label: 'Brand',    icon: '▣' },
 ] as const;
 
 export function PipelineProgressBar() {
@@ -63,15 +63,20 @@ export function PipelineProgressBar() {
         </View>
       </View>
 
-      <TouchableOpacity
-        style={s.hintBtn}
-        onPress={() => openLaunchDecision('hint_bar')}
-        activeOpacity={0.7}
-      >
+      <View style={s.bottomRow}>
         <Text style={s.hintTxt} numberOfLines={1}>
-          {activeNiche.keyword} · {completedStages.length}/5 stages · Tap for Launch Decision
+          {activeNiche.keyword} · {completedStages.length}/5 stages
         </Text>
-      </TouchableOpacity>
+        <TouchableOpacity
+          style={[s.decisionBtn, allDone && s.decisionBtnReady]}
+          onPress={() => openLaunchDecision('hint_bar')}
+          activeOpacity={0.8}
+        >
+          <Text style={[s.decisionBtnTxt, allDone && s.decisionBtnTxtReady]}>
+            {allDone ? '🚀 Get Decision' : 'Launch Decision →'}
+          </Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -121,6 +126,19 @@ const s = StyleSheet.create({
   dotIconDone:    { color: '#fff' },
   label:          { fontSize: 8, fontWeight: '600', color: DS.textMuted, letterSpacing: 0.3, textAlign: 'center' },
   labelDone:      { color: DS.accent, fontWeight: '800' },
-  hintBtn:        { alignItems: 'center' },
-  hintTxt:        { fontSize: 10, color: DS.textSecondary },
+  bottomRow:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  hintTxt:        { fontSize: 10, color: DS.textSecondary, flex: 1 },
+  decisionBtn: {
+    flexDirection:    'row',
+    alignItems:       'center',
+    paddingHorizontal: 10,
+    paddingVertical:   5,
+    borderRadius:     DS.radiusBadge,
+    backgroundColor:  DS.bgCard,
+    borderWidth:      1,
+    borderColor:      DS.border,
+  },
+  decisionBtnReady:    { backgroundColor: DS.success, borderColor: DS.success },
+  decisionBtnTxt:      { fontSize: 10, fontWeight: '800', color: DS.accent },
+  decisionBtnTxtReady: { color: '#fff' },
 });

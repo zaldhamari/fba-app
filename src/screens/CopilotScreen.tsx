@@ -1,22 +1,33 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet,
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert,
   TextInput, Modal, KeyboardAvoidingView, Platform,
   ActivityIndicator,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { PHASES, ALL_IDS, LAUNCH_CHECKLIST_KEY } from '../data/launchPhases';
+import { useNetworkStatus } from '../hooks/useNetworkStatus';
+import { OfflineBanner } from '../components/OfflineBanner';
+import { safeParseJSON } from '../utils/safeJSON';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { WinnerVaultDetailModal } from '../components/WinnerVaultDetailModal';
 import { useAuth } from '../hooks/useAuth';
+import { useSubscription, toggleDevMode } from '../hooks/useSubscription';
+import PaywallModal from '../components/PaywallModal';
 import { HelpButton } from '../components/HelpModal';
 import { AppHeader } from '../components/AppHeader';
+import NicheResearchScreen from './NicheResearchScreen';
+import { FeatureExplainer } from '../components/FeatureExplainer';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { DS } from '../theme/ds';
-import { api } from '../services/api';
+import { api, Product } from '../services/api';
+import { useCurrency } from '../context/CurrencyContext';
+import { Image } from 'expo-image';
 import { useBuilderSession } from '../hooks/useBuilderSession';
 import { useSellerProfile } from '../hooks/useSellerProfile';
+import { usePipeline } from '../context/PipelineContext';
+import { useProductIntelligence } from '../hooks/useProductIntelligence';
+import { IntelligenceSummaryBanner } from '../components/IntelligenceSummaryBanner';
+import { FBAGlossaryModal } from '../components/FBAGlossaryModal';
 import type { TabParamList } from '../navigation/tabTypes';
 import type { WinnerEntry } from '../types/builder';
 
@@ -141,7 +152,7 @@ function AnalyzeProductModal({ visible, onClose }: { visible: boolean; onClose: 
   const verdictColor = verdict === 'LAUNCH' ? DS.success : verdict === 'AVOID' ? DS.danger : DS.warning;
 
   return (
-    <ToolModal visible={visible} title="Analyze a Product" subtitle="Get an AI verdict before you commit" onClose={handleClose}>
+    <ToolModal visible={visible} title="Get a Verdict" subtitle="Should I sell this? An AI launch/test/avoid call before you commit" onClose={handleClose}>
 
       {/* Search bar */}
       <View style={ap.inputRow}>
@@ -361,18 +372,30 @@ const ap = StyleSheet.create({
 
 // ─── Find Opportunities Modal ─────────────────────────────────────────────────
 
+type NicheSuggestion = {
+  niche:             string;
+  verdict:           'LAUNCH' | 'TEST' | 'AVOID' | string;
+  reason:            string;
+  estimated_margin:  string;
+  competition_level: 'Low' | 'Medium' | 'High' | string;
+};
+
 function FindOpportunitiesModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const { profile }               = useSellerProfile();
+  const { can, increment }        = useSubscription();
   const [tab, setTab]             = useState<'foryou' | 'search'>('foryou');
   const [fyLoading, setFyLoading] = useState(false);
-  const [fyResult, setFyResult]   = useState<any[]>([]);
+  const [fyResult, setFyResult]   = useState<NicheSuggestion[]>([]);
   const [fyError, setFyError]     = useState('');
   const [srQuery, setSrQuery]     = useState('');
   const [srLoading, setSrLoading] = useState(false);
   const [srResult, setSrResult]   = useState<any>(null);
   const [srError, setSrError]     = useState('');
+  const [showPaywall, setShowPaywall] = useState(false);
 
   const generateForYou = useCallback(async () => {
+    if (!can('research')) { setShowPaywall(true); return; }
+    await increment('research');
     setFyLoading(true); setFyError(''); setFyResult([]);
     const ctx = profile
       ? `Budget: $${profile.budget}, marketplace: ${profile.marketplace}, price range: $${profile.priceMin}–$${profile.priceMax}, experience: ${profile.experience}`
@@ -385,9 +408,18 @@ function FindOpportunitiesModal({ visible, onClose }: { visible: boolean; onClos
       const raw = res.answer ?? '';
       const match = raw.match(/\[[\s\S]*?\]/);
       if (!match) throw new Error('No suggestions returned. Tap retry.');
-      const json = JSON.parse(match[0]);
-      if (!Array.isArray(json) || json.length === 0) throw new Error('No results. Tap retry.');
-      setFyResult(json);
+      const parsed = safeParseJSON<unknown[]>(match[0]);
+      if (!parsed || !Array.isArray(parsed) || parsed.length === 0) throw new Error('No results. Tap retry.');
+      // Runtime type guard — filter out any items missing required fields
+      const valid = parsed.filter(
+        (item): item is NicheSuggestion =>
+          typeof item === 'object' && item !== null &&
+          typeof (item as any).niche === 'string' &&
+          typeof (item as any).verdict === 'string' &&
+          typeof (item as any).reason === 'string',
+      );
+      if (valid.length === 0) throw new Error('Unexpected response format. Tap retry.');
+      setFyResult(valid);
     } catch (e: any) {
       setFyError(e?.message ?? 'Something went wrong. Tap retry.');
     } finally {
@@ -423,7 +455,9 @@ function FindOpportunitiesModal({ visible, onClose }: { visible: boolean; onClos
   };
 
   return (
-    <ToolModal visible={visible} title="Find Opportunities" subtitle="Niches matched to your profile" onClose={handleClose}>
+    <>
+      <PaywallModal visible={showPaywall} onClose={() => setShowPaywall(false)} featureContext="AI Opportunity Finder" />
+      <ToolModal visible={visible} title="Find Opportunities" subtitle="Niches matched to your profile" onClose={handleClose}>
       {/* Tab toggle */}
       <View style={fo.tabs}>
         {(['foryou', 'search'] as const).map(t => (
@@ -604,6 +638,7 @@ function FindOpportunitiesModal({ visible, onClose }: { visible: boolean; onClos
         </View>
       )}
     </ToolModal>
+    </>
   );
 }
 
@@ -666,29 +701,90 @@ const QUICK_CHIPS = [
   'What should I sell this season?',
   'How do I beat a saturated market?',
   'Is my margin healthy?',
-  'What makes a product listing rank?',
-  'How do I find my first supplier?',
-  'When is my product ready to scale?',
+  'Why is this product freight sensitive?',
+  'Should I use 1688 instead of Alibaba?',
+  'Is this product beginner-friendly to source?',
+  'Should I source locally instead?',
+  'What should I do next in sourcing?',
 ];
 
+// Builds the human-readable seller context sent to the AI.
+// When copilotContext is provided (from ProductIntelligenceProfile), it contains the
+// full supply chain intelligence — so we only include seller/product/niche data here
+// to avoid duplicating what the profile already covers.
+function buildSourcingContext(
+  pipeline:       ReturnType<typeof usePipeline>,
+  profile:        ReturnType<typeof useSellerProfile>['profile'],
+  copilotContext?: string,
+): string {
+  const parts: string[] = [];
+
+  if (profile) {
+    parts.push(`Seller experience: ${profile.experience}. Marketplace: ${profile.marketplace}. Budget: $${profile.budget}.`);
+  }
+
+  if (pipeline.activeProduct) {
+    parts.push(`Active product: "${pipeline.activeProduct.title}" priced at $${pipeline.activeProduct.price}.`);
+    if (pipeline.activeProduct.reviews != null) {
+      parts.push(`Product reviews: ${pipeline.activeProduct.reviews.toLocaleString()}.`);
+    }
+  }
+
+  if (pipeline.activeNiche) {
+    parts.push(`Niche: "${pipeline.activeNiche.keyword}" (score ${pipeline.activeNiche.score}/5, ${pipeline.activeNiche.verdictLabel}).`);
+  }
+
+  // Supplier + sourcing strategy are fully covered by the intelligence copilotContext.
+  // Only include them when the profile context is absent (no product/supplier yet).
+  if (!copilotContext) {
+    if (pipeline.selectedSupplier) {
+      parts.push(`Supplier: ${pipeline.selectedSupplier.name} at $${pipeline.selectedSupplier.unitCost}/unit, MOQ ${pipeline.selectedSupplier.moq}.`);
+    }
+    if (pipeline.costModel) {
+      parts.push(`Cost model: $${pipeline.costModel.netProfit.toFixed(2)}/unit profit, ${pipeline.costModel.marginPct.toFixed(0)}% margin.`);
+    }
+  }
+
+  const base = parts.length > 0
+    ? `Seller context:\n${parts.join('\n')}`
+    : 'FBA seller looking for actionable advice.';
+
+  if (copilotContext) {
+    return `${base}\n\n${copilotContext}`;
+  }
+
+  return base;
+}
+
 function AskCopilotModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+  const pipeline        = usePipeline();
+  const { profile }     = useSellerProfile();
+  const intelProfile    = useProductIntelligence();
   const [question, setQuestion] = useState('');
   const [loading, setLoading]   = useState(false);
+  const [slowConn, setSlowConn] = useState(false);
   const [answer, setAnswer]     = useState('');
   const [error, setError]       = useState('');
+
+  useEffect(() => {
+    if (!loading) { setSlowConn(false); return; }
+    const t = setTimeout(() => setSlowConn(true), 6_000);
+    return () => clearTimeout(t);
+  }, [loading]);
 
   const ask = useCallback(async (q: string) => {
     if (!q.trim()) return;
     setQuestion(q); setLoading(true); setError(''); setAnswer('');
     try {
-      const res = await api.askAI(q, 'FBA seller looking for actionable advice.');
+      const context = buildSourcingContext(pipeline, profile, intelProfile?.copilotContext);
+      const res = await api.askAI(q, context);
       setAnswer((res as any).answer ?? String(res));
     } catch (e: any) {
       setError(e?.message ?? 'Failed to get answer.');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [pipeline, profile, intelProfile]);
 
   const handleClose = () => { setQuestion(''); setAnswer(''); setError(''); onClose(); };
 
@@ -720,7 +816,12 @@ function AskCopilotModal({ visible, onClose }: { visible: boolean; onClose: () =
           </TouchableOpacity>
         </View>
 
-        {loading && <ActivityIndicator color={DS.accent} style={{ marginTop: 24 }} />}
+        {loading && (
+          <View style={{ alignItems: 'center', marginTop: 24, gap: 6 }}>
+            <ActivityIndicator color={DS.accent} />
+            {slowConn && <Text style={{ fontSize: 12, color: DS.textMuted, textAlign: 'center' }}>Connecting to server… first request may take a moment.</Text>}
+          </View>
+        )}
         {!!error && <Text style={aq.errorText}>{error}</Text>}
 
         {!!answer && (
@@ -744,7 +845,7 @@ const aq = StyleSheet.create({
   sendBtn:     { width: 44, height: 44, borderRadius: 10, backgroundColor: DS.accent, alignItems: 'center', justifyContent: 'center' },
   sendBtnText: { color: '#fff', fontSize: 20, fontWeight: '700', marginTop: -2 },
   errorText:   { color: DS.danger, fontSize: 14, textAlign: 'center', marginTop: 12 },
-  answerCard:  { backgroundColor: '#DBEAFE', borderRadius: 12, padding: 14 },
+  answerCard:  { backgroundColor: DS.accentLight, borderRadius: 12, padding: 14 },
   answerLabel: { fontSize: 11, fontWeight: '700', color: DS.accent, letterSpacing: 0.5, marginBottom: 6 },
   answerText:  { fontSize: 14, color: DS.textPrimary, lineHeight: 21 },
 });
@@ -752,14 +853,16 @@ const aq = StyleSheet.create({
 // ─── AI Tools Row ─────────────────────────────────────────────────────────────
 
 function AITools() {
-  const [showAnalyze, setShowAnalyze] = useState(false);
-  const [showOpps, setShowOpps]       = useState(false);
-  const [showAsk, setShowAsk]         = useState(false);
+  const [showAnalyze,  setShowAnalyze]  = useState(false);
+  const [showOpps,     setShowOpps]     = useState(false);
+  const [showAsk,      setShowAsk]      = useState(false);
+  const [showGlossary, setShowGlossary] = useState(false);
 
   const tools = [
-    { icon: '🔍', label: 'Analyze a\nProduct',  color: '#EFF6FF', border: '#BFDBFE', onPress: () => setShowAnalyze(true) },
+    { icon: '🔍', label: 'Get a\nVerdict',  color: '#EFF6FF', border: '#BFDBFE', onPress: () => setShowAnalyze(true) },
     { icon: '💡', label: 'Find\nOpportunities', color: '#F0FDF4', border: '#BBF7D0', onPress: () => setShowOpps(true) },
     { icon: '🤖', label: 'Ask\nCopilot',        color: '#FAF5FF', border: '#E9D5FF', onPress: () => setShowAsk(true) },
+    { icon: '📖', label: 'FBA\nGlossary',       color: DS.warningBg, border: '#FDE68A', onPress: () => setShowGlossary(true) },
   ];
 
   return (
@@ -775,6 +878,7 @@ function AITools() {
       <AnalyzeProductModal visible={showAnalyze} onClose={() => setShowAnalyze(false)} />
       <FindOpportunitiesModal visible={showOpps} onClose={() => setShowOpps(false)} />
       <AskCopilotModal visible={showAsk} onClose={() => setShowAsk(false)} />
+      <FBAGlossaryModal visible={showGlossary} onClose={() => setShowGlossary(false)} />
     </>
   );
 }
@@ -808,7 +912,7 @@ function WinnerVaultCard({ vault }: { vault: WinnerEntry[] }) {
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
           <HelpButton featureKey="winner_vault" size="sm" />
-          <TouchableOpacity onPress={() => nav.navigate('LaunchPad' as any)}>
+          <TouchableOpacity onPress={() => nav.navigate('Checklist' as any)}>
             <Text style={wv.link}>View all ›</Text>
           </TouchableOpacity>
         </View>
@@ -899,7 +1003,7 @@ function ActiveProductCard({ session }: { session: any }) {
   const progress = (STAGE_ORDER_LIST.indexOf(stage) + 1) / STAGE_ORDER_LIST.length;
 
   return (
-    <TouchableOpacity style={ac.card} onPress={() => nav.navigate('LaunchPad' as any)} activeOpacity={0.8}>
+    <TouchableOpacity style={ac.card} onPress={() => nav.navigate('Checklist' as any)} activeOpacity={0.8}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
         <Text style={ac.label}>Active Build</Text>
         <Text style={ac.arrow}>→</Text>
@@ -919,374 +1023,6 @@ const ac = StyleSheet.create({
   bar:       { height: 4, backgroundColor: DS.border, borderRadius: 2, overflow: 'hidden' },
   fill:      { height: 4, backgroundColor: DS.accent, borderRadius: 2 },
   progress:  { fontSize: 11, color: DS.textMuted },
-});
-
-// ─── Vault Summary ────────────────────────────────────────────────────────────
-
-function VaultSummary({ vault }: { vault: WinnerEntry[] }) {
-  const nav = useNavigation<Nav>();
-  return (
-    <TouchableOpacity style={vs.row} onPress={() => nav.navigate('LaunchPad' as any)} activeOpacity={0.8}>
-      <Text style={vs.label}>Vault</Text>
-      <View style={vs.chip}><Text style={vs.chipText}>{vault.length} builds completed</Text></View>
-    </TouchableOpacity>
-  );
-}
-
-const vs = StyleSheet.create({
-  row:      { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  label:    { fontSize: 12, color: DS.textMuted, fontWeight: '600' },
-  chip:     { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, backgroundColor: '#DBEAFE' },
-  chipText: { fontSize: 12, fontWeight: '700', color: DS.accent },
-});
-
-// ─── Checklist state hook ─────────────────────────────────────────────────────
-
-function useChecklistState() {
-  const [checked, setChecked] = useState<Set<string>>(new Set());
-
-  useEffect(() => {
-    AsyncStorage.getItem(LAUNCH_CHECKLIST_KEY).then(raw => {
-      if (raw) setChecked(new Set(JSON.parse(raw) as string[]));
-    });
-  }, []);
-
-  const toggle = useCallback(async (id: string) => {
-    setChecked(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      AsyncStorage.setItem(LAUNCH_CHECKLIST_KEY, JSON.stringify([...next]));
-      return next;
-    });
-  }, []);
-
-  return { checked, toggle };
-}
-
-// ─── Overall Progress Card ────────────────────────────────────────────────────
-
-function OverallProgressCard({ checked }: { checked: Set<string> }) {
-  const done  = checked.size;
-  const total = ALL_IDS.length;
-  const pct   = total > 0 ? Math.round((done / total) * 100) : 0;
-  const statusLabel = pct === 100 ? 'Complete 🏆' : pct >= 75 ? 'Launch Ready' : pct >= 50 ? 'Validating' : pct >= 25 ? 'Building' : 'Planning';
-  const statusColor = pct === 100 ? DS.success : pct >= 50 ? DS.accent : pct >= 25 ? DS.warning : DS.textMuted;
-  const nextPhase   = PHASES.find(p => p.items.some(i => !checked.has(i.id)));
-
-  return (
-    <View style={op.card}>
-      <View style={op.hero}>
-        <View style={{ flex: 1, gap: 4 }}>
-          <Text style={op.eyebrow}>OVERALL PROGRESS</Text>
-          <Text style={op.bigPct}>{pct}<Text style={op.bigPctSign}>%</Text></Text>
-          <Text style={op.taskCount}>{done} of {total} tasks complete</Text>
-          <View style={[op.statusPill, { backgroundColor: statusColor + '18', borderColor: statusColor + '44' }]}>
-            <Text style={[op.statusText, { color: statusColor }]}>{statusLabel}</Text>
-          </View>
-          {nextPhase && pct < 100 && (
-            <Text style={op.upNext}>Up next: {nextPhase.icon} {nextPhase.title}</Text>
-          )}
-        </View>
-        <View style={op.pctCircle}>
-          <Text style={op.pctCircleNum}>{pct}</Text>
-          <Text style={op.pctCircleSub}>%</Text>
-        </View>
-      </View>
-
-      <View style={op.barTrack}>
-        <View style={[op.barFill, { width: `${pct}%` as any }]} />
-      </View>
-
-      <View style={op.statsRow}>
-        <View style={op.stat}><Text style={op.statVal}>{done}</Text><Text style={op.statLabel}>Done</Text></View>
-        <View style={op.statDiv} />
-        <View style={op.stat}><Text style={op.statVal}>{total - done}</Text><Text style={op.statLabel}>Left</Text></View>
-        <View style={op.statDiv} />
-        <View style={op.stat}><Text style={op.statVal}>{PHASES.length}</Text><Text style={op.statLabel}>Stages</Text></View>
-      </View>
-    </View>
-  );
-}
-
-const op = StyleSheet.create({
-  card:        { backgroundColor: DS.bgCard, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: DS.border, gap: 12 },
-  hero:        { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
-  eyebrow:     { fontSize: 10, fontWeight: '700', color: DS.textMuted, letterSpacing: 0.8, textTransform: 'uppercase' },
-  bigPct:      { fontSize: 52, fontWeight: '900', color: DS.textPrimary, lineHeight: 56, letterSpacing: -2 },
-  bigPctSign:  { fontSize: 26, fontWeight: '700', color: DS.textMuted },
-  taskCount:   { fontSize: 12, color: DS.textMuted },
-  statusPill:  { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 20, borderWidth: 1, marginTop: 2 },
-  statusText:  { fontSize: 11, fontWeight: '700' },
-  upNext:      { fontSize: 11, color: DS.textMuted, marginTop: 4 },
-  pctCircle:   { width: 80, height: 80, borderRadius: 40, borderWidth: 6, borderColor: DS.accent, alignItems: 'center', justifyContent: 'center', backgroundColor: '#EFF6FF' },
-  pctCircleNum:{ fontSize: 22, fontWeight: '900', color: DS.accent, lineHeight: 26 },
-  pctCircleSub:{ fontSize: 12, fontWeight: '700', color: DS.accent },
-  barTrack:    { height: 5, backgroundColor: DS.border, borderRadius: 3, overflow: 'hidden' },
-  barFill:     { height: 5, backgroundColor: DS.accent, borderRadius: 3 },
-  statsRow:    { flexDirection: 'row', alignItems: 'center', backgroundColor: DS.bgCanvas, borderRadius: 10, paddingVertical: 10 },
-  stat:        { flex: 1, alignItems: 'center', gap: 2 },
-  statVal:     { fontSize: 15, fontWeight: '800', color: DS.textPrimary },
-  statLabel:   { fontSize: 9, color: DS.textMuted, textTransform: 'uppercase', letterSpacing: 0.4 },
-  statDiv:     { width: 1, height: 28, backgroundColor: DS.border },
-});
-
-// ─── Full Launch Checklist (all 7 phases) ─────────────────────────────────────
-
-function FullChecklistCard({ checked, toggle }: { checked: Set<string>; toggle: (id: string) => void }) {
-  const [activePhaseId, setActivePhaseId] = useState(PHASES[0].id);
-  const phase = PHASES.find(p => p.id === activePhaseId) ?? PHASES[0];
-  const phaseDone = phase.items.filter(i => checked.has(i.id)).length;
-  const allDone   = phaseDone === phase.items.length;
-
-  return (
-    <View style={dc.container}>
-      <Text style={dc.sectionTitle}>Launch Checklist</Text>
-
-      {/* Phase tab strip — horizontal scroll */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={dc.tabStrip}
-      >
-        {PHASES.map(p => {
-          const done  = p.items.filter(i => checked.has(i.id)).length;
-          const total = p.items.length;
-          const active = p.id === activePhaseId;
-          const complete = done === total;
-          return (
-            <TouchableOpacity
-              key={p.id}
-              style={[dc.tab, active && dc.tabActive, complete && !active && dc.tabComplete]}
-              onPress={() => setActivePhaseId(p.id)}
-              activeOpacity={0.7}
-            >
-              <Text style={dc.tabIcon}>{complete ? '✓' : p.icon}</Text>
-              <Text style={[dc.tabLabel, active && dc.tabLabelActive]}>{p.num}</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
-
-      {/* Phase header */}
-      <View style={dc.phaseHeader}>
-        <View style={{ flex: 1 }}>
-          <Text style={dc.phaseTitle}>{phase.title}</Text>
-          <Text style={dc.phaseSub}>{phase.desc}</Text>
-        </View>
-        <View style={[dc.badge, allDone && dc.badgeDone]}>
-          <Text style={[dc.badgeText, allDone && dc.badgeTextDone]}>{phaseDone}/{phase.items.length}</Text>
-        </View>
-      </View>
-
-      {/* Phase progress bar */}
-      <View style={dc.progressTrack}>
-        <View style={[dc.progressFill, { width: `${(phaseDone / phase.items.length) * 100}%` as any }]} />
-      </View>
-
-      {/* Tasks */}
-      <View style={{ gap: 0 }}>
-        {phase.items.map(item => {
-          const isChecked = checked.has(item.id);
-          return (
-            <TouchableOpacity key={item.id} style={dc.row} onPress={() => toggle(item.id)} activeOpacity={0.7}>
-              <View style={[dc.checkbox, isChecked && dc.checkboxDone]}>
-                {isChecked && <Text style={dc.checkmark}>✓</Text>}
-              </View>
-              <Text style={[dc.itemText, isChecked && dc.itemTextDone]}>{item.text}</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-    </View>
-  );
-}
-
-const dc = StyleSheet.create({
-  container:      { backgroundColor: DS.bgCard, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: DS.border, gap: 10 },
-  sectionTitle:   { fontSize: 16, fontWeight: '700', color: DS.textPrimary },
-  tabStrip:       { gap: 6, paddingBottom: 2 },
-  tab:            { width: 44, height: 44, borderRadius: 10, borderWidth: 1, borderColor: DS.border, backgroundColor: DS.bgCanvas, alignItems: 'center', justifyContent: 'center', gap: 1 },
-  tabActive:      { backgroundColor: DS.accent, borderColor: DS.accent },
-  tabComplete:    { backgroundColor: '#F0FDF4', borderColor: '#86EFAC' },
-  tabIcon:        { fontSize: 13 },
-  tabLabel:       { fontSize: 9, fontWeight: '700', color: DS.textMuted },
-  tabLabelActive: { color: '#fff' },
-  phaseHeader:    { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
-  phaseTitle:     { fontSize: 14, fontWeight: '700', color: DS.textPrimary },
-  phaseSub:       { fontSize: 11, color: DS.textMuted, marginTop: 2, lineHeight: 15 },
-  badge:          { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, backgroundColor: DS.bgCanvas, borderWidth: 1, borderColor: DS.border, flexShrink: 0 },
-  badgeDone:      { backgroundColor: '#DBEAFE', borderColor: DS.accent + '40' },
-  badgeText:      { fontSize: 12, fontWeight: '700', color: DS.textMuted },
-  badgeTextDone:  { color: DS.accent },
-  progressTrack:  { height: 4, backgroundColor: DS.border, borderRadius: 2, overflow: 'hidden' },
-  progressFill:   { height: 4, backgroundColor: DS.accent, borderRadius: 2 },
-  row:            { flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: DS.border + '80' },
-  checkbox:       { width: 20, height: 20, borderRadius: 5, borderWidth: 2, borderColor: DS.border, alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 },
-  checkboxDone:   { backgroundColor: DS.accent, borderColor: DS.accent },
-  checkmark:      { fontSize: 11, color: '#fff', fontWeight: '900' },
-  itemText:       { flex: 1, fontSize: 13, color: DS.textSecondary, lineHeight: 19 },
-  itemTextDone:   { color: DS.textMuted },
-});
-
-// ─── Daily Insight Card ───────────────────────────────────────────────────────
-
-const INSIGHTS = [
-  'Products with fewer than 200 reviews in the top 10 are the sweet spot for new sellers.',
-  'Aim for at least 25% margin after FBA fees — anything below is a race to the bottom.',
-  'Your first 30 reviews are the hardest. Budget for 3–5 PPC campaigns at launch.',
-  'Niche down first. "Yoga mat" is a war zone — "extra-wide non-slip yoga mat" is a door.',
-  'Freight timing is strategy. Sea freight 6–8 weeks, air 1–2 weeks. Plan 90 days ahead.',
-  'A supplier with MOQ 100 is better than one with MOQ 1000 when you are starting out.',
-];
-
-function DailyInsightCard() {
-  const [insight] = useState(() => INSIGHTS[new Date().getDate() % INSIGHTS.length]);
-  return (
-    <View style={di.card}>
-      <Text style={di.label}>Daily Insight</Text>
-      <Text style={di.text}>{insight}</Text>
-    </View>
-  );
-}
-
-const di = StyleSheet.create({
-  card:  { backgroundColor: DS.bgCard, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: DS.border, gap: 6 },
-  label: { fontSize: 11, fontWeight: '700', color: DS.textMuted, letterSpacing: 0.5, textTransform: 'uppercase' },
-  text:  { fontSize: 14, color: DS.textPrimary, lineHeight: 21 },
-});
-
-// ─── Profile Strip ────────────────────────────────────────────────────────────
-
-const MARKETPLACE_FLAG: Record<string, string> = { US: '🇺🇸', UK: '🇬🇧', DE: '🇪🇺', CA: '🇨🇦', AE: '🇦🇪', SA: '🇸🇦' };
-const EXPERIENCE_LABEL: Record<string, string> = { beginner: 'Beginner', some: 'Some exp.', selling: 'Active seller' };
-
-function ProfileStrip() {
-  const { profile } = useSellerProfile();
-  const nav = useNavigation<Nav>();
-  if (!profile) return null;
-  const flag = MARKETPLACE_FLAG[profile.marketplace] ?? '🌐';
-  const exp  = EXPERIENCE_LABEL[profile.experience] ?? profile.experience;
-  return (
-    <TouchableOpacity style={ps.strip} onPress={() => (nav as any).navigate('SellerProfile')} activeOpacity={0.8}>
-      <Text style={ps.flag}>{flag}</Text>
-      <Text style={ps.chip}>{profile.marketplace}</Text>
-      <View style={ps.dot} />
-      <Text style={ps.chip}>${profile.budget.toLocaleString()} budget</Text>
-      <View style={ps.dot} />
-      <Text style={ps.chip}>${profile.priceMin}–${profile.priceMax}</Text>
-      <View style={ps.dot} />
-      <Text style={ps.chip}>{exp}</Text>
-      <Text style={ps.edit}>Edit ›</Text>
-    </TouchableOpacity>
-  );
-}
-
-const ps = StyleSheet.create({
-  strip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: DS.bgCard, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: DS.border, flexWrap: 'wrap' },
-  flag:  { fontSize: 14 },
-  chip:  { fontSize: 12, color: DS.textSecondary, fontWeight: '500' },
-  dot:   { width: 3, height: 3, borderRadius: 1.5, backgroundColor: DS.border },
-  edit:  { marginLeft: 'auto', fontSize: 12, color: DS.accent, fontWeight: '600' },
-});
-
-// ─── Quick Actions ────────────────────────────────────────────────────────────
-
-function QuickActions() {
-  const nav = useNavigation<Nav>();
-  const actions = [
-    { icon: '◈', label: 'Start a Build',   sub: 'LaunchPad pipeline',   onPress: () => nav.navigate('LaunchPad' as any) },
-    { icon: '◎', label: 'Research Market', sub: 'Search niches & data', onPress: () => nav.navigate('Search') },
-    { icon: '#',  label: 'Profit Lab',     sub: '9 calculation tools',  onPress: () => nav.navigate('Calculate' as any) },
-    { icon: '✦', label: 'Brand Studio',   sub: 'Build your identity',   onPress: () => nav.navigate('Brand') },
-  ];
-  return (
-    <View style={qa.container}>
-      <Text style={qa.sectionTitle}>Quick Actions</Text>
-      <View style={qa.grid}>
-        {actions.map(a => (
-          <TouchableOpacity key={a.label} style={qa.card} onPress={a.onPress} activeOpacity={0.75}>
-            <Text style={qa.icon}>{a.icon}</Text>
-            <Text style={qa.label}>{a.label}</Text>
-            <Text style={qa.sub}>{a.sub}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-    </View>
-  );
-}
-
-const qa = StyleSheet.create({
-  container:    { gap: 10 },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: DS.textPrimary },
-  grid:         { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  card:         { width: '48%', backgroundColor: DS.bgCard, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: DS.border, gap: 3 },
-  icon:         { fontSize: 18, color: DS.accent, marginBottom: 2 },
-  label:        { fontSize: 13, fontWeight: '700', color: DS.textPrimary },
-  sub:          { fontSize: 11, color: DS.textMuted, lineHeight: 15 },
-});
-
-// ─── FBA Tips Carousel ────────────────────────────────────────────────────────
-
-const FBA_TIPS = [
-  { title: 'Price Sweet Spot',   body: 'Target $20–$70. Below $20 leaves no margin; above $70 buyers research too hard.', icon: '💰' },
-  { title: 'Review Gate',        body: 'If the top 10 results average under 300 reviews, there\'s still room to compete.', icon: '⭐' },
-  { title: 'Margin Rule',        body: 'Never launch below 25% net margin after FBA fees, COGS, and freight.', icon: '📊' },
-  { title: 'First Order Size',   body: 'Start with 200–300 units. Enough to test, not so much you\'re stuck with dead stock.', icon: '📦' },
-  { title: 'Launch PPC Budget',  body: 'Spend roughly 2× your unit cost per day on ads during your first 30 days.', icon: '🚀' },
-  { title: 'Freight Threshold',  body: 'Sea freight beats air once your order exceeds ~$2,000 in value. Plan 6–8 weeks.', icon: '🚢' },
-  { title: 'Brand Register',     body: 'Register your brand in year 1. Protects against hijackers and unlocks A+ content.', icon: '🛡️' },
-  { title: 'Avoid These First',  body: 'Skip electronics, supplements, and toys for your first product — too much compliance.', icon: '⚠️' },
-];
-
-function TipsCarousel() {
-  return (
-    <View style={tc.container}>
-      <Text style={tc.sectionTitle}>FBA Fundamentals</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
-        {FBA_TIPS.map(tip => (
-          <View key={tip.title} style={tc.card}>
-            <Text style={tc.icon}>{tip.icon}</Text>
-            <Text style={tc.title}>{tip.title}</Text>
-            <Text style={tc.body}>{tip.body}</Text>
-          </View>
-        ))}
-      </ScrollView>
-    </View>
-  );
-}
-
-const tc = StyleSheet.create({
-  container:    { gap: 10 },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: DS.textPrimary },
-  card:         { width: 200, backgroundColor: DS.bgCard, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: DS.border, gap: 6 },
-  icon:         { fontSize: 24 },
-  title:        { fontSize: 13, fontWeight: '700', color: DS.textPrimary },
-  body:         { fontSize: 12, color: DS.textSecondary, lineHeight: 18 },
-});
-
-// ─── Empty Build CTA ──────────────────────────────────────────────────────────
-
-function EmptyBuildCTA() {
-  const nav = useNavigation<Nav>();
-  return (
-    <TouchableOpacity style={eb.card} onPress={() => nav.navigate('LaunchPad' as any)} activeOpacity={0.85}>
-      <View style={eb.iconWrap}><Text style={eb.icon}>◈</Text></View>
-      <View style={{ flex: 1 }}>
-        <Text style={eb.title}>Ready to find your first product?</Text>
-        <Text style={eb.sub}>The LaunchPad guides you step-by-step from idea to a profitable brand.</Text>
-      </View>
-      <Text style={eb.arrow}>→</Text>
-    </TouchableOpacity>
-  );
-}
-
-const eb = StyleSheet.create({
-  card:    { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: DS.accent, borderRadius: 16, padding: 16 },
-  iconWrap: { width: 44, height: 44, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
-  icon:    { fontSize: 22, color: '#fff' },
-  title:   { fontSize: 14, fontWeight: '700', color: '#fff', marginBottom: 3 },
-  sub:     { fontSize: 12, color: 'rgba(255,255,255,0.8)', lineHeight: 17 },
-  arrow:   { fontSize: 20, color: '#fff', fontWeight: '700' },
 });
 
 // ─── Greeting Header ──────────────────────────────────────────────────────────
@@ -1321,7 +1057,7 @@ function extractFirstName(email: string | null | undefined): string {
   return first.charAt(0).toUpperCase() + first.slice(1).toLowerCase();
 }
 
-function GreetingHeader({ vaultCount }: { vaultCount: number }) {
+function GreetingHeader({ vaultCount, analyzed, lookupsLeft, isFree }: { vaultCount: number; analyzed: number; lookupsLeft: number; isFree: boolean }) {
   const { user }   = useAuth();
   const hour       = new Date().getHours();
   const name       = user?.user_metadata?.full_name
@@ -1334,6 +1070,12 @@ function GreetingHeader({ vaultCount }: { vaultCount: number }) {
 
   const roleLabel  = vaultCount >= 3 ? 'Serial Founder' : vaultCount >= 1 ? 'FBA Founder' : 'Future Founder';
   const roleIcon   = vaultCount >= 3 ? '🏆' : vaultCount >= 1 ? '🚀' : '⚡';
+
+  const statCells = [
+    { value: String(analyzed),  label: 'Analyzed' },
+    { value: String(vaultCount), label: 'Saved' },
+    { value: isFree ? String(lookupsLeft) : '∞', label: isFree ? 'Lookups left' : 'Lookups' },
+  ];
 
   return (
     <View style={gh.card}>
@@ -1352,19 +1094,15 @@ function GreetingHeader({ vaultCount }: { vaultCount: number }) {
       {/* Tagline */}
       <Text style={gh.tagline}>{tagline}</Text>
 
-      {/* Vault count strip */}
-      {vaultCount > 0 && (
-        <View style={gh.vaultStrip}>
-          <Text style={gh.vaultStripText}>
-            {vaultCount} product{vaultCount !== 1 ? 's' : ''} in the Winner Vault
-          </Text>
-          <View style={gh.vaultDots}>
-            {Array.from({ length: Math.min(vaultCount, 6) }).map((_, i) => (
-              <View key={i} style={[gh.vaultDot, i < 3 && { backgroundColor: DS.success }, i >= 3 && { backgroundColor: DS.accent }]} />
-            ))}
+      {/* Stats strip */}
+      <View style={gh.statsRow}>
+        {statCells.map((c, i) => (
+          <View key={c.label} style={[gh.statCell, i < statCells.length - 1 && gh.statCellBorder]}>
+            <Text style={gh.statValue}>{c.value}</Text>
+            <Text style={gh.statLabel}>{c.label}</Text>
           </View>
-        </View>
-      )}
+        ))}
+      </View>
     </View>
   );
 }
@@ -1391,48 +1129,375 @@ const gh = StyleSheet.create({
   roleIcon:  { fontSize: 14 },
   roleText:  { fontSize: 12, fontWeight: '800', color: DS.accent, letterSpacing: 0.2 },
   tagline:   { fontSize: 14, color: DS.textSecondary, lineHeight: 21, fontStyle: 'italic' },
-  vaultStrip: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: DS.bgCanvas, borderRadius: 10, padding: 10,
+  statsRow: {
+    flexDirection: 'row',
+    backgroundColor: DS.bgCanvas, borderRadius: 10,
     borderWidth: 1, borderColor: DS.border,
+    paddingVertical: 10,
   },
-  vaultStripText: { fontSize: 12, fontWeight: '600', color: DS.textMuted },
-  vaultDots:      { flexDirection: 'row', gap: 4 },
-  vaultDot:       { width: 8, height: 8, borderRadius: 4, backgroundColor: DS.border },
+  statCell:       { flex: 1, alignItems: 'center', gap: 2 },
+  statCellBorder: { borderRightWidth: 1, borderRightColor: DS.border },
+  statValue:      { fontSize: 16, fontWeight: '900', color: DS.textPrimary, letterSpacing: -0.5 },
+  statLabel:      { fontSize: 10, fontWeight: '600', color: DS.textMuted },
+});
+
+// ─── Pipeline Context Banner ──────────────────────────────────────────────────
+
+function PipelineContextBanner() {
+  const pipeline  = usePipeline();
+  const nav       = useNavigation<Nav>();
+  const hasData   = pipeline.activeProduct || pipeline.selectedSupplier || pipeline.costModel;
+  if (!hasData) return null;
+
+  return (
+    <View style={pcb.card}>
+      <Text style={pcb.heading}>Active Pipeline</Text>
+      {pipeline.activeNiche && (
+        <TouchableOpacity style={pcb.row} onPress={() => nav.navigate('Home' as never)}>
+          <Text style={pcb.icon}>🔍</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={pcb.label}>Niche</Text>
+            <Text style={pcb.value} numberOfLines={1}>{pipeline.activeNiche.keyword}</Text>
+          </View>
+          <Text style={pcb.chevron}>›</Text>
+        </TouchableOpacity>
+      )}
+      {pipeline.activeProduct && (
+        <TouchableOpacity style={pcb.row} onPress={() => nav.navigate('Research' as never)}>
+          <Text style={pcb.icon}>📦</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={pcb.label}>Product</Text>
+            <Text style={pcb.value} numberOfLines={1}>{pipeline.activeProduct.title}</Text>
+          </View>
+          <Text style={pcb.chevron}>›</Text>
+        </TouchableOpacity>
+      )}
+      {pipeline.selectedSupplier && (
+        <TouchableOpacity style={pcb.row} onPress={() => nav.navigate('Sourcing' as never)}>
+          <Text style={pcb.icon}>🏭</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={pcb.label}>Supplier</Text>
+            <Text style={pcb.value} numberOfLines={1}>{pipeline.selectedSupplier.name} · ${pipeline.selectedSupplier.unitCost}/unit</Text>
+          </View>
+          <Text style={pcb.chevron}>›</Text>
+        </TouchableOpacity>
+      )}
+      {pipeline.costModel && (
+        <View style={[pcb.row, { borderBottomWidth: 0 }]}>
+          <Text style={pcb.icon}>💰</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={pcb.label}>Cost Model</Text>
+            <Text style={pcb.value}>${pipeline.costModel.netProfit.toFixed(2)}/unit profit · {pipeline.costModel.marginPct.toFixed(0)}% margin</Text>
+          </View>
+        </View>
+      )}
+    </View>
+  );
+}
+
+const pcb = StyleSheet.create({
+  card:    { backgroundColor: DS.bgCard, borderRadius: DS.radiusCard, borderWidth: 1, borderColor: DS.border, padding: DS.cardPadding, gap: 0 },
+  heading: { fontSize: 13, fontWeight: '700', color: DS.textPrimary, marginBottom: 8, letterSpacing: 0.3 },
+  row:     { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: DS.border },
+  icon:    { fontSize: 16, width: 24, textAlign: 'center' },
+  label:   { fontSize: 10, color: DS.textMuted, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
+  value:   { fontSize: 13, color: DS.textPrimary, fontWeight: '500', marginTop: 1 },
+  chevron: { fontSize: 18, color: DS.textMuted },
 });
 
 // ─── Copilot Screen ───────────────────────────────────────────────────────────
 
-export default function CopilotScreen() {
+// ─── Home Screen (dashboard, pipeline, launch plan) ──────────────────────────
+
+// ─── Trending products feed (live) ────────────────────────────────────────────
+// No backend "trending" endpoint exists, so we surface real products from a live
+// Amazon search on a rotating evergreen category. Cached once per session.
+
+const TRENDING_KEYWORDS = [
+  'kitchen gadgets', 'home organization', 'pet accessories', 'fitness gear',
+  'desk accessories', 'travel essentials', 'baby products', 'car accessories',
+];
+let _trendingCache: Product[] | null = null;
+
+function TrendingProducts({ onPick }: { onPick: () => void }) {
+  const { marketplace } = useCurrency();
+  const [items, setItems]     = useState<Product[] | null>(_trendingCache);
+  const [loading, setLoading] = useState(_trendingCache === null);
+
+  useEffect(() => {
+    if (_trendingCache !== null) { setLoading(false); return; }
+    let alive = true;
+    const kw = TRENDING_KEYWORDS[new Date().getDate() % TRENDING_KEYWORDS.length];
+    api.searchAmazon(kw, marketplace)
+      .then(r => {
+        const list = (r.products || []).filter(p => p.asin && !p.error && p.price != null).slice(0, 8);
+        _trendingCache = list;
+        if (alive) setItems(list);
+      })
+      .catch(() => { if (alive) setItems([]); })
+      .finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Quietly hide the whole section if the live fetch returns nothing.
+  if (!loading && (!items || items.length === 0)) return null;
+
+  return (
+    <View style={tp.wrap}>
+      <Text style={tp.header}>🔥  POPULAR RIGHT NOW</Text>
+      {loading ? (
+        <View style={tp.loadingRow}>
+          <ActivityIndicator color={DS.accent} />
+          <Text style={tp.loadingTxt}>Pulling live products…</Text>
+        </View>
+      ) : (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={tp.row}>
+          {items!.map(p => {
+            const verdict = p.opportunity === 'Good' ? 'LAUNCH' : p.opportunity === 'Saturated' ? 'AVOID' : 'TEST';
+            const reviews = p.review_count ?? 0;
+            return (
+              <TouchableOpacity
+                key={p.asin}
+                style={tp.card}
+                onPress={onPick}
+                activeOpacity={0.85}
+                accessibilityRole="button"
+                accessibilityLabel={`Analyze ${p.title}`}
+              >
+                <View style={tp.cardTop}>
+                  {p.image
+                    ? <Image source={{ uri: p.image }} style={tp.img} contentFit="contain" transition={150} accessibilityLabel={`Product photo: ${p.title}`} />
+                    : <Text style={tp.icon}>📦</Text>}
+                  <VerdictBadge verdict={verdict} />
+                </View>
+                <Text style={tp.name} numberOfLines={2}>{p.title}</Text>
+                <View style={tp.stats}>
+                  <Text style={tp.stat}>${p.price}</Text>
+                  {reviews > 0 && (
+                    <>
+                      <Text style={tp.statDot}>·</Text>
+                      <Text style={tp.stat}>{reviews >= 1000 ? (reviews / 1000).toFixed(1) + 'k' : reviews} rev</Text>
+                    </>
+                  )}
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      )}
+    </View>
+  );
+}
+
+const tp = StyleSheet.create({
+  wrap:       { gap: 10 },
+  header:     { fontSize: 10, fontWeight: '800', color: DS.textMuted, letterSpacing: 1.2 },
+  row:        { gap: 10, paddingRight: 4 },
+  card:       { width: 150, backgroundColor: DS.bgCard, borderRadius: DS.radiusCard, borderWidth: 1, borderColor: DS.border, padding: 12, gap: 8 },
+  cardTop:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  img:        { width: 40, height: 40, borderRadius: 8, backgroundColor: DS.bgSubtle },
+  icon:       { fontSize: 24 },
+  name:       { fontSize: 13, fontWeight: '700', color: DS.textPrimary, lineHeight: 17, minHeight: 34 },
+  stats:      { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  stat:       { fontSize: 11, fontWeight: '600', color: DS.textSecondary },
+  statDot:    { fontSize: 11, color: DS.textMuted },
+  loadingRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 16 },
+  loadingTxt: { fontSize: 13, color: DS.textMuted },
+});
+
+export function HomeScreen() {
   const { vault, activeSession, reloadVault } = useBuilderSession();
-  const { checked, toggle }                   = useChecklistState();
+  const { isOnline }                          = useNetworkStatus();
+  const { devMode, usage, remaining, isFree } = useSubscription();
+  const tapCount                              = useRef(0);
+  const tapTimer                              = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Modal state lifted here so the launchpad's hero can trigger the
+  // existing AI tools directly (Get a Verdict, Discover).
+  const [showAnalyze,  setShowAnalyze]  = useState(false);
+  const [showOpps,     setShowOpps]     = useState(false);
 
   useFocusEffect(useCallback(() => { reloadVault(); }, [reloadVault]));
+
+  const handleSecretTap = useCallback(async () => {
+    // Only functional in dev builds — toggleDevMode() is a no-op in production.
+    if (!__DEV__) return;
+    tapCount.current += 1;
+    if (tapTimer.current) clearTimeout(tapTimer.current);
+    if (tapCount.current >= 7) {
+      tapCount.current = 0;
+      const isNowOn = await toggleDevMode();
+      Alert.alert(
+        isNowOn ? '🔓 Dev Mode ON' : '🔒 Dev Mode OFF',
+        isNowOn
+          ? 'All paywalls bypassed. Operator tier active.'
+          : 'Restrictions restored.',
+      );
+    } else {
+      tapTimer.current = setTimeout(() => { tapCount.current = 0; }, 2000);
+    }
+  }, []);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: DS.bgCanvas }}>
       <AppHeader helpKey="copilot" />
+      <OfflineBanner visible={!isOnline} />
+      {devMode && (
+        <TouchableOpacity onPress={handleSecretTap} activeOpacity={0.8}>
+          <View style={s.devBanner}>
+            <Text style={s.devBannerText}>DEV MODE — all restrictions bypassed · tap to toggle</Text>
+          </View>
+        </TouchableOpacity>
+      )}
       <ScrollView
         contentContainerStyle={s.scroll}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        <GreetingHeader vaultCount={vault.length} />
-        <ProfileStrip />
-        <AITools />
-        {!activeSession && !vault.length && <EmptyBuildCTA />}
+        <TouchableOpacity activeOpacity={1} onPress={handleSecretTap}>
+          <GreetingHeader
+            vaultCount={vault.length}
+            analyzed={usage.research}
+            lookupsLeft={remaining('research')}
+            isFree={isFree}
+          />
+        </TouchableOpacity>
+
+        {/* ── Discover engine: the full Niche screen, embedded ── */}
+        <Text style={hl.sectionLabel}>DON'T HAVE ONE YET? EXPLORE A MARKET TO FIND ONE ↓</Text>
+        <FeatureExplainer text="Search any category or keyword and Siftly scores the whole market — demand, competition, and the gap you could fill. Use this when you don't have a product yet; use 'Get a Verdict' below when you already have one in mind." />
+        <NicheResearchScreen embedded />
+
+        {/* ── HERO: get a verdict on a specific product ── */}
+        <View style={hl.hero}>
+          <Text style={hl.heroEyebrow}>GOT A PRODUCT IN MIND?</Text>
+          <Text style={hl.heroTitle}>Should I sell this?</Text>
+          <Text style={hl.heroSub}>
+            Search any product by name — get an instant Launch / Test / Avoid verdict based on the top match.
+          </Text>
+          <TouchableOpacity
+            style={hl.heroBtn}
+            onPress={() => setShowAnalyze(true)}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel="Get a verdict on a product"
+          >
+            <Text style={hl.heroBtnTxt}>🔍  Get a Verdict →</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* ── Trending products feed ── */}
+        <TrendingProducts onPick={() => setShowAnalyze(true)} />
+
+        {/* ── Returning-user context (each self-hides when empty) ── */}
         {activeSession && <ActiveProductCard session={activeSession} />}
-        <QuickActions />
+        <PipelineContextBanner />
         <WinnerVaultCard vault={vault} />
-        <TipsCarousel />
-        <OverallProgressCard checked={checked} />
-        <FullChecklistCard checked={checked} toggle={toggle} />
-        <DailyInsightCard />
+
+        {/* ── AI tool modals (reused) ── */}
+        <AnalyzeProductModal visible={showAnalyze} onClose={() => setShowAnalyze(false)} />
+        <FindOpportunitiesModal visible={showOpps} onClose={() => setShowOpps(false)} />
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+const hl = StyleSheet.create({
+  hero: {
+    backgroundColor: DS.accent,
+    borderRadius:    DS.radiusHero,
+    padding:         20,
+    gap:             8,
+  },
+  heroEyebrow: { fontSize: 10, fontWeight: '800', color: DS.textInverse, letterSpacing: 2, opacity: 0.85 },
+  heroTitle:   { fontSize: 23, fontWeight: '900', color: DS.textInverse, letterSpacing: -0.6, lineHeight: 28 },
+  heroSub:     { fontSize: 13, color: DS.textInverse, opacity: 0.9, lineHeight: 19 },
+  heroBtn: {
+    backgroundColor: DS.bgCard,
+    borderRadius:    DS.radiusButton,
+    paddingVertical: 14,
+    alignItems:      'center',
+    marginTop:       6,
+  },
+  heroBtnTxt: { fontSize: 15, fontWeight: '800', color: DS.accent, letterSpacing: -0.2 },
+
+  discoverSection: { gap: 10 },
+  sectionLabel:    { fontSize: 10, fontWeight: '800', color: DS.textMuted, letterSpacing: 1.2 },
+  chipGrid:        { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chip: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: DS.bgCard, borderRadius: DS.radiusBadge,
+    borderWidth: 1, borderColor: DS.border,
+    paddingHorizontal: 12, paddingVertical: 9,
+  },
+  chipIcon:     { fontSize: 14 },
+  chipLabel:    { fontSize: 12, fontWeight: '600', color: DS.textSecondary },
+  discoverMore: { fontSize: 13, fontWeight: '700', color: DS.accent, marginTop: 2 },
+});
+
+// ─── Copilot Screen (pure AI tools — navigated from header) ──────────────────
+
+export default function CopilotScreen() {
+  const { isOnline }    = useNetworkStatus();
+  const navigation      = useNavigation<Nav>();
+  const intelProfile    = useProductIntelligence();
+  return (
+    <SafeAreaView style={{ flex: 1, backgroundColor: DS.bgCanvas }}>
+      <AppHeader helpKey="copilot" />
+      {navigation.canGoBack() && (
+        <TouchableOpacity style={s.backBar} onPress={() => navigation.goBack()} activeOpacity={0.7}>
+          <Text style={s.backTxt}>← Back</Text>
+        </TouchableOpacity>
+      )}
+      <OfflineBanner visible={!isOnline} />
+      <ScrollView
+        contentContainerStyle={s.scroll}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={s.copilotHeader}>
+          <Text style={s.copilotTitle}>AI Copilot</Text>
+          <Text style={s.copilotSub}>Analyze products, find opportunities, and get answers.</Text>
+        </View>
+        {intelProfile && (
+          <IntelligenceSummaryBanner
+            profile={intelProfile}
+            onNavigate={tab => navigation.navigate(tab as keyof TabParamList)}
+          />
+        )}
+        {!intelProfile && (
+          <View style={s.coldStartCard}>
+            <Text style={s.coldStartIcon}>◉</Text>
+            <Text style={s.coldStartTitle}>No product context yet</Text>
+            <Text style={s.coldStartBody}>
+              Search a niche in the Niche tab, then select a product in Research to unlock product-specific AI analysis here.
+            </Text>
+          </View>
+        )}
+        <AITools />
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const s = StyleSheet.create({
-  scroll: { paddingHorizontal: 20, paddingTop: 14, paddingBottom: 40, gap: 20 },
+  backBar: {
+    paddingHorizontal: DS.pagePadding,
+    paddingVertical:   8,
+    backgroundColor:   DS.bgCard,
+    borderBottomWidth: 1,
+    borderBottomColor: DS.border,
+  },
+  backTxt:        { fontSize: 13, fontWeight: '700', color: DS.accent },
+  scroll:         { paddingHorizontal: 20, paddingTop: 14, paddingBottom: 40, gap: 20 },
+  copilotHeader:  { gap: 4 },
+  copilotTitle:   { fontSize: 26, fontWeight: '900', color: DS.textPrimary, letterSpacing: -0.5 },
+  copilotSub:     { fontSize: 14, color: DS.textSecondary, lineHeight: 20 },
+  coldStartCard:  { backgroundColor: DS.bgCard, borderRadius: DS.radiusCard, borderWidth: 1, borderColor: DS.border, padding: DS.cardPadding, alignItems: 'center', gap: 8 },
+  coldStartIcon:  { fontSize: 28, color: DS.accent },
+  coldStartTitle: { fontSize: 14, fontWeight: '800', color: DS.textPrimary },
+  coldStartBody:  { fontSize: 13, color: DS.textSecondary, textAlign: 'center', lineHeight: 19 },
+  devBanner:      { backgroundColor: DS.warning, paddingVertical: 6, paddingHorizontal: 16 },
+  devBannerText:  { fontSize: 11, fontWeight: '700', color: '#1C1C1E', textAlign: 'center', letterSpacing: 0.3 },
 });

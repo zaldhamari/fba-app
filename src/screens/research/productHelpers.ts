@@ -1,26 +1,16 @@
 import { DS } from '../../components/ds';
 import { Product, Supplier, TrendData } from '../../services/api';
 import {
+  monthlySalesEst,
+  estimateMonthlySales,
+  estimatePPCPressure,
+} from '../../lib/financialEngine';
+import {
   ProductDisplay,
   SupplierDisplay,
   KeywordMetric,
   EnrichedKeyword,
 } from './types';
-
-// ── Static mocks (pre-search) ─────────────────────────────────────────────────
-
-export const MOCK_KEYWORD_METRICS: KeywordMetric[] = [
-  { label: 'Search Volume', value: '—', icon: '◎', color: DS.textMuted, bg: DS.bgSubtle },
-  { label: 'Trend Score',   value: '—', icon: '↗', color: DS.textMuted, bg: DS.bgSubtle },
-  { label: 'Trend',         value: '—', icon: '↗', color: DS.textMuted, bg: DS.bgSubtle },
-  { label: 'SEO Score',     value: '—', icon: '✦', color: DS.textMuted, bg: DS.bgSubtle },
-];
-
-export const MOCK_RELATED_KEYWORDS: EnrichedKeyword[] = [];
-
-export const MOCK_PRODUCTS: ProductDisplay[] = [];
-
-export const MOCK_SUPPLIERS: SupplierDisplay[] = [];
 
 // ── Data converters ───────────────────────────────────────────────────────────
 
@@ -29,22 +19,43 @@ export function productToDisplay(p: Product): ProductDisplay {
     p.competition === 'High' ? 'High' : p.competition === 'Low' ? 'Low' : 'Medium';
   const badge: ProductDisplay['badge'] =
     p.opportunity === 'Good' ? 'Promising' : p.opportunity === 'Saturated' ? 'Saturated' : 'Moderate';
-  const revenueUSD = p.price && p.review_count
-    ? Math.round(p.price * p.review_count * 0.05)
+
+  // Sales estimation — uses review-rate model; label as directional in UI
+  const salesEst = (p.review_count && p.review_count > 0 && p.price && p.price > 0)
+    ? estimateMonthlySales(p.review_count, comp, p.price)
     : null;
+
+  const revenueUSD = salesEst && p.price
+    ? Math.round(salesEst.mid * p.price)
+    : null;
+
+  const ppcPressure = (p.review_count != null)
+    ? estimatePPCPressure(p.review_count, comp)
+    : undefined;
+
   return {
-    id:          p.asin,
-    name:        p.title,
-    price:       p.price,
-    rating:      p.rating,
-    image:       p.image ?? '',
-    revenue:     revenueUSD != null ? `~$${revenueUSD.toLocaleString()}/mo` : 'N/A',
+    id:              p.asin,
+    name:            p.title,
+    price:           p.price,
+    rating:          p.rating,
+    image:           p.image ?? '',
+    revenue:         revenueUSD != null ? `~$${revenueUSD.toLocaleString()}/mo` : 'N/A',
     revenueUSD,
-    reviews:     p.review_count != null ? `${p.review_count.toLocaleString()} reviews` : 'N/A',
-    reviewCount: p.review_count,
-    competition: comp,
+    monthlySalesEst: monthlySalesEst(revenueUSD, p.price),
+    reviews:         p.review_count != null ? `${p.review_count.toLocaleString()} reviews` : 'N/A',
+    reviewCount:     p.review_count,
+    competition:     comp,
     badge,
-    url:         p.url || undefined,
+    url:             p.url || undefined,
+    // Sales estimates
+    salesEstLow:     salesEst?.low,
+    salesEstHigh:    salesEst?.high,
+    salesEstMonthly: salesEst?.monthlyLabel,
+    salesEstDaily:   salesEst?.dailyLabel,
+    salesConfidence: salesEst?.confidence,
+    ppcPressure,
+    revenueEstLow:   salesEst?.revenueEstLow,
+    revenueEstHigh:  salesEst?.revenueEstHigh,
   };
 }
 
@@ -87,6 +98,29 @@ export function displayToProduct(p: ProductDisplay): Product {
     competition:  p.competition as Product['competition'],
     opportunity:  p.badge === 'Promising' ? 'Good' : p.badge === 'Saturated' ? 'Saturated' : 'Moderate',
     url:          p.url ?? '',
+  };
+}
+
+export function emptyProductDisplay(): Partial<ProductDisplay> {
+  return { monthlySalesEst: null };
+}
+
+export function productToPipelinePayload(item: ProductDisplay) {
+  return {
+    title:           item.name,
+    asin:            item.id,
+    price:           item.price ?? 0,
+    reviews:         item.reviewCount ?? 0,
+    rating:          item.rating ?? 0,
+    url:             item.url,
+    competition:     item.competition,
+    salesEstLow:     item.salesEstLow,
+    salesEstHigh:    item.salesEstHigh,
+    salesEstDaily:   item.salesEstDaily,
+    salesConfidence: item.salesConfidence,
+    ppcPressure:     item.ppcPressure,
+    revenueEstLow:   item.revenueEstLow,
+    revenueEstHigh:  item.revenueEstHigh,
   };
 }
 
@@ -190,6 +224,8 @@ export function buildKeywordCSV(keywords: EnrichedKeyword[]): string {
 
 // ── Input type detection ──────────────────────────────────────────────────────
 
+export const REAL_ASIN_RE = /^B[A-Z0-9]{9}$/;
+
 export function isASIN(input: string): boolean {
   return /^[A-Z0-9]{10}$/.test(input.trim().toUpperCase());
 }
@@ -208,4 +244,108 @@ export function hasEnoughDataForCompare(p: ProductDisplay): boolean {
   const isMock = p.id === '1' || p.id === '2' || p.id === '3';
   if (isMock) return false;
   return !!p.name && (p.price != null || p.reviewCount != null);
+}
+
+// ── Opportunity signals ────────────────────────────────────────────────────────
+
+export type SignalType = 'positive' | 'warning' | 'neutral';
+
+export interface OpportunitySignal {
+  label:  string;
+  detail: string;
+  type:   SignalType;
+}
+
+export function buildOpportunitySignals(item: ProductDisplay): OpportunitySignal[] {
+  const signals: OpportunitySignal[] = [];
+  const rc   = item.reviewCount ?? 0;
+  const comp = item.competition;
+  const ppc  = item.ppcPressure;
+  const price = item.price ?? 0;
+
+  // Review moat signals
+  if (rc > 500 && comp === 'High') {
+    signals.push({
+      label:  'High review moat',
+      detail: 'Incumbents have 500+ reviews — ranking requires sustained PPC spend to break through',
+      type:   'warning',
+    });
+  } else if (rc < 100 && comp === 'Low') {
+    signals.push({
+      label:  'Underserved niche',
+      detail: 'Low review counts with low competition — early mover advantage possible',
+      type:   'positive',
+    });
+  } else if (rc > 300 && comp !== 'Low') {
+    signals.push({
+      label:  'Moderate review barrier',
+      detail: 'Established sellers present — differentiate on design or target a sub-niche',
+      type:   'warning',
+    });
+  }
+
+  // PPC pressure signal
+  if (ppc === 'High') {
+    signals.push({
+      label:  'High PPC risk',
+      detail: 'Competitive keywords likely require aggressive ad spend — budget for $500–$1,500+ launch PPC',
+      type:   'warning',
+    });
+  } else if (ppc === 'Low') {
+    signals.push({
+      label:  'Low PPC pressure',
+      detail: 'Organic ranking is more achievable — lower launch capital required for initial traction',
+      type:   'positive',
+    });
+  }
+
+  // Review velocity — assumed 24-month average market age for directional estimate
+  if (rc > 0) {
+    const vel = Math.round(rc / 24);
+    if (vel > 20) {
+      signals.push({
+        label:  `~${vel}/mo review velocity`,
+        detail: 'Fast-growing niche — accumulate reviews quickly or competitors will outpace you',
+        type:   'warning',
+      });
+    } else if (vel >= 5) {
+      signals.push({
+        label:  `~${vel}/mo review velocity`,
+        detail: 'Moderate review growth — achievable with a focused launch strategy',
+        type:   'neutral',
+      });
+    } else {
+      signals.push({
+        label:  `~${vel}/mo review velocity`,
+        detail: 'Slow review accumulation — easier to catch up to incumbents',
+        type:   'positive',
+      });
+    }
+  }
+
+  // Price band viability
+  if (price > 0 && price < 12) {
+    signals.push({
+      label:  'Low price point risk',
+      detail: 'Under $12 — FBA fees and any PPC spend may eliminate all margin',
+      type:   'warning',
+    });
+  } else if (price >= 25 && price <= 60 && comp !== 'High') {
+    signals.push({
+      label:  'Strong price band',
+      detail: '$25–$60 is the FBA sweet spot — solid margin buffer after fees and PPC',
+      type:   'positive',
+    });
+  }
+
+  // Saturation signal
+  if (item.badge === 'Saturated' && rc > 200) {
+    signals.push({
+      label:  'Saturated market',
+      detail: 'Meaningful product improvement or unique positioning required to compete profitably',
+      type:   'warning',
+    });
+  }
+
+  return signals.slice(0, 4);
 }

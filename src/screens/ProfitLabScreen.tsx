@@ -16,6 +16,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { safeParseJSON } from '../utils/safeJSON';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   AppCard, SectionHeader, StatusBadge,
@@ -27,37 +28,40 @@ import { usePipeline } from '../context/PipelineContext';
 import { PipelineProgressBar } from '../components/PipelineProgressBar';
 import type { CurrencyCode, MarketplaceId } from '../context/CurrencyContext';
 import { useActiveProduct } from '../context/ActiveProductContext';
-import { CurrencySelector } from '../components/CurrencySelector';
 import { HelpButton } from '../components/HelpModal';
 import { AppHeader } from '../components/AppHeader';
 import type { FeatureKey } from '../lib/featureHelp';
 import { getMarketplaceProfile, getDutyRates } from '../constants/marketplaceProfiles';
 import FeasibilityHeart from '../components/FeasibilityHeart';
+import { EstimateLabel } from '../components/EstimateLabel';
 import { useVault } from '../hooks/useVault';
 import type { VaultEntry } from '../types/vault';
 import { searchFreightCompanies } from '../lib/freightSearch';
 import type { FreightCompanyResult, FreightPriority, FreightSearchResult, SavedFreightSelection } from '../lib/freightSearch';
 import type { ShipOrigin, ShipMarket, ShipMode } from '../utils/shippingCalcs';
+import { validateFinancialInputs, computeUnitEconomics } from '../lib/financialEngine';
+import { Toast } from '../components/Toast';
+import { useToast } from '../hooks/useToast';
+import { useNetworkStatus } from '../hooks/useNetworkStatus';
+import { OfflineBanner } from '../components/OfflineBanner';
+import { useProductIntelligence } from '../hooks/useProductIntelligence';
+import { useDecisionSimulation } from '../hooks/useDecisionSimulation';
+import { DecisionSimulationPanel } from '../components/DecisionSimulationPanel';
 
 // ─── Calculator registry ──────────────────────────────────────────────────────
 
 type CalcType =
-  | 'fba' | 'landed' | 'breakeven'
-  | 'ppc' | 'freight' | 'duties'
-  | 'reorder' | 'roi' | 'unitEcon';
+  | 'fba' | 'breakeven'
+  | 'ppc' | 'freight' | 'duties';
 
 const CALCS: {
   id: CalcType; icon: string; name: string; desc: string; badge?: string; summary: string;
 }[] = [
   { id: 'fba',      icon: '🏆', name: 'FBA Profit',   desc: 'Full P&L',        badge: 'Default',   summary: 'Calculate your net profit, margin %, and ROI per unit after all Amazon fees. Use your landed cost as product cost — never the raw supplier quote.' },
-  { id: 'landed',   icon: '📦', name: 'Landed Cost',  desc: 'True unit cost',  badge: 'Most Used', summary: 'Find your true per-unit cost including freight and import duties across sea, air, and express shipping. Use the sea freight result in FBA Profit and Feasibility Check.' },
   { id: 'breakeven',icon: '⚖️', name: 'Break-even',   desc: 'Units to profit',                     summary: 'Shows how many units you need to sell to recover your total investment. Enter a conservative launch velocity — 30-50% of what the top competitor sells.' },
   { id: 'ppc',      icon: '📣', name: 'PPC / ACoS',   desc: 'Ad budget calc',  badge: 'Popular',   summary: 'Calculates your break-even ACoS and recommended launch ad budget. Run this before setting your PPC spend — enter the result into Capital Estimator.' },
-  { id: 'freight',  icon: '🚢', name: 'Freight',      desc: 'Shipping cost',                       summary: 'Compares sea, air, and express shipping costs per unit and per shipment. Use as a planning estimate — get real quotes from 2-3 freight forwarders before ordering.' },
+  { id: 'freight',  icon: '🚢', name: 'Freight Forwarders', desc: 'Compare & get quotes',          summary: 'Compares sea, air, and express shipping costs per unit and per shipment, then connects you with freight forwarders to request real quotes. For a quick shipping cost estimate, use the Freight tab in Sourcing.' },
   { id: 'duties',   icon: '🌐', name: 'Duties',       desc: 'Import taxes',                        summary: 'Estimates import duty and VAT by country and HS tariff code. Take the duty % result and enter it into Feasibility Check and Landed Cost.' },
-  { id: 'reorder',  icon: '🔄', name: 'Reorder Pt.',  desc: 'Stock timing',                        summary: 'Tells you when to place your next supplier order to prevent a stockout. Only use this after 30+ days of live sales — launch velocity is not representative.' },
-  { id: 'roi',      icon: '💰', name: 'ROI',          desc: 'Return on invest.',                   summary: 'Measures return on your total capital invested per cycle and annualised at your inventory turn rate. Target 50%+ per cycle; 100%+ annually is strong for FBA.' },
-  { id: 'unitEcon', icon: '📊', name: 'Unit Econ',    desc: 'Per-unit metrics',                    summary: 'Shows the full cost waterfall from selling price to net profit. Any cost category consuming more than 25% of revenue is your primary optimisation target.' },
 ];
 
 // ─── Shared helpers ───────────────────────────────────────────────────────────
@@ -173,33 +177,6 @@ const cob = StyleSheet.create({
 
 // ─── Verification Checklist ───────────────────────────────────────────────────
 
-const VERIFY_ITEMS = [
-  'Get actual supplier quote (not Alibaba estimate)',
-  'Get real freight quote from a forwarder',
-  'Verify FBA fees in Seller Central',
-  'Confirm HS/HTS code with a customs broker',
-];
-
-function VerificationChecklist() {
-  return (
-    <AppCard style={{ gap: 8 }}>
-      <Text style={vc.title}>Before You Order — Verify</Text>
-      {VERIFY_ITEMS.map(item => (
-        <View key={item} style={vc.row}>
-          <View style={vc.box} />
-          <Text style={vc.txt}>{item}</Text>
-        </View>
-      ))}
-    </AppCard>
-  );
-}
-const vc = StyleSheet.create({
-  title: { fontSize: 13, fontWeight: '800', color: DS.textPrimary, letterSpacing: -0.2 },
-  row:   { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  box:   { width: 16, height: 16, borderWidth: 1.5, borderColor: DS.border, borderRadius: 3, flexShrink: 0 },
-  txt:   { fontSize: 12, color: DS.textSecondary, flex: 1, lineHeight: 17 },
-});
-
 // ─── Scenario Config ──────────────────────────────────────────────────────────
 
 type Scenario = 'conservative' | 'expected' | 'optimistic';
@@ -213,37 +190,60 @@ const SCENARIO_CFG: Record<Scenario, { label: string; freightMult: number; dutyM
 // ─── Calculator Selector ──────────────────────────────────────────────────────
 
 function CalcSelector({ active, onSelect }: { active: CalcType; onSelect: (id: CalcType) => void }) {
+  const [expanded, setExpanded] = useState(active !== 'fba');
+  const activeCalcInfo = CALCS.find(c => c.id === active) ?? CALCS[0];
+
   return (
     <AppCard style={sel.card}>
-      <Text style={sel.heading}>Choose a Calculator</Text>
-      <View style={sel.grid}>
-        {CALCS.map(c => {
-          const isActive = c.id === active;
-          return (
-            <TouchableOpacity
-              key={c.id}
-              style={[sel.tile, isActive && sel.tileActive]}
-              onPress={() => onSelect(c.id)}
-              activeOpacity={0.75}
-            >
-              <Text style={sel.icon}>{c.icon}</Text>
-              <Text style={[sel.name, isActive && sel.nameActive]} numberOfLines={2}>{c.name}</Text>
-              <Text style={sel.desc} numberOfLines={1}>{c.desc}</Text>
-              {c.badge ? (
-                <View style={[sel.badge, isActive && sel.badgeActive]}>
-                  <Text style={[sel.badgeTxt, isActive && sel.badgeTxtActive]}>{c.badge}</Text>
-                </View>
-              ) : null}
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+      <TouchableOpacity
+        style={sel.headerRow}
+        onPress={() => setExpanded(e => !e)}
+        activeOpacity={0.75}
+      >
+        <View style={{ flex: 1, gap: 2 }}>
+          <Text style={sel.heading}>
+            {activeCalcInfo.icon} {activeCalcInfo.name}
+          </Text>
+          {active !== 'fba' && (
+            <Text style={sel.activeSub}>{activeCalcInfo.desc}</Text>
+          )}
+        </View>
+        <Text style={sel.switchLink}>{expanded ? 'Done ▲' : 'Switch ▼'}</Text>
+      </TouchableOpacity>
+
+      {expanded && (
+        <View style={sel.grid}>
+          {CALCS.map(c => {
+            const isActive = c.id === active;
+            return (
+              <TouchableOpacity
+                key={c.id}
+                style={[sel.tile, isActive && sel.tileActive]}
+                onPress={() => { onSelect(c.id); setExpanded(false); }}
+                activeOpacity={0.75}
+              >
+                <Text style={sel.icon}>{c.icon}</Text>
+                <Text style={[sel.name, isActive && sel.nameActive]} numberOfLines={2}>{c.name}</Text>
+                <Text style={sel.desc} numberOfLines={1}>{c.desc}</Text>
+                {c.badge ? (
+                  <View style={[sel.badge, isActive && sel.badgeActive]}>
+                    <Text style={[sel.badgeTxt, isActive && sel.badgeTxtActive]}>{c.badge}</Text>
+                  </View>
+                ) : null}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      )}
     </AppCard>
   );
 }
 const sel = StyleSheet.create({
-  card:        { gap: 12 },
+  card:        { gap: 10 },
+  headerRow:   { flexDirection: 'row', alignItems: 'center' },
   heading:     { fontSize: 15, fontWeight: '800', color: DS.textPrimary, letterSpacing: -0.3 },
+  activeSub:   { fontSize: 11, color: DS.textMuted },
+  switchLink:  { fontSize: 12, fontWeight: '700', color: DS.accent },
   grid:        { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   tile: {
     width:         '31%', minHeight: 86,
@@ -296,11 +296,11 @@ function PipelineActions({
         </Text>
       </TouchableOpacity>
       <TouchableOpacity
-        style={[pa.btn, pa.btnLaunch]}
-        onPress={() => navigation.navigate('LaunchDecision')}
+        style={[pa.btn, pa.btnBrand]}
+        onPress={() => navigation.navigate('BrandStudio' as any)}
         activeOpacity={0.85}
       >
-        <Text style={pa.btnLaunchTxt}>Open Launch Decision →</Text>
+        <Text style={pa.btnBrandTxt}>Continue to Brand Studio →</Text>
       </TouchableOpacity>
     </View>
   );
@@ -313,8 +313,8 @@ const pa = StyleSheet.create({
   btnSaved:     { borderColor: DS.success + '50', backgroundColor: DS.success + '10' },
   btnTxt:       { fontSize: 13, fontWeight: '800', color: DS.accent },
   btnSavedTxt:  { color: DS.success },
-  btnLaunch:    { backgroundColor: DS.accent, borderColor: DS.accent },
-  btnLaunchTxt: { fontSize: 14, fontWeight: '900', color: '#fff', letterSpacing: -0.2 },
+  btnBrand:     { backgroundColor: DS.bgCard, borderColor: DS.border },
+  btnBrandTxt:  { fontSize: 13, fontWeight: '800', color: DS.textPrimary },
 });
 
 // ─── 1. FBA Profitability ─────────────────────────────────────────────────────
@@ -344,26 +344,19 @@ const US_FEE_TIERS = [
   { tier: 'Oversize (small)',          range: '$9.73+' },
 ];
 
+// Thin adapter — FBAWorkspace stores raw user input as strings; the actual
+// profit/margin/ROI formula lives in financialEngine.computeUnitEconomics so
+// Profit Lab and Sourcing never disagree.
 function computeFBA(i: FBAInputs) {
-  const sell = n(i.sellingPrice);
-  const totalCost = n(i.productCost)+n(i.freight)+n(i.fbaFees)+n(i.referralFee)+n(i.duties)+n(i.packaging);
-  const netProfit = sell - totalCost;
-  const margin = sell > 0 ? (netProfit / sell) * 100 : 0;
-  const investBase = n(i.productCost)+n(i.freight)+n(i.duties)+n(i.packaging);
-  const roi = investBase > 0 ? (netProfit / investBase) * 100 : 0;
-  const isViable = margin >= 20;
-  return {
-    netProfit, margin, roi, totalCost, sellingPrice: sell, isViable,
-    costAmounts: [
-      { label: 'Supplier cost',   amount: n(i.productCost) },
-      { label: 'Freight / unit',  amount: n(i.freight) },
-      { label: 'FBA fulfillment', amount: n(i.fbaFees) },
-      { label: 'Referral fee',    amount: n(i.referralFee) },
-      { label: 'Import duties',   amount: n(i.duties) },
-      { label: 'Packaging',       amount: n(i.packaging) },
-      { label: 'Total costs',     amount: totalCost },
-    ],
-  };
+  return computeUnitEconomics({
+    sellingPrice: n(i.sellingPrice),
+    productCost:  n(i.productCost),
+    freight:      n(i.freight),
+    fbaFees:      n(i.fbaFees),
+    referralFee:  n(i.referralFee),
+    duties:       n(i.duties),
+    packaging:    n(i.packaging),
+  });
 }
 
 function opportunityBg(opp: string): string {
@@ -376,6 +369,67 @@ function opportunityFg(opp: string): string {
   if (opp === 'Moderate') return DS.warningText;
   return DS.dangerText;
 }
+
+// ─── Advisor verdict ──────────────────────────────────────────────────────────
+// Turns the computed P&L into a plain-English decision + the single best move
+// (a taste of the reverse-calculator: the unit cost needed to hit a 30% margin).
+// Additive — sits above Profit Health; the detailed sections below are unchanged.
+
+function AdvisorVerdict({ c, productCost, fmtLocal }: {
+  c: ReturnType<typeof computeFBA>;
+  productCost: number;
+  fmtLocal: (v: number) => string;
+}) {
+  const sell = c.sellingPrice;
+  if (sell <= 0) return null;
+
+  const tier =
+    c.netProfit <= 0 ? 'loss' :
+    c.margin < 15    ? 'thin' :
+    c.margin < 25    ? 'workable' : 'strong';
+  const color =
+    tier === 'loss' || tier === 'thin' ? DS.danger :
+    tier === 'workable'                ? DS.warning : DS.success;
+  const headline =
+    tier === 'loss'     ? 'Not viable — you lose money on every unit'        :
+    tier === 'thin'     ? `Thin — ${c.margin.toFixed(0)}% margin is below the 20% FBA floor` :
+    tier === 'workable' ? `Workable — ${c.margin.toFixed(0)}% margin, test before you scale` :
+                          `Strong — ${c.margin.toFixed(0)}% margin, ${c.roi.toFixed(0)}% ROI`;
+
+  const drivers = c.costAmounts.filter(x => x.label !== 'Total costs' && x.amount > 0);
+  const top = drivers.length ? drivers.reduce((a, b) => (b.amount > a.amount ? b : a)) : null;
+
+  const TARGET = 0.30;
+  const otherCosts = c.totalCost - productCost;
+  const neededCost = sell * (1 - TARGET) - otherCosts;
+  const move =
+    c.margin >= 30   ? 'Margins are healthy — lock in your supplier price.' :
+    neededCost > 0   ? `Negotiate unit cost down to ${fmtLocal(neededCost)} to reach a 30% margin.` :
+                       'Even free product won’t hit 30% here — raise the price or cut other costs.';
+
+  return (
+    <AppCard style={{ gap: 10, borderColor: color + '55', borderWidth: 1.5 }}>
+      <View style={av.row}>
+        <View style={[av.dot, { backgroundColor: color }]} />
+        <Text style={[av.headline, { color }]}>{headline}</Text>
+      </View>
+      {top && (
+        <Text style={av.line}>
+          <Text style={av.k}>Biggest cost: </Text>{top.label} ({fmtLocal(top.amount)}/unit)
+        </Text>
+      )}
+      <Text style={av.line}><Text style={av.k}>Your best move: </Text>{move}</Text>
+    </AppCard>
+  );
+}
+
+const av = StyleSheet.create({
+  row:      { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  dot:      { width: 8, height: 8, borderRadius: 4 },
+  headline: { flex: 1, fontSize: 15, fontWeight: '800', letterSpacing: -0.2 },
+  line:     { fontSize: 13, color: DS.textSecondary, lineHeight: 19 },
+  k:        { fontWeight: '700', color: DS.textPrimary },
+});
 
 function FBAWorkspace({
   onSave, onUnsave, saveLoading, saveSuccess, saveError, latestEntry, activeProductPrice, activeProductName, onFeasibility,
@@ -399,8 +453,7 @@ function FBAWorkspace({
   const [autofillDone,      setAutofillDone]       = useState(false);
   const [scenario,          setScenario]           = useState<Scenario>('expected');
   const [showFeeHelper,     setShowFeeHelper]      = useState(false);
-  const [showScenarioTable, setShowScenarioTable]  = useState(false);
-  const [showSensitivity,   setShowSensitivity]    = useState(false);
+  const [showStressTest,    setShowStressTest]     = useState(false);
 
   // Restore last saved calculation so tapping "Open in Profit Lab" from home isn't blank.
   useEffect(() => {
@@ -424,8 +477,9 @@ function FBAWorkspace({
   // Pre-fill selling price from vault when no saved calculation exists.
   // Runs whenever latestEntry changes (vault loads async after mount).
   useEffect(() => {
-    if (!latestEntry) return;
+    if (!latestEntry || autofillDone) return;
     AsyncStorage.getItem(STORAGE_KEYS.savedCalculations).then(raw => {
+      if (autofillDone) return; // effect 1 may have completed while we waited
       if (raw) {
         try {
           const list: FBASaved[] = JSON.parse(raw);
@@ -448,8 +502,9 @@ function FBAWorkspace({
   // Pre-fill from active product (Research → Feasibility flow) when vault has nothing.
   // Lower priority: only fills if selling price is still at default and vault didn't fill it.
   useEffect(() => {
-    if (!activeProductPrice || latestEntry) return;
+    if (!activeProductPrice || latestEntry || autofillDone) return;
     AsyncStorage.getItem(STORAGE_KEYS.savedCalculations).then(raw => {
+      if (autofillDone) return; // effect 1 may have completed while we waited
       if (raw) {
         try {
           const list: FBASaved[] = JSON.parse(raw);
@@ -466,13 +521,21 @@ function FBAWorkspace({
   }, [activeProductPrice, activeProductName]);
 
   // Pre-fill supplier cost from pipeline when no saved calculation exists.
+  // Persists a fingerprint so restart never overwrites manual edits.
+  const AUTOFILL_KEY = 'siftly_profitlab_autofill_v1';
   useEffect(() => {
     if (!pipeline.selectedSupplier || autofillDone) return;
-    AsyncStorage.getItem(STORAGE_KEYS.savedCalculations).then(raw => {
+    const supplierKey = `${pipeline.selectedSupplier.name}:${pipeline.selectedSupplier.unitCost}`;
+    Promise.all([
+      AsyncStorage.getItem(STORAGE_KEYS.savedCalculations),
+      AsyncStorage.getItem(AUTOFILL_KEY),
+    ]).then(([raw, storedKey]) => {
+      // Skip if already autofilled for this exact supplier in a previous session
+      if (storedKey === supplierKey) { setAutofillDone(true); return; }
       if (raw) {
         try {
           const list: FBASaved[] = JSON.parse(raw);
-          if (list.length > 0) return;
+          if (list.length > 0) { setAutofillDone(true); return; }
         } catch { /* fall through */ }
       }
       const cost = pipeline.selectedSupplier?.unitCost;
@@ -485,6 +548,13 @@ function FBAWorkspace({
       if (pipeline.activeProduct?.price) {
         setInputs(prev => prev.sellingPrice !== '' ? prev : { ...prev, sellingPrice: (pipeline.activeProduct?.price ?? 0).toFixed(2) });
       }
+      const freightPerUnit = pipeline.freightEstimate?.perUnitCost;
+      if (freightPerUnit && freightPerUnit > 0) {
+        setInputs(prev => prev.freight !== '' ? prev : { ...prev, freight: freightPerUnit.toFixed(2) });
+      }
+      // Persist fingerprint so restart skips re-fill for this supplier
+      AsyncStorage.setItem(AUTOFILL_KEY, supplierKey).catch(() => {});
+      setAutofillDone(true);
     }).catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pipeline.selectedSupplier, pipeline.activeProduct, autofillDone]);
@@ -644,17 +714,17 @@ function FBAWorkspace({
         </View>
       )}
 
-      {/* Feasibility Check CTA */}
+      {/* Launch Decision CTA */}
       <TouchableOpacity style={fc.banner} onPress={onFeasibility} activeOpacity={0.82}>
         <View style={fc.left}>
           <View style={fc.topRow}>
-            <Text style={fc.label}>PRODUCT FEASIBILITY CHECK</Text>
+            <Text style={fc.label}>LAUNCH DECISION</Text>
             <HelpButton featureKey="feasibility" size="sm" />
           </View>
           <Text style={fc.title}>Is this product worth launching?</Text>
           <Text style={fc.sub}>Combine Amazon product, supplier costs, risk, capital, and readiness into one decision.</Text>
           <View style={fc.cta}>
-            <Text style={fc.ctaTxt}>Open Feasibility Check  →</Text>
+            <Text style={fc.ctaTxt}>Get Launch Decision  →</Text>
           </View>
         </View>
       </TouchableOpacity>
@@ -668,6 +738,7 @@ function FBAWorkspace({
               {sc.netProfit < 0 ? '-' : ''}{fmtLocal(Math.abs(sc.netProfit))}
             </Text>
             <Text style={ws.heroUnit}>per unit · {profile.amazonMarketplace}</Text>
+            {n(committed.freight) === 0 && <EstimateLabel type="estimated" />}
           </View>
           <StatusBadge
             label={sc.netProfit <= 0 ? 'Loss' : sc.isViable ? 'Healthy' : 'Thin'}
@@ -699,22 +770,8 @@ function FBAWorkspace({
         <ConfidenceBar score={confidence} />
       </AppCard>
 
-      {/* Health */}
-      <AppCard style={{ gap: 14 }}>
-        <Text style={ws.cardTitle}>Profit Health</Text>
-        <View style={ws.healthRow}>
-          {[
-            { label: 'Margin', val: sc.margin >= 30 ? 'Good' : sc.margin >= 15 ? 'Fair' : 'Low',  v: sc.margin >= 30 ? 'success' : sc.margin >= 15 ? 'warning' : 'danger' },
-            { label: 'ROI',    val: sc.roi    >= 50 ? 'Strong' : sc.roi >= 20 ? 'Fair' : 'Low',   v: sc.roi    >= 50 ? 'success' : sc.roi    >= 20 ? 'warning' : 'danger' },
-            { label: 'Risk',   val: sc.isViable ? 'Low' : 'Medium',                               v: sc.isViable ? 'success' : 'warning' },
-          ].map(h => (
-            <View key={h.label} style={ws.healthItem}>
-              <StatusBadge label={h.val} variant={h.v as 'success'|'warning'|'danger'} />
-              <Text style={ws.healthLbl}>{h.label}</Text>
-            </View>
-          ))}
-        </View>
-      </AppCard>
+      {/* Advisor verdict — the decision + the single best move */}
+      <AdvisorVerdict c={sc} productCost={n(committed.productCost)} fmtLocal={fmtLocal} />
 
       {/* Cost breakdown */}
       <AppCard style={{ gap: 12 }}>
@@ -730,68 +787,61 @@ function FBAWorkspace({
         <Text style={ws.disclaimer}>{profile.fbaFeeDisclaimer}</Text>
       </AppCard>
 
-      {/* Scenario Comparison */}
+      {/* Stress Test — scenario comparison + sensitivity, combined */}
       <AppCard style={{ gap: 8 }}>
-        <TouchableOpacity style={ws.collapseRow} onPress={() => setShowScenarioTable(v => !v)} activeOpacity={0.7}>
-          <Text style={ws.collapseTitle}>Scenario Comparison</Text>
-          <Text style={ws.collapseChev}>{showScenarioTable ? '▲' : '▼'}</Text>
+        <TouchableOpacity style={ws.collapseRow} onPress={() => setShowStressTest(v => !v)} activeOpacity={0.7}>
+          <Text style={ws.collapseTitle}>Stress Test</Text>
+          <Text style={ws.collapseChev}>{showStressTest ? '▲' : '▼'}</Text>
         </TouchableOpacity>
-        {showScenarioTable && (
-          <View style={{ gap: 4 }}>
-            <View style={ws.tableRow}>
-              <Text style={[ws.tableCell, ws.tableLblCell, ws.tableHdr]}></Text>
-              {allScenarios.map(s => (
-                <Text key={s.label} style={[ws.tableCell, ws.tableHdr]}>{s.label}</Text>
-              ))}
-            </View>
-            {([
-              { label: 'Net Profit', vals: allScenarios.map(s => fmtLocal(s.netProfit)) },
-              { label: 'Margin',     vals: allScenarios.map(s => `${s.margin.toFixed(1)}%`) },
-              { label: 'ROI',        vals: allScenarios.map(s => `${s.roi.toFixed(0)}%`) },
-              { label: 'Total Cost', vals: allScenarios.map(s => fmtLocal(s.totalCost)) },
-            ] as const).map(row => (
-              <View key={row.label} style={ws.tableRow}>
-                <Text style={[ws.tableCell, ws.tableLblCell]}>{row.label}</Text>
-                {row.vals.map((v, i) => (
-                  <Text key={i} style={[ws.tableCell, i === 1 && { fontWeight: '800', color: DS.textPrimary }]}>{v}</Text>
+        {showStressTest && (
+          <View style={{ gap: 16 }}>
+            <View style={{ gap: 4 }}>
+              <Text style={ws.subTitle}>Scenario Comparison</Text>
+              <View style={ws.tableRow}>
+                <Text style={[ws.tableCell, ws.tableLblCell, ws.tableHdr]}></Text>
+                {allScenarios.map(s => (
+                  <Text key={s.label} style={[ws.tableCell, ws.tableHdr]}>{s.label}</Text>
                 ))}
               </View>
-            ))}
-            <Text style={ws.disclaimer}>Planning simulation. Conservative: +20% freight, +15% duties. Optimistic: −10% each.</Text>
-          </View>
-        )}
-      </AppCard>
-
-      {/* Sensitivity Analysis */}
-      <AppCard style={{ gap: 8 }}>
-        <TouchableOpacity style={ws.collapseRow} onPress={() => setShowSensitivity(v => !v)} activeOpacity={0.7}>
-          <Text style={ws.collapseTitle}>Sensitivity Analysis</Text>
-          <Text style={ws.collapseChev}>{showSensitivity ? '▲' : '▼'}</Text>
-        </TouchableOpacity>
-        {showSensitivity && (
-          <View style={{ gap: 4 }}>
-            <View style={ws.tableRow}>
-              <Text style={[ws.tableCell, ws.tableLblCell, ws.tableHdr]}>Change</Text>
-              <Text style={[ws.tableCell, ws.tableHdr]}>Profit Δ</Text>
-              <Text style={[ws.tableCell, ws.tableHdr]}>Margin Δ</Text>
+              {([
+                { label: 'Net Profit', vals: allScenarios.map(s => fmtLocal(s.netProfit)) },
+                { label: 'Margin',     vals: allScenarios.map(s => `${s.margin.toFixed(1)}%`) },
+                { label: 'ROI',        vals: allScenarios.map(s => `${s.roi.toFixed(0)}%`) },
+                { label: 'Total Cost', vals: allScenarios.map(s => fmtLocal(s.totalCost)) },
+              ] as const).map(row => (
+                <View key={row.label} style={ws.tableRow}>
+                  <Text style={[ws.tableCell, ws.tableLblCell]}>{row.label}</Text>
+                  {row.vals.map((v, i) => (
+                    <Text key={i} style={[ws.tableCell, i === 1 && { fontWeight: '800', color: DS.textPrimary }]}>{v}</Text>
+                  ))}
+                </View>
+              ))}
+              <Text style={ws.disclaimer}>Planning simulation. Conservative: +20% freight, +15% duties. Optimistic: −10% each.</Text>
             </View>
-            {sensitivity.map(row => (
-              <View key={row.label} style={ws.tableRow}>
-                <Text style={[ws.tableCell, ws.tableLblCell]}>{row.label}</Text>
-                <Text style={[ws.tableCell, { color: row.profit >= 0 ? DS.success : DS.danger, fontWeight: '700' }]}>
-                  {row.profit >= 0 ? '+' : ''}{fmtLocal(row.profit)}
-                </Text>
-                <Text style={[ws.tableCell, { color: row.margin >= 0 ? DS.success : DS.danger, fontWeight: '700' }]}>
-                  {row.margin >= 0 ? '+' : ''}{row.margin.toFixed(1)}%
-                </Text>
+
+            <View style={{ gap: 4 }}>
+              <Text style={ws.subTitle}>Sensitivity Analysis</Text>
+              <View style={ws.tableRow}>
+                <Text style={[ws.tableCell, ws.tableLblCell, ws.tableHdr]}>Change</Text>
+                <Text style={[ws.tableCell, ws.tableHdr]}>Profit Δ</Text>
+                <Text style={[ws.tableCell, ws.tableHdr]}>Margin Δ</Text>
               </View>
-            ))}
-            <Text style={ws.disclaimer}>Planning simulation only. Results may differ from actual market conditions.</Text>
+              {sensitivity.map(row => (
+                <View key={row.label} style={ws.tableRow}>
+                  <Text style={[ws.tableCell, ws.tableLblCell]}>{row.label}</Text>
+                  <Text style={[ws.tableCell, { color: row.profit >= 0 ? DS.success : DS.danger, fontWeight: '700' }]}>
+                    {row.profit >= 0 ? '+' : ''}{fmtLocal(row.profit)}
+                  </Text>
+                  <Text style={[ws.tableCell, { color: row.margin >= 0 ? DS.success : DS.danger, fontWeight: '700' }]}>
+                    {row.margin >= 0 ? '+' : ''}{row.margin.toFixed(1)}%
+                  </Text>
+                </View>
+              ))}
+              <Text style={ws.disclaimer}>Planning simulation only. Results may differ from actual market conditions.</Text>
+            </View>
           </View>
         )}
       </AppCard>
-
-      <VerificationChecklist />
 
       {/* Save */}
       <View style={{ gap: 8 }}>
@@ -805,7 +855,7 @@ function FBAWorkspace({
         )}
         <Text style={ws.disclaimer}>{profile.marketplaceDisclaimer}</Text>
         <SecondaryButton
-          label={saveLoading ? 'Saving…' : saveSuccess ? 'Tap to unsave ✕' : 'Save Calculation'}
+          label={saveLoading ? 'Saving…' : saveSuccess ? 'Tap to unsave ✕' : 'Save to History'}
           onPress={() => saveSuccess
             ? onUnsave()
             : onSave(sc.netProfit, sc.margin, sc.roi, committed, currency, marketplace, productName, hsCode, loadedAsin, confidence)
@@ -825,11 +875,19 @@ function FBAWorkspace({
       {n(committed.sellingPrice) > 0 && (
         <PipelineActions
           onSaveCostModel={() => {
-            const moq = n(committed.unitsOrdered);
+            const sell    = n(committed.sellingPrice);
+            const cost    = n(committed.productCost);
+            const freight = n(committed.freight);
+            const moq     = n(committed.unitsOrdered);
+            const validation = validateFinancialInputs(sell, cost, freight);
+            if (!validation.valid) {
+              Alert.alert('Fix Before Saving', validation.errors.join('\n'));
+              return;
+            }
             pipeline.setCostModel({
-              sellingPrice:    n(committed.sellingPrice),
-              unitCost:        n(committed.productCost),
-              freight:         n(committed.freight),
+              sellingPrice:    sell,
+              unitCost:        cost,
+              freight,
               fbaFee:          n(committed.fbaFees),
               referralFee:     n(committed.referralFee),
               duties:          n(committed.duties),
@@ -839,7 +897,7 @@ function FBAWorkspace({
               roiPct:          sc.roi,
               totalCost:       sc.totalCost,
               unitsOrdered:    moq,
-              totalInvestment: moq > 0 ? (n(committed.productCost) + n(committed.freight) + n(committed.duties) + n(committed.packaging)) * moq : 0,
+              totalInvestment: moq > 0 ? (cost + freight + n(committed.duties) + n(committed.packaging)) * moq : 0,
               savedAt:         new Date().toISOString(),
             });
             pipeline.trackPipelineEvent('cost_model_saved', { margin: sc.margin.toFixed(1), roi: sc.roi.toFixed(0) });
@@ -874,8 +932,17 @@ function FBAWorkspace({
               </View>
             </View>
             {autofillDone ? (
-              <View style={ws.banner}>
-                <Text style={ws.bannerTxt}>✓  Product data loaded into Profit Lab</Text>
+              <View style={{ gap: 6 }}>
+                <View style={ws.banner}>
+                  <Text style={ws.bannerTxt}>✓  Product data loaded into Profit Lab</Text>
+                </View>
+                <TouchableOpacity
+                  style={ws.refreshBtn}
+                  onPress={() => setAutofillDone(false)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={ws.refreshBtnTxt}>↺  Refresh from pipeline</Text>
+                </TouchableOpacity>
               </View>
             ) : (
               <TouchableOpacity style={lp.loadBtn} onPress={handleLoad} activeOpacity={0.85}>
@@ -896,138 +963,7 @@ function FBAWorkspace({
   );
 }
 
-// ─── 2. Landed Cost ───────────────────────────────────────────────────────────
-
-// Duty rates are now per-marketplace — loaded via getDutyRates(marketplace) inside each workspace.
-const FREIGHT_OPTS = [
-  { label: 'Sea (25–35d)', key: 'sea'     as const },
-  { label: 'Air (5–7d)',   key: 'air'     as const },
-  { label: 'Express',      key: 'express' as const },
-];
-
-function LandedWorkspace() {
-  const { symbol, fromUSD, marketplace } = useCurrency();
-  const profile    = getMarketplaceProfile(marketplace);
-  const dutyRates  = getDutyRates(marketplace);
-  const [unitCost,        setUnitCost]        = useState('5.00');
-  const [qty,             setQty]             = useState('500');
-  const [weight,          setWeight]          = useState('0.5');
-  const [fi,              setFi]              = useState(0);
-  const [di,              setDi]              = useState(0);
-  const [prep,            setPrep]            = useState('0.50');
-  const [photo,           setPhoto]           = useState('400');
-  const [show,            setShow]            = useState(false);
-  const [savedFreight,    setSavedFreight]    = useState<SavedFreightSelection | null>(null);
-  const [useCustomFreight,setUseCustomFreight]= useState(false);
-
-  useEffect(() => {
-    AsyncStorage.getItem(STORAGE_KEYS.freightSelection)
-      .then(v => { if (v) setSavedFreight(JSON.parse(v)); })
-      .catch(() => {});
-  }, []);
-
-  const cpu = n(unitCost); const qty_ = n(qty); const wt = n(weight);
-  const totalKg = wt * qty_ * 0.453592;
-  const calcFreightPerUnit = fromUSD(qty_ > 0 ? (totalKg * profile.freightRateProfile[FREIGHT_OPTS[fi].key]) / qty_ : 0);
-  const freightPerUnit = useCustomFreight && savedFreight
-    ? fromUSD(savedFreight.costPerUnit)
-    : calcFreightPerUnit;
-  const dutyPerUnit = cpu * (dutyRates[di]?.rate ?? 0);
-  const prepV = n(prep);
-  const photoPerUnit = qty_ > 0 ? n(photo) / qty_ : 0;
-  const trueCost = cpu + freightPerUnit + dutyPerUnit + prepV + photoPerUnit;
-  const totalInvestment = safe(trueCost * qty_);
-
-  return (
-    <View style={ws.wrap}>
-      {/* Saved freight banner */}
-      {savedFreight && (
-        <AppCard style={fc2.savedBanner}>
-          <View style={{ flex: 1, gap: 3 }}>
-            <Text style={fc2.savedLabel}>SAVED FORWARDER</Text>
-            <Text style={fc2.savedName}>{savedFreight.companyName}</Text>
-            <Text style={fc2.savedMeta}>
-              {savedFreight.mode.toUpperCase()} · {savedFreight.transitDays} · ${savedFreight.costPerUnit.toFixed(2)}/unit
-            </Text>
-            <TouchableOpacity
-              style={[fc2.selectBtn, useCustomFreight && fc2.selectBtnSaved, { marginTop: 6 }]}
-              onPress={() => setUseCustomFreight(v => !v)}
-              activeOpacity={0.8}
-            >
-              <Text style={[fc2.selectBtnTxt, useCustomFreight && fc2.selectBtnTxtSaved]}>
-                {useCustomFreight ? '✓ Using saved freight rate' : 'Use saved freight rate'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </AppCard>
-      )}
-
-      <AppCard style={{ gap: 12 }}>
-        <Text style={ws.cardTitle}>Inputs</Text>
-        <Pair>
-          <Field label={`Unit cost / FOB (${symbol})`} value={unitCost} onChange={setUnitCost} placeholder="5.00" />
-          <Field label="Order quantity" value={qty} onChange={setQty} placeholder="500" keyboard="number-pad" />
-        </Pair>
-        <Field label="Unit weight (lbs)" value={weight} onChange={setWeight} placeholder="0.5" />
-        <Text style={ws.chipLabel}>FREIGHT METHOD{useCustomFreight ? ' (overridden by saved rate)' : ''}</Text>
-        <View style={ws.chips}>
-          {FREIGHT_OPTS.map((f, i) => (
-            <TouchableOpacity
-              key={i}
-              style={[ws.chip, fi === i && ws.chipActive, useCustomFreight && { opacity: 0.4 }]}
-              onPress={() => { if (!useCustomFreight) setFi(i); }}
-            >
-              <Text style={[ws.chipTxt, fi === i && ws.chipTxtActive]}>{f.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-        <Text style={ws.chipLabel}>DUTY CATEGORY — {profile.importDutyLabel.toUpperCase()}</Text>
-        <View style={ws.chips}>
-          {dutyRates.map((d, i) => (
-            <TouchableOpacity key={i} style={[ws.chip, di === i && ws.chipActive]} onPress={() => setDi(i)}>
-              <Text style={[ws.chipTxt, di === i && ws.chipTxtActive]}>{d.label} {(d.rate*100).toFixed(0)}%</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-        <Pair>
-          <Field label={`FBA prep (${symbol})`} value={prep} onChange={setPrep} placeholder="0.50" />
-          <Field label={`Photography (${symbol})`} value={photo} onChange={setPhoto} placeholder="400" />
-        </Pair>
-        <CalcBtn label="Calculate Landed Cost" onPress={() => setShow(true)} />
-      </AppCard>
-
-      {show && cpu > 0 && qty_ > 0 && (
-        <>
-          <AppCard style={{ gap: 10 }}>
-            <Text style={ws.cardTitle}>Results</Text>
-            <AccuracyBadge level="planning" />
-            <View style={ws.heroRow}>
-              <View style={{ gap: 2 }}>
-                <Text style={ws.heroLabel}>True Cost Per Unit</Text>
-                <Text style={[ws.heroValue, { color: DS.indigo }]}>{symbol}{trueCost.toFixed(2)}</Text>
-                <Text style={ws.heroUnit}>{cpu > 0 ? `${((trueCost/cpu-1)*100).toFixed(0)}% above supplier quote` : ''}</Text>
-              </View>
-            </View>
-            {[
-              [`Supplier cost (FOB)`,                                   `${symbol}${cpu.toFixed(2)}`],
-              [`Freight — ${FREIGHT_OPTS[fi].label}`,                   `${symbol}${freightPerUnit.toFixed(2)}`],
-              [`Import duty (${((dutyRates[di]?.rate ?? 0)*100).toFixed(0)}%)`,`${symbol}${dutyPerUnit.toFixed(2)}`],
-              [`FBA prep`,                                               `${symbol}${prepV.toFixed(2)}`],
-              [`Photography (amortized)`,                                `${symbol}${photoPerUnit.toFixed(2)}`],
-              [`Total investment (${qty_} units)`,                       `${symbol}${totalInvestment.toFixed(0)}`],
-            ].map(([l, v], i) => <Row key={l} label={l} value={v} highlight={i === 5} />)}
-            <Text style={ws.disclaimer}>
-              Planning estimate — {profile.dutyDisclaimer} Request a real freight quote before ordering.
-            </Text>
-          </AppCard>
-          <VerificationChecklist />
-        </>
-      )}
-    </View>
-  );
-}
-
-// ─── 3. Break-even ────────────────────────────────────────────────────────────
+// ─── 2. Break-even ────────────────────────────────────────────────────────────
 
 function BreakevenWorkspace() {
   const { symbol } = useCurrency();
@@ -1092,7 +1028,7 @@ function BreakevenWorkspace() {
   );
 }
 
-// ─── 4. PPC / ACoS ───────────────────────────────────────────────────────────
+// ─── 3. PPC / ACoS ───────────────────────────────────────────────────────────
 
 function PPCWorkspace() {
   const { symbol } = useCurrency();
@@ -1154,7 +1090,7 @@ function PPCWorkspace() {
   );
 }
 
-// ─── 5. Freight ───────────────────────────────────────────────────────────────
+// ─── 4. Freight ───────────────────────────────────────────────────────────────
 
 // ── Freight comparison modal ──────────────────────────────────────────────────
 
@@ -1367,7 +1303,7 @@ function FreightWorkspace() {
 
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEYS.freightSelection)
-      .then(v => { if (v) setSavedSel(JSON.parse(v)); })
+      .then(v => { if (v) { const p = safeParseJSON<typeof savedSel>(v); if (p) setSavedSel(p as any); } })
       .catch(() => {});
   }, []);
 
@@ -1977,7 +1913,7 @@ function FreightWorkspace() {
   );
 }
 
-// ─── 6. Duties & Taxes ───────────────────────────────────────────────────────
+// ─── 5. Duties & Taxes ───────────────────────────────────────────────────────
 
 function DutiesWorkspace() {
   const { symbol, marketplace } = useCurrency();
@@ -2086,188 +2022,6 @@ function DutiesWorkspace() {
   );
 }
 
-// ─── 7. Reorder Point ────────────────────────────────────────────────────────
-
-function ReorderWorkspace() {
-  const [inv,    setInv]    = useState('');
-  const [daily,  setDaily]  = useState('');
-  const [lead,   setLead]   = useState('30');
-  const [safety, setSafety] = useState('15');
-  const [show,   setShow]   = useState(false);
-
-  const invV = n(inv); const d = n(daily);
-  const leadV = n(lead) || 30; const safetyV = n(safety) || 15;
-  const daysLeft = d > 0 ? Math.floor(invV / d) : 0;
-  const reorderPt = leadV + safetyV;
-  const daysUntil = Math.max(0, daysLeft - reorderPt);
-  const status = daysLeft === 0 ? 'OUT OF STOCK' : daysLeft <= leadV ? 'CRITICAL' : daysLeft <= reorderPt ? 'ORDER NOW' : daysUntil <= 14 ? 'ORDER SOON' : 'OK';
-  const statusColor = status === 'OK' ? DS.accent : status === 'ORDER SOON' ? DS.warning : DS.danger;
-
-  return (
-    <View style={ws.wrap}>
-      <AppCard style={{ gap: 12 }}>
-        <Text style={ws.cardTitle}>Inputs</Text>
-        <Text style={ws.hint}>Running out of stock can cost weeks of ranking recovery.</Text>
-        <Pair>
-          <Field label="Current inventory" value={inv} onChange={setInv} placeholder="500" keyboard="number-pad" />
-          <Field label="Daily sales (units)" value={daily} onChange={setDaily} placeholder="10" keyboard="number-pad" />
-        </Pair>
-        <Pair>
-          <Field label="Lead time (days)" value={lead} onChange={setLead} placeholder="30" keyboard="number-pad" />
-          <Field label="Safety stock (days)" value={safety} onChange={setSafety} placeholder="15" keyboard="number-pad" />
-        </Pair>
-        <CalcBtn label="Calculate Reorder Point" onPress={() => setShow(true)} />
-      </AppCard>
-
-      {show && invV > 0 && d > 0 && (
-        <AppCard style={{ gap: 10 }}>
-          <AccuracyBadge level="exact" />
-          <View style={ws.heroRow}>
-            <View style={{ gap: 2 }}>
-              <Text style={ws.heroLabel}>Inventory Status</Text>
-              <Text style={[ws.heroValue, { color: statusColor, fontSize: 28 }]}>{status}</Text>
-              <Text style={ws.heroUnit}>{daysLeft} days of stock remaining</Text>
-            </View>
-          </View>
-          {[
-            ['Current inventory',       `${invV.toFixed(0)} units`],
-            ['Daily sales velocity',    `${d.toFixed(0)} units/day`],
-            ['Reorder point',           `${reorderPt} days before stockout`],
-            ['Days until reorder',      daysUntil > 0 ? `${daysUntil} days` : 'Reorder now!'],
-            ['Suggested order qty',     `${(d * 90).toFixed(0)} units (90-day supply)`],
-          ].map(([l, v]) => (
-            <Row key={l} label={l} value={v}
-              highlight={l === 'Days until reorder' && daysUntil === 0} />
-          ))}
-        </AppCard>
-      )}
-    </View>
-  );
-}
-
-// ─── 8. ROI Calculator ────────────────────────────────────────────────────────
-
-function ROIWorkspace() {
-  const { symbol } = useCurrency();
-  const [invest,  setInvest]  = useState('');
-  const [revenue, setRevenue] = useState('');
-  const [costs,   setCosts]   = useState('');
-  const [show,    setShow]    = useState(false);
-
-  const inv = n(invest); const rev = n(revenue); const cos = n(costs);
-  const profit = rev - cos;
-  const roi = inv > 0 ? safe((profit / inv) * 100) : 0;
-  const payback = profit > 0 ? safe(inv / profit) : 0;
-  const annualReturn = profit * 12;
-
-  return (
-    <View style={ws.wrap}>
-      <AppCard style={{ gap: 12 }}>
-        <Text style={ws.cardTitle}>Inputs</Text>
-        <Field label={`Total investment (${symbol})`} value={invest} onChange={setInvest} placeholder="5000" hint="Inventory + launch costs" />
-        <Pair>
-          <Field label={`Monthly revenue (${symbol})`} value={revenue} onChange={setRevenue} placeholder="8000" />
-          <Field label={`Monthly costs (${symbol})`} value={costs} onChange={setCosts} placeholder="5500" hint="COGS + fees" />
-        </Pair>
-        <CalcBtn label="Calculate ROI" onPress={() => setShow(true)} />
-      </AppCard>
-
-      {show && inv > 0 && (
-        <AppCard style={{ gap: 10 }}>
-          <Text style={ws.cardTitle}>Results</Text>
-          <AccuracyBadge level="exact" />
-          <View style={ws.heroRow}>
-            <View style={{ gap: 2 }}>
-              <Text style={ws.heroLabel}>Return on Investment</Text>
-              <Text style={[ws.heroValue, { color: roi >= 50 ? DS.success : roi >= 20 ? DS.warning : DS.danger }]}>
-                {roi.toFixed(0)}%
-              </Text>
-              <Text style={ws.heroUnit}>{roi >= 50 ? 'Excellent' : roi >= 20 ? 'Good' : 'Below target'}</Text>
-            </View>
-            <StatusBadge
-              label={roi >= 50 ? 'Strong' : roi >= 20 ? 'Fair' : 'Low'}
-              variant={roi >= 50 ? 'success' : roi >= 20 ? 'warning' : 'danger'}
-            />
-          </View>
-          {[
-            ['Monthly profit',    `${symbol}${profit.toFixed(0)}`],
-            ['Annual return',     `${symbol}${annualReturn.toFixed(0)}`],
-            ['ROI',              `${roi.toFixed(1)}%`],
-            ['Payback period',   payback > 0 ? `${payback.toFixed(1)} months` : 'N/A'],
-            ['Return multiple',  inv > 0 ? `${(profit * 12 / inv).toFixed(1)}×/year` : 'N/A'],
-          ].map(([l, v]) => <Row key={l} label={l} value={v} />)}
-        </AppCard>
-      )}
-    </View>
-  );
-}
-
-// ─── 9. Unit Economics ────────────────────────────────────────────────────────
-
-function UnitEconWorkspace() {
-  const { symbol } = useCurrency();
-  const [price,  setPrice]  = useState('');
-  const [cogs,   setCogs]   = useState('');
-  const [fees,   setFees]   = useState('');
-  const [adSpend,setAdSpend]= useState('');
-  const [returns,setReturns]= useState('5');
-  const [show,   setShow]   = useState(false);
-
-  const p = n(price); const c = n(cogs); const f = n(fees);
-  const ad = n(adSpend); const ret = n(returns) / 100;
-  // Contribution margin = revenue after variable costs
-  const grossMargin = p - c - f;
-  const contribMargin = grossMargin - ad;
-  const returnCost = p * ret;
-  const netPerUnit = contribMargin - returnCost;
-  const cmPct = p > 0 ? safe((contribMargin / p) * 100) : 0;
-  // Target ACoS = what we can afford to spend on ads and still be profitable
-  const targetAcos = grossMargin > 0 && p > 0 ? safe((grossMargin / p) * 100) : 0;
-  // ROAS needed to break even on ads
-  const targetROAS = ad > 0 ? safe(p / ad) : 0;
-
-  return (
-    <View style={ws.wrap}>
-      <AppCard style={{ gap: 12 }}>
-        <Text style={ws.cardTitle}>Inputs</Text>
-        <Pair>
-          <Field label={`Selling price (${symbol})`} value={price} onChange={setPrice} placeholder="29.99" />
-          <Field label={`COGS per unit (${symbol})`} value={cogs} onChange={setCogs} placeholder="5.00" />
-        </Pair>
-        <Pair>
-          <Field label={`Platform fees (${symbol})`} value={fees} onChange={setFees} placeholder="6.50" hint="FBA + referral" />
-          <Field label={`Ad spend / unit (${symbol})`} value={adSpend} onChange={setAdSpend} placeholder="2.00" />
-        </Pair>
-        <Field label="Return rate (%)" value={returns} onChange={setReturns} placeholder="5" hint="Industry avg: 5–8%" />
-        <CalcBtn label="Calculate Unit Economics" onPress={() => setShow(true)} />
-      </AppCard>
-
-      {show && p > 0 && (
-        <AppCard style={{ gap: 10 }}>
-          <Text style={ws.cardTitle}>Results</Text>
-          <AccuracyBadge level="exact" />
-          <View style={ws.heroRow}>
-            <View style={{ gap: 2 }}>
-              <Text style={ws.heroLabel}>Net Per Unit</Text>
-              <Text style={[ws.heroValue, { color: netPerUnit > 0 ? DS.success : DS.danger }]}>
-                {symbol}{netPerUnit.toFixed(2)}
-              </Text>
-              <Text style={ws.heroUnit}>after COGS, fees, ads and returns</Text>
-            </View>
-          </View>
-          {[
-            ['Gross margin',           `${symbol}${grossMargin.toFixed(2)}`],
-            ['Contribution margin',    `${symbol}${contribMargin.toFixed(2)} (${cmPct.toFixed(0)}%)`],
-            ['Return cost / unit',     `${symbol}${returnCost.toFixed(2)}`],
-            ['Max breakeven ACoS',     `${targetAcos.toFixed(0)}%`],
-            ['Min ROAS needed',        ad > 0 ? `${targetROAS.toFixed(1)}×` : 'No ad spend'],
-          ].map(([l, v]) => <Row key={l} label={l} value={v} />)}
-        </AppCard>
-      )}
-    </View>
-  );
-}
-
 // ─── Workspace styles (shared) ────────────────────────────────────────────────
 
 const ws = StyleSheet.create({
@@ -2288,9 +2042,9 @@ const ws = StyleSheet.create({
   hint:       { fontSize: 12, color: DS.textMuted, lineHeight: 17 },
   disclaimer: { fontSize: 11, color: DS.textMuted, lineHeight: 16, fontStyle: 'italic' },
 
-  warnBox:    { backgroundColor: '#FFFBEB', borderRadius: 12, borderWidth: 1, borderColor: '#FDE68A', padding: 12, gap: 8 },
+  warnBox:    { backgroundColor: DS.warningBg, borderRadius: 12, borderWidth: 1, borderColor: '#FDE68A', padding: 12, gap: 8 },
   warnRow:    { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
-  warnIcon:   { fontSize: 12, color: '#D97706', marginTop: 1 },
+  warnIcon:   { fontSize: 12, color: DS.warningText, marginTop: 1 },
   warnTxt:    { flex: 1, fontSize: 12, color: '#92400E', lineHeight: 17 },
 
   chipLabel:  { fontSize: 9, fontWeight: '800', color: DS.textMuted, letterSpacing: 1.5 },
@@ -2307,12 +2061,10 @@ const ws = StyleSheet.create({
   acosHint:   { backgroundColor: DS.bgSubtle, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 },
   acosHintTxt:{ fontSize: 13, fontWeight: '700' },
 
-  healthRow:  { flexDirection: 'row', justifyContent: 'space-around' },
-  healthItem: { alignItems: 'center', gap: 6 },
-  healthLbl:  { fontSize: 11, fontWeight: '600', color: DS.textMuted },
-
-  banner:     { flexDirection: 'row', alignItems: 'center', backgroundColor: DS.accentLight, borderRadius: 10, padding: 12 },
-  bannerTxt:  { fontSize: 13, fontWeight: '600', color: DS.accentDark },
+  banner:          { flexDirection: 'row', alignItems: 'center', backgroundColor: DS.accentLight, borderRadius: 10, padding: 12 },
+  bannerTxt:       { fontSize: 13, fontWeight: '600', color: DS.accentDark },
+  refreshBtn:      { alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 6, borderRadius: DS.radiusChip, borderWidth: 1, borderColor: DS.border, backgroundColor: DS.bgElevated },
+  refreshBtnTxt:   { fontSize: 11, fontWeight: '700', color: DS.textSecondary },
 
   freightCard: {
     borderWidth: 1, borderColor: DS.border, borderRadius: 14,
@@ -2334,6 +2086,7 @@ const ws = StyleSheet.create({
   collapseRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   collapseTitle: { fontSize: 13, fontWeight: '800', color: DS.textPrimary, letterSpacing: -0.2 },
   collapseChev:  { fontSize: 11, fontWeight: '700', color: DS.textMuted },
+  subTitle:      { fontSize: 12, fontWeight: '800', color: DS.textSecondary, letterSpacing: -0.1 },
 
   // Compact data tables (scenario / sensitivity)
   tableRow:      { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 4, borderBottomWidth: 1, borderBottomColor: DS.border },
@@ -2585,8 +2338,8 @@ const hist = StyleSheet.create({
   cardStat:    { fontSize: 11, fontWeight: '600', color: DS.textSecondary },
   cardDate:    { fontSize: 10, color: DS.textMuted },
   dateRow:     { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  staleBadge:  { backgroundColor: '#FFFBEB', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2, borderWidth: 1, borderColor: '#FDE68A' },
-  staleTxt:    { fontSize: 9, fontWeight: '700', color: '#D97706' },
+  staleBadge:  { backgroundColor: DS.warningBg, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2, borderWidth: 1, borderColor: '#FDE68A' },
+  staleTxt:    { fontSize: 9, fontWeight: '700', color: DS.warningText },
   legacyBadge: { backgroundColor: DS.bgSubtle, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
   legacyTxt:   { fontSize: 9, fontWeight: '700', color: DS.textMuted },
   legacyNote:  { fontSize: 11, color: DS.textMuted, fontStyle: 'italic' },
@@ -2598,6 +2351,7 @@ const hist = StyleSheet.create({
 type NavProp = StackNavigationProp<RootStackParamList, 'Main'>;
 
 export default function ProfitLabScreen() {
+  const { isOnline } = useNetworkStatus();
   const navigation = useNavigation<NavProp>();
   const [calcType,    setCalcType]    = useState<CalcType>('fba');
   const [saveLoading,  setSaveLoading]  = useState(false);
@@ -2613,7 +2367,7 @@ export default function ProfitLabScreen() {
 
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEYS.savedCalculations)
-      .then(raw => { if (raw) setSavedCalcs(JSON.parse(raw)); })
+      .then(raw => { if (raw) { const p = safeParseJSON<FBASaved[]>(raw); if (p) setSavedCalcs(p); } })
       .catch(() => {});
   }, []);
 
@@ -2677,22 +2431,32 @@ export default function ProfitLabScreen() {
   }
 
   const activeCalc = CALCS.find(c => c.id === calcType)!;
+  const { toastMsg, toastVisible, toastType, showToast, hideToast } = useToast();
+  const pipeline     = usePipeline();
+  const intelProfile = useProductIntelligence();
+  const decisionSim  = useDecisionSimulation(intelProfile);
+  const prevCostModelSavedAt = React.useRef<string | null>(null);
+  useEffect(() => {
+    const savedAt = pipeline.costModel?.savedAt ?? null;
+    if (savedAt && savedAt !== prevCostModelSavedAt.current) {
+      prevCostModelSavedAt.current = savedAt;
+      showToast('Cost model saved to pipeline');
+    }
+  }, [pipeline.costModel?.savedAt]);
 
   const CALC_HELP: Record<CalcType, FeatureKey> = {
     fba:      'calc_fba',
-    landed:   'calc_landed',
     breakeven:'calc_breakeven',
     ppc:      'calc_ppc',
     freight:  'calc_freight',
     duties:   'calc_duties',
-    reorder:  'calc_reorder',
-    roi:      'calc_roi',
-    unitEcon: 'calc_unit_econ',
-  };;
+  };
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
+      <Toast message={toastMsg} visible={toastVisible} onHide={hideToast} type={toastType} />
       <AppHeader helpKey={CALC_HELP[calcType]} />
+      <OfflineBanner visible={!isOnline} />
       <PipelineProgressBar />
 
       <ScrollView
@@ -2721,17 +2485,18 @@ export default function ProfitLabScreen() {
             latestEntry={latestEntry}
             activeProductPrice={activeProduct?.price ?? null}
             activeProductName={activeProduct?.name ?? ''}
-            onFeasibility={() => navigation.navigate('FeasibilityCheck')}
+            onFeasibility={() => navigation.navigate('LaunchDecision' as any)}
           />
         )}
-        {calcType === 'landed'    && <LandedWorkspace />}
         {calcType === 'breakeven' && <BreakevenWorkspace />}
         {calcType === 'ppc'       && <PPCWorkspace />}
         {calcType === 'freight'   && <FreightWorkspace />}
         {calcType === 'duties'    && <DutiesWorkspace />}
-        {calcType === 'reorder'   && <ReorderWorkspace />}
-        {calcType === 'roi'       && <ROIWorkspace />}
-        {calcType === 'unitEcon'  && <UnitEconWorkspace />}
+
+        {/* Decision simulator — what-if analysis on financials */}
+        {intelProfile && (
+          <DecisionSimulationPanel sim={decisionSim} baseProfile={intelProfile} />
+        )}
 
         {/* Recent Calculations (FBA only) */}
         {calcType === 'fba' && savedCalcs.length > 0 && (

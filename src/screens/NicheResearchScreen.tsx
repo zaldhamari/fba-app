@@ -3,8 +3,12 @@ import {
   View, Text, StyleSheet, ScrollView, TextInput,
   TouchableOpacity, ActivityIndicator, Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNetworkStatus } from '../hooks/useNetworkStatus';
+import { OfflineBanner } from '../components/OfflineBanner';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useNavigation } from '@react-navigation/native';
+import { safeParseJSON } from '../utils/safeJSON';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { DS } from '../components/ds';
 import { api } from '../services/api';
 import { AppHeader } from '../components/AppHeader';
@@ -12,6 +16,12 @@ import { PipelineProgressBar } from '../components/PipelineProgressBar';
 import { useCurrency } from '../context/CurrencyContext';
 import { useSellerProfile } from '../hooks/useSellerProfile';
 import { usePipeline } from '../context/PipelineContext';
+import { UsageQuotaBar } from '../components/UsageQuotaBar';
+import { useProductIntelligence } from '../hooks/useProductIntelligence';
+import { ProductQuickIntel } from '../components/ProductQuickIntel';
+import { FeatureExplainer } from '../components/FeatureExplainer';
+import { useSubscription } from '../hooks/useSubscription';
+import PaywallModal from '../components/PaywallModal';
 
 const WATCHLIST_KEY = 'siftly_niche_watchlist_v1';
 
@@ -95,11 +105,14 @@ function Stat({ label, value, sub }: { label: string; value: string; sub?: strin
 
 // ── Main screen ───────────────────────────────────────────────────────────────
 
-export default function NicheResearchScreen() {
-  const { marketplace } = useCurrency();
+export default function NicheResearchScreen({ embedded = false }: { embedded?: boolean } = {}) {
+  const { marketplace, symbol: currencySymbol } = useCurrency();
   const { profile }     = useSellerProfile();
   const pipeline        = usePipeline();
   const navigation      = useNavigation<any>();
+  const route           = useRoute<any>();
+  const { isOnline }    = useNetworkStatus();
+  const { can, increment } = useSubscription();
 
   const [keyword,   setKeyword]   = useState('');
   const [priceMin,  setPriceMin]  = useState('15');
@@ -111,19 +124,33 @@ export default function NicheResearchScreen() {
   const [watchlist, setWatchlist] = useState<SavedNiche[]>([]);
   const [watchlistLoaded, setWatchlistLoaded] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  const [showPaywall, setShowPaywall] = useState(false);
+
+  const intelProfile = useProductIntelligence();
 
   React.useEffect(() => {
     AsyncStorage.getItem(WATCHLIST_KEY).then(raw => {
-      if (raw) setWatchlist(JSON.parse(raw));
+      if (raw) {
+        const parsed = safeParseJSON<SavedNiche[]>(raw);
+        if (parsed) setWatchlist(parsed);
+      }
       setWatchlistLoaded(true);
     });
   }, []);
 
+  // Pre-fill + auto-run a search when opened from a Home niche chip.
+  const initialQ: string | undefined = route.params?.q;
+  React.useEffect(() => {
+    if (initialQ) { setKeyword(initialQ); handleSearchWith(initialQ); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialQ]);
+
   const budget = profile?.budget ?? 1000;
 
-  async function handleSearch() {
-    const kw = keyword.trim();
+  async function handleSearchWith(kw: string) {
     if (!kw) { Alert.alert('Enter a niche or keyword'); return; }
+    if (!can('keywords')) { setShowPaywall(true); return; }
+    await increment('keywords');
     setLoading(true);
     setError('');
     setReport(null);
@@ -151,6 +178,10 @@ export default function NicheResearchScreen() {
     }
   }
 
+  function handleSearch() {
+    handleSearchWith(keyword.trim());
+  }
+
   const saveToWatchlist = useCallback(async () => {
     if (!report) return;
     const entry: SavedNiche = {
@@ -175,17 +206,16 @@ export default function NicheResearchScreen() {
 
   const vc = report ? VERDICT_COLOR[report.verdict.color] ?? DS.textMuted : DS.textMuted;
 
-  return (
-    <View style={s.container}>
-      <AppHeader helpKey="research" />
-      <PipelineProgressBar />
-      <ScrollView style={s.scroll} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+  const nicheBody = (
+    <>
 
-        {/* Hero */}
-        <View style={s.hero}>
-          <Text style={s.heroTitle}>Niche Research</Text>
-          <Text style={s.heroSub}>Discover high-demand, low-competition markets before committing capital.</Text>
-        </View>
+        {/* Hero (hidden when embedded in Home — Home supplies its own header) */}
+        {!embedded && (
+          <View style={s.hero}>
+            <Text style={s.heroTitle}>Discover a Niche</Text>
+            <Text style={s.heroSub}>Find high-demand, low-competition markets before committing capital.</Text>
+          </View>
+        )}
 
         {/* Search card */}
         <View style={s.searchCard}>
@@ -213,11 +243,11 @@ export default function NicheResearchScreen() {
             <View style={s.filters}>
               <View style={s.filterRow}>
                 <View style={s.filterField}>
-                  <Text style={s.filterLabel}>MIN PRICE $</Text>
+                  <Text style={s.filterLabel}>MIN PRICE {currencySymbol}</Text>
                   <TextInput style={s.filterInput} value={priceMin} onChangeText={setPriceMin} keyboardType="decimal-pad" placeholderTextColor={DS.textMuted} />
                 </View>
                 <View style={s.filterField}>
-                  <Text style={s.filterLabel}>MAX PRICE $</Text>
+                  <Text style={s.filterLabel}>MAX PRICE {currencySymbol}</Text>
                   <TextInput style={s.filterInput} value={priceMax} onChangeText={setPriceMax} keyboardType="decimal-pad" placeholderTextColor={DS.textMuted} />
                 </View>
                 <View style={s.filterField}>
@@ -228,9 +258,23 @@ export default function NicheResearchScreen() {
               <Text style={s.filterHint}>Budget: ${budget.toLocaleString()} · Marketplace: {marketplace}</Text>
             </View>
           )}
+
+          <UsageQuotaBar feature="keywords" />
         </View>
 
-        {/* Loading */}
+        {intelProfile && !loading && (
+          <ProductQuickIntel
+            profile={intelProfile}
+            reconInsights={pipeline.reconInsights}
+            label={`Active Product: ${intelProfile.productTitle}`}
+          />
+        )}
+        {!intelProfile && !pipeline.activeProduct && !loading && (
+          <View style={s.intelPrompt}>
+            <Text style={s.intelPromptTxt}>Select a product in Research to unlock product intelligence</Text>
+          </View>
+        )}
+
         {/* Quick-start niches — only when no search yet */}
         {!report && !loading && (
           <View style={s.quickSection}>
@@ -263,18 +307,26 @@ export default function NicheResearchScreen() {
             </View>
 
             <View style={s.howItWorks}>
-              <Text style={s.howTitle}>HOW IT WORKS</Text>
+              <Text style={s.howTitle}>YOUR FBA RESEARCH LIFECYCLE</Text>
               <View style={s.howRow}>
                 <View style={s.howStep}><Text style={s.howNum}>1</Text></View>
-                <Text style={s.howTxt}>Tap a niche or type your own idea</Text>
+                <Text style={s.howTxt}><Text style={{ fontWeight: '700' }}>Niche</Text> — Find high-demand, low-competition markets. Start here.</Text>
               </View>
               <View style={s.howRow}>
                 <View style={s.howStep}><Text style={s.howNum}>2</Text></View>
-                <Text style={s.howTxt}>Get a market score, competition analysis, and gap opportunities</Text>
+                <Text style={s.howTxt}><Text style={{ fontWeight: '700' }}>Research</Text> — Validate specific products: demand, reviews, competition.</Text>
               </View>
               <View style={s.howRow}>
                 <View style={s.howStep}><Text style={s.howNum}>3</Text></View>
-                <Text style={s.howTxt}>Save promising niches to your watchlist and validate in the next tab</Text>
+                <Text style={s.howTxt}><Text style={{ fontWeight: '700' }}>Sourcing</Text> — Find a supplier, confirm MOQ, estimate freight.</Text>
+              </View>
+              <View style={s.howRow}>
+                <View style={s.howStep}><Text style={s.howNum}>4</Text></View>
+                <Text style={s.howTxt}><Text style={{ fontWeight: '700' }}>Profit</Text> — Model your FBA numbers. Know margin before you spend.</Text>
+              </View>
+              <View style={s.howRow}>
+                <View style={s.howStep}><Text style={s.howNum}>5</Text></View>
+                <Text style={s.howTxt}><Text style={{ fontWeight: '700' }}>Home</Text> — AI reviews everything and tells you: Launch, Test, or Avoid.</Text>
               </View>
             </View>
           </View>
@@ -288,7 +340,14 @@ export default function NicheResearchScreen() {
         )}
 
         {/* Error */}
-        {!!error && <Text style={s.errorTxt}>{error}</Text>}
+        {!!error && (
+          <View style={s.errorWrap}>
+            <Text style={s.errorTxt}>{error}</Text>
+            <TouchableOpacity style={s.retryBtn} onPress={handleSearch} activeOpacity={0.8} disabled={!isOnline}>
+              <Text style={s.retryBtnTxt}>{!isOnline ? 'Offline' : 'Retry'}</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Report */}
         {report && !loading && (
@@ -329,16 +388,31 @@ export default function NicheResearchScreen() {
                 <Text style={[s.saveBtnTxt, { color: vc }]}>+ Save to Watchlist</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity
-                style={s.handoffBtn}
-                onPress={() => {
-                  pipeline.trackPipelineEvent('niche_handoff_validate', { keyword: report.keyword });
-                  navigation.navigate('Validate');
-                }}
-                activeOpacity={0.88}
-              >
-                <Text style={s.handoffBtnTxt}>Validate Products in This Niche →</Text>
-              </TouchableOpacity>
+              <View style={s.handoffRow}>
+                <TouchableOpacity
+                  style={[s.handoffBtn, s.handoffBtnAmazon]}
+                  onPress={() => {
+                    pipeline.trackPipelineEvent('niche_handoff_amazon', { keyword: report.keyword });
+                    navigation.navigate('Research', { autoSearch: report.keyword } as any);
+                  }}
+                  activeOpacity={0.88}
+                >
+                  <Text style={s.handoffBtnAmazonTxt}>Find Products on Amazon →</Text>
+                  <Text style={s.handoffBtnHint}>What's selling in this niche?</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[s.handoffBtn, s.handoffBtnRecon]}
+                  onPress={() => {
+                    pipeline.trackPipelineEvent('niche_handoff_recon', { keyword: report.keyword });
+                    navigation.navigate('Research', { autoRecon: report.keyword } as any);
+                  }}
+                  activeOpacity={0.88}
+                >
+                  <Text style={s.handoffBtnReconTxt}>Run Review Recon →</Text>
+                  <Text style={s.handoffBtnHint}>What complaints can you exploit?</Text>
+                </TouchableOpacity>
+              </View>
             </View>
 
             {/* Market snapshot */}
@@ -360,6 +434,7 @@ export default function NicheResearchScreen() {
             {report.the_gap?.length > 0 && (
               <View style={s.card}>
                 <Text style={s.cardTitle}>The Gap — Where You Can Win</Text>
+                <FeatureExplainer text="The space competitors are leaving open — common complaints, missing features, or price points no one serves well. This is the wedge a new product can use to stand out." />
                 {report.the_gap.map((g, i) => (
                   <View key={i} style={s.gapRow}>
                     <Text style={s.gapIcon}>◉</Text>
@@ -391,6 +466,7 @@ export default function NicheResearchScreen() {
               <View style={s.card}>
                 <Text style={s.cardTitle}>Products to Model</Text>
                 <Text style={s.cardSub}>Low-competition listings in your price range</Text>
+                <FeatureExplainer text="Existing products to study and beat — not copy. Benchmark their price, reviews, and buyer complaints to design a better version." />
                 {report.products_to_model.map((p, i) => (
                   <View key={i} style={s.modelProduct}>
                     <View style={{ flex: 1 }}>
@@ -424,7 +500,7 @@ export default function NicheResearchScreen() {
                 <View key={w.keyword} style={s.watchCard}>
                   <TouchableOpacity
                     style={{ flex: 1 }}
-                    onPress={() => { setKeyword(w.keyword); handleSearch(); }}
+                    onPress={() => { setKeyword(w.keyword); handleSearchWith(w.keyword); }}
                     activeOpacity={0.7}
                   >
                     <Text style={s.watchKeyword}>{w.keyword}</Text>
@@ -441,8 +517,29 @@ export default function NicheResearchScreen() {
             })}
           </View>
         )}
+    </>
+  );
+
+  // Embedded in Home: no SafeArea / header / inner ScrollView (Home provides them).
+  if (embedded) {
+    return (
+      <View style={s.embeddedWrap}>
+        <PaywallModal visible={showPaywall} onClose={() => setShowPaywall(false)} featureContext="Niche research" />
+        {nicheBody}
+      </View>
+    );
+  }
+
+  return (
+    <SafeAreaView style={s.container} edges={['top']}>
+      <PaywallModal visible={showPaywall} onClose={() => setShowPaywall(false)} featureContext="Niche research" />
+      <AppHeader helpKey="niche" />
+      <PipelineProgressBar />
+      <OfflineBanner visible={!isOnline} />
+      <ScrollView style={s.scroll} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        {nicheBody}
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -461,6 +558,7 @@ const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: DS.bgCanvas },
   scroll:    { flex: 1 },
   content:   { paddingHorizontal: DS.pagePadding, paddingBottom: 60, gap: DS.sectionGap },
+  embeddedWrap: { gap: DS.sectionGap },
 
   hero:      { paddingTop: DS.sectionGap, gap: 4 },
   heroTitle: { fontSize: 24, fontWeight: '900', color: DS.textPrimary, letterSpacing: -0.6 },
@@ -513,6 +611,9 @@ const s = StyleSheet.create({
   },
   filterHint: { fontSize: 10, color: DS.textMuted },
 
+  intelPrompt:    { paddingVertical: 10, paddingHorizontal: 14, backgroundColor: DS.bgElevated, borderRadius: DS.radiusChip, borderWidth: 1, borderColor: DS.border },
+  intelPromptTxt: { fontSize: 12, color: DS.textMuted, textAlign: 'center', fontStyle: 'italic' },
+
   quickSection:  { gap: 14 },
   quickTitle:    { fontSize: 10, fontWeight: '800', color: DS.textMuted, letterSpacing: 2 },
   quickGrid:     { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
@@ -546,7 +647,10 @@ const s = StyleSheet.create({
 
   loadingWrap: { alignItems: 'center', gap: 12, paddingVertical: 32 },
   loadingTxt:  { fontSize: 14, color: DS.textSecondary },
+  errorWrap:   { alignItems: 'center', gap: 10 },
   errorTxt:    { fontSize: 13, color: DS.danger, textAlign: 'center' },
+  retryBtn:    { paddingHorizontal: 20, paddingVertical: 9, borderRadius: DS.radiusButton, backgroundColor: DS.accent },
+  retryBtnTxt: { fontSize: 13, fontWeight: '700', color: '#fff' },
 
   verdictCard: {
     borderRadius:  DS.radiusCard,
@@ -570,13 +674,19 @@ const s = StyleSheet.create({
   },
   saveBtnTxt: { fontSize: 13, fontWeight: '800' },
 
+  handoffRow: { gap: 8 },
   handoffBtn: {
-    backgroundColor: DS.accent,
     borderRadius:    DS.radiusButton,
-    paddingVertical: 13,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     alignItems:      'center',
+    gap:             3,
   },
-  handoffBtnTxt: { fontSize: 14, fontWeight: '900', color: '#fff', letterSpacing: -0.2 },
+  handoffBtnAmazon:    { backgroundColor: DS.accent },
+  handoffBtnRecon:     { backgroundColor: DS.indigo },
+  handoffBtnAmazonTxt: { fontSize: 14, fontWeight: '900', color: '#fff', letterSpacing: -0.2 },
+  handoffBtnReconTxt:  { fontSize: 14, fontWeight: '900', color: '#fff', letterSpacing: -0.2 },
+  handoffBtnHint:      { fontSize: 11, color: 'rgba(255,255,255,0.72)', fontWeight: '500' },
 
   card: {
     backgroundColor: DS.bgCard,

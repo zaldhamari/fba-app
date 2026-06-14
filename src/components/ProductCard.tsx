@@ -1,7 +1,9 @@
 import React, { useEffect, useRef } from 'react';
+import { DS } from '../theme/ds';
 import {
-  View, Text, StyleSheet, TouchableOpacity, Image, Animated, Linking,
+  View, Text, StyleSheet, TouchableOpacity, Animated, Linking,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { colors, spacing, radius, shadow, motion } from '../theme';
 import { useCurrency } from '../context/CurrencyContext';
 import { Product } from '../services/api';
@@ -74,7 +76,7 @@ const sc = StyleSheet.create({
 
 // ─── ProductCard ─────────────────────────────────────────────────────────────
 
-export default function ProductCard({
+function ProductCard({
   item, isSaved, onSave, onInsight, onAnalyze, expanded, analyzing, usageMeter, showHint, cardIndex, opportunityScore,
 }: {
   item: Product;
@@ -115,7 +117,7 @@ export default function ProductCard({
         {/* Image */}
         <View style={s.imgSection}>
           {item.image
-            ? <Image source={{ uri: item.image }} style={s.img} resizeMode="contain" />
+            ? <Image source={{ uri: item.image }} style={s.img} contentFit="contain" transition={150} accessibilityRole="image" accessibilityLabel={`Product photo: ${item.title}`} />
             : <View style={[s.img, s.imgPlaceholder]}><Text style={{ fontSize: 26, color: colors.textMuted }}>◈</Text></View>
           }
           <View style={[s.oppBadge, { backgroundColor: oppBg }]}>
@@ -190,9 +192,9 @@ export default function ProductCard({
             disabled={analyzing}
           >
             {analyzing
-              ? <PulseDots color={expanded ? '#2563EB' : colors.white} />
+              ? <PulseDots color={expanded ? DS.accent : colors.white} />
               : <Text style={[s.analyzeBtnText, expanded && s.analyzeBtnTextExpanded]}>
-                  {expanded ? 'Hide Analysis ↑' : 'Analyze Product →'}
+                  {expanded ? 'Hide Verdict ↑' : 'Get Verdict →'}
                 </Text>
             }
           </TouchableOpacity>
@@ -240,15 +242,15 @@ const s = StyleSheet.create({
   signalRow:      { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 1 },
   reviewCount:    { fontSize: 10, color: colors.textSecondary },
   rowDivider:     { fontSize: 10, color: colors.textMuted },
-  insightBtn:     { fontSize: 10, fontWeight: '700', color: '#2563EB' },
+  insightBtn:     { fontSize: 10, fontWeight: '700', color: DS.accent },
   analyzeBtn: {
-    marginTop: spacing.sm, backgroundColor: '#2563EB',
+    marginTop: spacing.sm, backgroundColor: DS.accent,
     borderRadius: radius.full, paddingVertical: 10, alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: '#2563EB', minHeight: 38,
+    borderWidth: 1, borderColor: DS.accent, minHeight: 38,
   },
-  analyzeBtnExpanded:     { backgroundColor: 'transparent', borderColor: '#2563EB' },
+  analyzeBtnExpanded:     { backgroundColor: 'transparent', borderColor: DS.accent },
   analyzeBtnText:         { fontSize: 13, fontWeight: '700', color: colors.white, letterSpacing: -0.1 },
-  analyzeBtnTextExpanded: { color: '#2563EB' },
+  analyzeBtnTextExpanded: { color: DS.accent },
   usageMeter:             { fontSize: 10, color: colors.textMuted, textAlign: 'center', marginTop: 2 },
   analyzeHint: {
     backgroundColor: 'rgba(37,99,235,0.10)', borderRadius: radius.sm,
@@ -256,5 +258,9 @@ const s = StyleSheet.create({
     alignSelf: 'flex-start', marginBottom: 2,
     borderWidth: 1, borderColor: 'rgba(37,99,235,0.22)',
   },
-  analyzeHintText: { fontSize: 10, fontWeight: '700', color: '#2563EB' },
+  analyzeHintText: { fontSize: 10, fontWeight: '700', color: DS.accent },
 });
+
+// Memoized: list rows skip re-render when sibling rows or unrelated parent state
+// change. Pairs with the parent's useCallback'd handlers to avoid wasted renders.
+export default React.memo(ProductCard);

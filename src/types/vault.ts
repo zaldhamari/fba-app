@@ -1,4 +1,5 @@
 import { Product } from '../services/api';
+import { DS } from '../theme/ds';
 
 export type VaultStatus =
   | 'researching'
@@ -44,9 +45,9 @@ export const VAULT_STATUSES: VaultStatus[] = [
 ];
 
 export const STATUS_CONFIG: Record<VaultStatus, { label: string; color: string }> = {
-  researching:        { label: 'Researching',     color: '#2563EB' },
-  supplier_contacted: { label: 'Supplier Sent',   color: '#D97706' },
-  testing:            { label: 'Testing',          color: '#2563EB' },
-  ready_to_launch:    { label: 'Ready to Launch', color: '#059669' },
-  rejected:           { label: 'Rejected',         color: '#DC2626' },
+  researching:        { label: 'Researching',     color: DS.accent },
+  supplier_contacted: { label: 'Supplier Sent',   color: DS.warningText },
+  testing:            { label: 'Testing',          color: DS.accent },
+  ready_to_launch:    { label: 'Ready to Launch', color: DS.successText },
+  rejected:           { label: 'Rejected',         color: DS.dangerText },
 };
