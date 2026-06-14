@@ -18,9 +18,6 @@
     },
     "preview": {
       "distribution": "internal",
-      "env": {
-        "EXPO_PUBLIC_DEV_BYPASS": "true"
-      },
       "ios": {
         "simulator": false
       },
@@ -40,6 +37,9 @@
   },
   "submit": {
     "production": {
+      "ios": {
+        "ascAppId": "6767785775"
+      },
       "android": {
         "serviceAccountKeyPath": "./google-play-service-account.json",
         "track": "internal"

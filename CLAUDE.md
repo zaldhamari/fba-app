@@ -1,5 +1,11 @@
 # Siftly — Claude Code Working Guide
 
+## Response style
+- No preamble — act immediately, don't narrate what you're about to do
+- No trailing summaries — the diff speaks for itself
+- Read only the relevant lines of a file, not the whole thing
+- Skip options lists — give a recommendation and act on it
+
 ## What this app is
 Amazon FBA product research and launch assistant. Users scan products, run profit calculations, get AI-powered feasibility analysis, manage a vault of winning products, and get launch advice. iOS + Android (React Native with Expo).
 
@@ -58,11 +64,13 @@ src/
 
 | Tab | Screen | Purpose |
 |---|---|---|
-| Copilot | CopilotScreen | AI chat assistant |
-| Research | ResearchWorkspaceScreen | Product search + analysis |
-| Profit | ProfitLabScreen | FBA profit calculator |
-| Brand | BrandStudioScreen | Brand name / logo tools |
-| LaunchPad | BuilderScreen | Launch plan builder |
+| Niche    | NicheResearchScreen     | Niche discovery + market scoring |
+| Research | ResearchWorkspaceScreen | Product search + analysis + recon |
+| Sourcing | SourcingLogisticsScreen | Supplier search + freight estimate |
+| Profit   | ProfitLabScreen         | FBA profit calculator (9 tools)   |
+| Copilot  | CopilotScreen           | AI chat + pipeline analysis       |
+
+BrandStudioScreen is a root stack screen accessible via Profit CTA, AppHeader settings, and LaunchDecision.
 
 ---
 
@@ -171,6 +179,25 @@ AppCard, Buttons, EmptyState, InputField, LoadingSkeleton, MetricCard, SectionHe
 6. **No new abstractions** unless the task explicitly requires it
 7. **No features beyond the task**
 8. **Wrap new screens in ErrorBoundary** when adding to navigator
+
+---
+
+## Current Status (as of 2026-06-12)
+
+**Large uncommitted changeset on `main`** — last commit `ae0dd4d6` (May 23). Since then: 68 tracked files modified (+8454/-5937) plus ~25 new untracked files/dirs. Nothing has been committed yet — review and commit in logical chunks before this grows further.
+
+New systems added (uncommitted):
+- **Product Intelligence** (`src/lib/productIntelligence/`) — seller fit, confidence scoring, action recommendations, feeds `ProductQuickIntel` / `IntelligenceSummaryBanner` / `SupplyChainIntelligenceCard`
+- **Decision Simulation** (`src/lib/productSimulation/`, `useDecisionSimulation`) — scenario deltas/impact, surfaced via `ScenarioComparisonCard` / `SimulationImpactCard`
+- **Sourcing Intelligence** (`src/lib/sourcing/`) — certification risk, cashflow stress, freight volatility, supplier confidence, launch survivability, return risk, negotiation engine; new `SourcingLogisticsScreen`
+- **Analytics** (`src/lib/analytics.ts`, `analyticsTransmit.ts`) + offline support (`useNetworkStatus`, `OfflineBanner`, `safeJSON`, `storageMigration`)
+- **Financial engine** (`src/lib/financialEngine.ts`, `financialConstants.ts`) — replaces/supersedes old `riskAssessment.ts` and trims `feasibility.ts` / `launchDecision.ts`
+- UX additions: `Toast`/`useToast`, `UsageQuotaBar`, `FreeAllowanceBar`, `VerdictFeedback`, `FeatureExplainer`, `FBAGlossaryModal`
+- New `tests/pure-logic.test.cjs`, `supabase/migrations/002_delete_user_rpc_and_analytics_rls.sql`
+
+Most recently touched files (likely still in progress): `ProfitLabScreen.tsx`, `NicheResearchScreen.tsx`, `CopilotScreen.tsx`, `TabNavigator.tsx`, `RootNavigator.tsx`, `SourcingLogisticsScreen.tsx`, `ResearchWorkspaceScreen.tsx`.
+
+Next steps: run `tests/pure-logic.test.cjs`, smoke-test the 5 tabs (esp. Sourcing + Niche, which are new/heavily edited), then commit in reviewable chunks (e.g. financial engine, product intelligence, sourcing intelligence, UX/analytics as separate commits).
 
 ---
 
