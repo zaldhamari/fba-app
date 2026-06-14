@@ -98,6 +98,12 @@ export const PLAN_FEATURES: Record<Tier, string[]> = {
 
 const DEV_BYPASS = process.env.EXPO_PUBLIC_DEV_BYPASS === 'true';
 
+// ─── TEMP: TestFlight — paywalls disabled for all testers ──────────────────────
+// Forces every user onto the operator tier (unlimited usage, all features
+// unlocked), skipping RevenueCat entitlement checks entirely. Set to false to
+// restore normal subscription gating before public release.
+const PAYWALLS_DISABLED = true;
+
 // ─── Runtime dev unlock (persists in AsyncStorage, toggled via secret gesture) ─
 
 const RUNTIME_DEV_KEY = 'siftly_dev_unlock_v1';
@@ -193,7 +199,7 @@ export function useSubscription() {
 
   useEffect(() => {
     const overrideTier = process.env.EXPO_PUBLIC_OVERRIDE_TIER as Tier | undefined;
-    if (DEV_BYPASS || _runtimeDevMode || overrideTier) {
+    if (DEV_BYPASS || _runtimeDevMode || overrideTier || PAYWALLS_DISABLED) {
       setTier(overrideTier ?? 'operator');
       setLoaded(true);
       return;
