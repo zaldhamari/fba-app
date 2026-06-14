@@ -153,8 +153,14 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
   const safeCurrency = CURRENCIES[currency] ? currency : 'USD';
   const rate     = rates[safeCurrency] ?? FALLBACK_RATES[safeCurrency] ?? 1;
   const info     = CURRENCIES[safeCurrency];
-  const fromUSD  = useCallback((usd: number) => usd * (ratesRef.current[safeCurrency] ?? 1), [safeCurrency]);
-  const toUSD    = useCallback((local: number) => local / (ratesRef.current[safeCurrency] ?? 1), [safeCurrency]);
+  const fromUSD  = useCallback((usd: number) => {
+    const r = ratesRef.current[safeCurrency] ?? FALLBACK_RATES[safeCurrency] ?? 1;
+    return usd * r;
+  }, [safeCurrency]);
+  const toUSD    = useCallback((local: number) => {
+    const r = ratesRef.current[safeCurrency] ?? FALLBACK_RATES[safeCurrency] ?? 1;
+    return r ? local / r : local; // guard divide-by-zero on a bad rate
+  }, [safeCurrency]);
   const fmt      = useCallback((usd: number, decimals = 2) =>
     `${info.symbol}${(usd * rate).toFixed(decimals)}`,
   [rate, info]);

@@ -1,6 +1,7 @@
 export const STORAGE_KEYS = {
   // Subscription / usage
-  tier:                'fba_tier_v3',
+  // NOTE: fba_tier_v3 and fba_tier_verified_at_v1 live in SecureStore, not AsyncStorage.
+  // They are managed exclusively by useSubscription.ts and cleared via SecureStore.deleteItemAsync.
   usage:               'fba_usage_v3',
   onboardingDone:      'fba_onboarding_v3',
   deviceId:            'fba_device_id',
@@ -60,4 +61,7 @@ export const STORAGE_KEYS = {
 
   // Winner Vault (published completed builds)
   winnerVault: 'siftly_winner_vault_v1',
+
+  // Dynamic sourcing tasks injected into Launch Plan
+  sourcingTasks: 'siftly_sourcing_tasks_v1',
 } as const;
