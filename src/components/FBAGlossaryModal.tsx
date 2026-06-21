@@ -46,7 +46,7 @@ type CategoryFilter = typeof CATEGORIES[number];
 const CAT_COLOR: Record<GlossaryTerm['category'], string> = {
   Financial:  DS.accent,
   Operations: DS.success,
-  Listing:    DS.indigo ?? '#6366F1',
+  Listing:    DS.accent,
   Sourcing:   DS.warning,
 };
 

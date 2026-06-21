@@ -160,7 +160,7 @@ export function GhostButton({
       accessibilityState={{ disabled: disabled || loading }}
     >
       {loading ? (
-        <ActivityIndicator color={DS.indigo} size="small" />
+        <ActivityIndicator color={DS.accent} size="small" />
       ) : (
         <View style={s.inner}>
           {icon ? <Text style={[s.iconGhost, { fontSize: sz.fontSize + 1 }]}>{icon}</Text> : null}
@@ -181,8 +181,8 @@ const s = StyleSheet.create({
     borderRadius:   DS.radiusButton,
   },
   primary: {
-    backgroundColor: DS.indigo,
-    shadowColor:   DS.indigo,
+    backgroundColor: DS.accent,
+    shadowColor:   DS.accent,
     shadowOffset:  { width: 0, height: 4 },
     shadowOpacity: 0.28,
     shadowRadius:  10,
@@ -194,7 +194,7 @@ const s = StyleSheet.create({
     borderColor:     DS.border,
   },
   ghost: {
-    backgroundColor: DS.indigoLight,
+    backgroundColor: DS.accentLight,
   },
   disabled: {
     opacity: 0.45,
@@ -206,7 +206,7 @@ const s = StyleSheet.create({
   },
   icon:          { color: DS.textInverse },
   iconSecondary: { color: DS.textPrimary },
-  iconGhost:     { color: DS.indigo      },
+  iconGhost:     { color: DS.accent      },
   primaryLabel:  {
     color:          DS.textInverse,
     fontWeight:     '700',
@@ -218,7 +218,7 @@ const s = StyleSheet.create({
     letterSpacing:  -0.2,
   },
   ghostLabel: {
-    color:          DS.indigo,
+    color:          DS.accent,
     fontWeight:     '700',
     letterSpacing:  -0.2,
   },

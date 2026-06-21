@@ -4,7 +4,7 @@ import {
   ScrollView, StyleSheet,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { DS } from './ds';
+import { DS } from '../theme/ds';
 import { FEATURE_HELP, FeatureKey } from '../lib/featureHelp';
 
 // ─── Modal ────────────────────────────────────────────────────────────────────
@@ -86,29 +86,29 @@ const m = StyleSheet.create({
   safe:         { flex: 1, backgroundColor: DS.bgCanvas },
 
   header:       { flexDirection: 'row', alignItems: 'flex-start', gap: 12, padding: 20, borderBottomWidth: 1, borderBottomColor: DS.border, backgroundColor: DS.bgCard },
-  headerIcon:   { width: 36, height: 36, borderRadius: 10, backgroundColor: DS.indigoLight, alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 },
-  headerGlyph:  { fontSize: 16, fontWeight: '900', color: DS.indigo },
+  headerIcon:   { width: 36, height: 36, borderRadius: 10, backgroundColor: DS.accentLight, alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 },
+  headerGlyph:  { fontSize: 16, fontWeight: '900', color: DS.accent },
   headerText:   { flex: 1, gap: 2 },
   headerName:   { fontSize: 17, fontWeight: '900', color: DS.textPrimary, letterSpacing: -0.4 },
   headerTagline:{ fontSize: 12, color: DS.textSecondary, lineHeight: 17 },
   closeBtn:     { fontSize: 20, color: DS.textMuted, fontWeight: '300', paddingTop: 4 },
 
   body:         { padding: 20, gap: 20, paddingBottom: 8 },
-  quickTipCard: { backgroundColor: DS.accentLight, borderRadius: 12, borderWidth: 1, borderColor: DS.accent + '30', padding: 14, gap: 5 },
+  quickTipCard: { backgroundColor: DS.accent + '0E', borderRadius: 12, borderWidth: 1, borderColor: DS.accent + '30', padding: 14, gap: 5 },
   quickTipLabel:{ fontSize: 9, fontWeight: '800' as const, color: DS.accent, letterSpacing: 2 },
   quickTipText: { fontSize: 13, color: DS.textSecondary, lineHeight: 20 },
   section:      { gap: 6 },
   sectionTitle: { fontSize: 9, fontWeight: '800', color: DS.accent, letterSpacing: 2, marginBottom: 2 },
   sectionContent:{ fontSize: 14, color: DS.textSecondary, lineHeight: 23 },
 
-  recCard:      { backgroundColor: DS.accentLight, borderRadius: 12, borderWidth: 1, borderColor: DS.accent + '30', padding: 14, gap: 5 },
+  recCard:      { backgroundColor: DS.accent + '0E', borderRadius: 12, borderWidth: 1, borderColor: DS.accent + '30', padding: 14, gap: 5 },
   recLabel:     { fontSize: 9, fontWeight: '800' as const, color: DS.accent, letterSpacing: 2 },
   recText:      { fontSize: 13, color: DS.textSecondary, lineHeight: 20 },
 
   bottomPad:    { height: 16 },
 
   footer:       { padding: 20, borderTopWidth: 1, borderTopColor: DS.border, backgroundColor: DS.bgCard },
-  gotItBtn:     { backgroundColor: DS.indigo, borderRadius: 14, paddingVertical: 15, alignItems: 'center' },
+  gotItBtn:     { backgroundColor: DS.accent, borderRadius: DS.radiusButton, paddingVertical: 15, alignItems: 'center' },
   gotItTxt:     { fontSize: 15, fontWeight: '800', color: '#fff' },
 });
 
@@ -146,7 +146,7 @@ export function HelpButton({ featureKey, size = 'md' }: HelpButtonProps) {
 }
 
 const b = StyleSheet.create({
-  btn:    { width: 28, height: 28, borderRadius: 14, backgroundColor: DS.indigo, alignItems: 'center', justifyContent: 'center' },
+  btn:    { width: 28, height: 28, borderRadius: 14, backgroundColor: DS.accent, alignItems: 'center', justifyContent: 'center' },
   btnSm:  { width: 22, height: 22, borderRadius: 11 },
   glyph:  { fontSize: 13, fontWeight: '900', color: '#fff' },
   glyphSm:{ fontSize: 11 },

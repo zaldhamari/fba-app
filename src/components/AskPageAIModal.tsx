@@ -142,7 +142,7 @@ export function AskPageAIModal({ featureKey, size = 'md' }: AskPageAIModalProps)
 }
 
 const ap = StyleSheet.create({
-  btn:   { width: 28, height: 28, borderRadius: 14, backgroundColor: DS.indigo, alignItems: 'center', justifyContent: 'center' },
+  btn:   { width: 28, height: 28, borderRadius: 14, backgroundColor: DS.accent, alignItems: 'center', justifyContent: 'center' },
   btnSm: { width: 22, height: 22, borderRadius: 11 },
   glyph: { fontSize: 13, fontWeight: '900', color: '#fff' },
   glyphSm: { fontSize: 11 },

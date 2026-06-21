@@ -4,7 +4,6 @@ import {
   View, Text, TouchableOpacity, StyleSheet, Modal, ScrollView,
 } from 'react-native';
 import { useCurrency, MARKETPLACES, CURRENCIES, CurrencyCode, MarketplaceId } from '../context/CurrencyContext';
-import { colors, spacing, radius } from '../theme';
 
 // ─── Compact trigger button ───────────────────────────────────────────────────
 
@@ -30,7 +29,7 @@ export function CurrencyRegionPicker() {
   const { currency, marketplace, setCurrency, setMarketplace } = useCurrency();
 
   return (
-    <View>
+    <View style={{ gap: 4 }}>
       <Text style={s.sectionLabel}>MARKETPLACE</Text>
       {MARKETPLACES.map(mp => {
         const isActive = marketplace === mp.id;
@@ -55,7 +54,7 @@ export function CurrencyRegionPicker() {
         );
       })}
 
-      <Text style={[s.sectionLabel, { marginTop: spacing.md }]}>CURRENCY ONLY</Text>
+      <Text style={[s.sectionLabel, { marginTop: 12 }]}>CURRENCY ONLY</Text>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -105,7 +104,6 @@ export function CurrencySelector() {
           <View style={s.handle} />
           <Text style={s.sheetTitle}>Region & Currency</Text>
 
-          {/* ── Marketplace section ── */}
           <Text style={s.sectionLabel}>MARKETPLACE</Text>
           {MARKETPLACES.map(mp => {
             const isActive = marketplace === mp.id;
@@ -130,8 +128,7 @@ export function CurrencySelector() {
             );
           })}
 
-          {/* ── Currency-only section ── */}
-          <Text style={[s.sectionLabel, { marginTop: spacing.md }]}>CURRENCY ONLY</Text>
+          <Text style={[s.sectionLabel, { marginTop: 16 }]}>CURRENCY ONLY</Text>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -169,64 +166,64 @@ export function CurrencySelector() {
 const s = StyleSheet.create({
   btn: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: colors.bgElevated, borderRadius: radius.full,
+    backgroundColor: DS.bgElevated, borderRadius: DS.radiusBadge,
     paddingHorizontal: 10, paddingVertical: 5,
-    borderWidth: 1, borderColor: colors.border,
+    borderWidth: 1, borderColor: DS.border,
   },
   btnFlag: { fontSize: 14 },
-  btnCode: { fontSize: 11, fontWeight: '700', color: colors.textSecondary },
+  btnCode: { fontSize: 11, fontWeight: '700', color: DS.textSecondary },
 
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)' },
   sheet: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
-    backgroundColor: colors.bgCard,
+    backgroundColor: DS.bgCard,
     borderTopLeftRadius: 24, borderTopRightRadius: 24,
-    paddingHorizontal: spacing.lg, paddingBottom: 40, paddingTop: spacing.md,
+    paddingHorizontal: DS.pagePadding, paddingBottom: 40, paddingTop: 16,
     borderTopWidth: 1, borderLeftWidth: 1, borderRightWidth: 1,
-    borderColor: colors.border,
+    borderColor: DS.border,
   },
   handle: {
-    width: 36, height: 4, backgroundColor: colors.bgElevated,
-    borderRadius: 2, alignSelf: 'center', marginBottom: spacing.md,
+    width: 36, height: 4, backgroundColor: DS.bgElevated,
+    borderRadius: 2, alignSelf: 'center', marginBottom: 16,
   },
   sheetTitle: {
-    fontSize: 17, fontWeight: '800', color: colors.textPrimary,
-    letterSpacing: -0.3, marginBottom: spacing.md,
+    fontSize: 17, fontWeight: '800', color: DS.textPrimary,
+    letterSpacing: -0.3, marginBottom: 14,
   },
   sectionLabel: {
-    fontSize: 9, fontWeight: '800', color: colors.textMuted,
-    letterSpacing: 1.5, marginBottom: spacing.sm,
+    fontSize: 9, fontWeight: '800', color: DS.textMuted,
+    letterSpacing: 1.5, marginBottom: 8,
   },
 
   option: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
-    paddingVertical: 10, paddingHorizontal: spacing.sm,
-    borderRadius: radius.md, marginBottom: 2,
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingVertical: 10, paddingHorizontal: 10,
+    borderRadius: DS.radiusButton, marginBottom: 2,
   },
-  optionActive:     { backgroundColor: 'rgba(37,99,235,0.10)' },
+  optionActive:     { backgroundColor: DS.accent + '12' },
   optionFlag:       { fontSize: 22 },
   optionText:       { flex: 1 },
-  optionName:       { fontSize: 14, fontWeight: '600', color: colors.textPrimary },
+  optionName:       { fontSize: 14, fontWeight: '600', color: DS.textPrimary },
   optionNameActive: { color: DS.accent },
-  optionSub:        { fontSize: 11, color: colors.textMuted, marginTop: 1 },
+  optionSub:        { fontSize: 11, color: DS.textMuted, marginTop: 1 },
   check:            { fontSize: 14, fontWeight: '800', color: DS.accent },
 
-  currencyRow: { gap: 8, paddingVertical: spacing.xs },
+  currencyRow: { gap: 8, paddingVertical: 4 },
   chip: {
     alignItems: 'center', gap: 2, minWidth: 60,
-    paddingHorizontal: spacing.sm, paddingVertical: 8,
-    backgroundColor: colors.bgElevated, borderRadius: radius.md,
-    borderWidth: 1, borderColor: colors.border,
+    paddingHorizontal: 10, paddingVertical: 8,
+    backgroundColor: DS.bgElevated, borderRadius: DS.radiusButton,
+    borderWidth: 1, borderColor: DS.border,
   },
-  chipActive:    { backgroundColor: 'rgba(37,99,235,0.10)', borderColor: DS.accent },
+  chipActive:    { backgroundColor: DS.accent + '12', borderColor: DS.accent },
   chipFlag:      { fontSize: 20 },
-  chipCode:      { fontSize: 10, fontWeight: '800', color: colors.textSecondary },
+  chipCode:      { fontSize: 10, fontWeight: '800', color: DS.textSecondary },
   chipCodeActive:{ color: DS.accent },
-  chipSym:       { fontSize: 11, color: colors.textMuted },
+  chipSym:       { fontSize: 11, color: DS.textMuted },
   chipSymActive: { color: DS.accent },
 
   note: {
-    fontSize: 10, color: colors.textMuted, textAlign: 'center',
-    marginTop: spacing.md,
+    fontSize: 10, color: DS.textMuted, textAlign: 'center',
+    marginTop: 14,
   },
 });
