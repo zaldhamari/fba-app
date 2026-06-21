@@ -2,8 +2,10 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert,
   TextInput, Modal, KeyboardAvoidingView, Platform,
-  ActivityIndicator,
+  ActivityIndicator, Linking,
 } from 'react-native';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import { OfflineBanner } from '../components/OfflineBanner';
 import { safeParseJSON } from '../utils/safeJSON';
@@ -25,6 +27,7 @@ import { Image } from 'expo-image';
 import { useBuilderSession } from '../hooks/useBuilderSession';
 import { useSellerProfile } from '../hooks/useSellerProfile';
 import { usePipeline } from '../context/PipelineContext';
+import { useVault } from '../hooks/useVault';
 import { useProductIntelligence } from '../hooks/useProductIntelligence';
 import { IntelligenceSummaryBanner } from '../components/IntelligenceSummaryBanner';
 import { FBAGlossaryModal } from '../components/FBAGlossaryModal';
@@ -57,7 +60,7 @@ function ToolModal({ visible, title, subtitle, onClose, children }: ToolModalPro
               <Text style={m.closeText}>✕</Text>
             </TouchableOpacity>
           </View>
-          <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
+          <ScrollView contentContainerStyle={{ paddingHorizontal: DS.pagePadding, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
             {children}
           </ScrollView>
         </KeyboardAvoidingView>
@@ -308,8 +311,8 @@ function AnalyzeProductModal({ visible, onClose }: { visible: boolean; onClose: 
 const ap = StyleSheet.create({
   // Search bar
   inputRow:         { flexDirection: 'row', gap: 8, marginTop: 16, marginBottom: 8 },
-  input:            { flex: 1, height: 48, borderRadius: 12, borderWidth: 1.5, borderColor: DS.border, paddingHorizontal: 14, fontSize: 14, color: DS.textPrimary, backgroundColor: DS.bgCard },
-  searchBtn:        { width: 48, height: 48, borderRadius: 12, backgroundColor: DS.accent, alignItems: 'center', justifyContent: 'center' },
+  input:            { flex: 1, borderRadius: DS.radiusInput, borderWidth: 1.5, borderColor: DS.border, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: DS.textPrimary, backgroundColor: DS.bgCard },
+  searchBtn:        { width: 48, borderRadius: DS.radiusInput, backgroundColor: DS.accent, alignItems: 'center', justifyContent: 'center' },
   searchBtnDisabled:{ opacity: 0.45 },
   searchBtnText:    { color: '#fff', fontWeight: '700', fontSize: 18 },
   // Idle state
@@ -318,7 +321,7 @@ const ap = StyleSheet.create({
   chipRow:          { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip:             { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, backgroundColor: DS.bgCard, borderWidth: 1, borderColor: DS.border },
   chipText:         { fontSize: 12, color: DS.textSecondary, fontWeight: '500' },
-  idleHint:         { flexDirection: 'row', gap: 10, backgroundColor: '#EFF6FF', borderRadius: 12, padding: 12, alignItems: 'flex-start' },
+  idleHint:         { flexDirection: 'row', gap: 10, backgroundColor: DS.accentLight, borderRadius: DS.radiusButton, padding: 12, alignItems: 'flex-start' },
   idleHintIcon:     { fontSize: 18, marginTop: 1 },
   idleHintText:     { flex: 1, fontSize: 12, color: DS.accent, lineHeight: 18 },
   // Loading state
@@ -650,7 +653,7 @@ const fo = StyleSheet.create({
   tabText:       { fontSize: 13, fontWeight: '600', color: DS.textMuted },
   tabTextActive: { color: DS.accent, fontWeight: '700' },
   // Profile strip
-  profileStrip:     { backgroundColor: '#EFF6FF', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 7 },
+  profileStrip:     { backgroundColor: DS.accentLight, borderRadius: DS.radiusChip, paddingHorizontal: 12, paddingVertical: 7 },
   profileStripText: { fontSize: 12, color: DS.accent, fontWeight: '500' },
   // Empty / idle state
   emptyState:    { alignItems: 'center', gap: 10, paddingVertical: 32, paddingHorizontal: 12 },
@@ -859,10 +862,10 @@ function AITools() {
   const [showGlossary, setShowGlossary] = useState(false);
 
   const tools = [
-    { icon: '🔍', label: 'Get a\nVerdict',  color: '#EFF6FF', border: '#BFDBFE', onPress: () => setShowAnalyze(true) },
-    { icon: '💡', label: 'Find\nOpportunities', color: '#F0FDF4', border: '#BBF7D0', onPress: () => setShowOpps(true) },
-    { icon: '🤖', label: 'Ask\nCopilot',        color: '#FAF5FF', border: '#E9D5FF', onPress: () => setShowAsk(true) },
-    { icon: '📖', label: 'FBA\nGlossary',       color: DS.warningBg, border: '#FDE68A', onPress: () => setShowGlossary(true) },
+    { icon: '🔍', label: 'Get a\nVerdict',       color: DS.accentLight, border: DS.accent + '40', onPress: () => setShowAnalyze(true) },
+    { icon: '💡', label: 'Find\nOpportunities', color: DS.successBg,   border: DS.success + '40', onPress: () => setShowOpps(true) },
+    { icon: '🤖', label: 'Ask\nCopilot',        color: DS.bgElevated,  border: DS.border,          onPress: () => setShowAsk(true) },
+    { icon: '📖', label: 'FBA\nGlossary',       color: DS.warningBg,   border: DS.warning + '50', onPress: () => setShowGlossary(true) },
   ];
 
   return (
@@ -910,12 +913,7 @@ function WinnerVaultCard({ vault }: { vault: WinnerEntry[] }) {
           <Text style={wv.sectionTitle}>Winner Vault</Text>
           <Text style={wv.sectionSub}>{vault.length} product{vault.length !== 1 ? 's' : ''} ready to launch</Text>
         </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          <HelpButton featureKey="winner_vault" size="sm" />
-          <TouchableOpacity onPress={() => nav.navigate('Checklist' as any)}>
-            <Text style={wv.link}>View all ›</Text>
-          </TouchableOpacity>
-        </View>
+        <HelpButton featureKey="winner_vault" size="sm" />
       </View>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingRight: 4 }}>
@@ -973,10 +971,10 @@ function WinnerVaultCard({ vault }: { vault: WinnerEntry[] }) {
 const wv = StyleSheet.create({
   container:    { gap: 10 },
   headerRow:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: DS.textPrimary },
-  sectionSub:   { fontSize: 11, color: DS.textMuted, marginTop: 1 },
-  link:         { fontSize: 13, color: DS.accent, fontWeight: '600', marginTop: 2 },
-  card:         { width: 180, backgroundColor: DS.bgCard, borderRadius: 14, borderWidth: 1, borderColor: DS.border, overflow: 'hidden' },
+  sectionTitle: { fontSize: 16, fontWeight: '700', color: DS.textPrimary, letterSpacing: -0.3 },
+  sectionSub:   { fontSize: 11, color: DS.textMuted, marginTop: 2 },
+  link:         { fontSize: 13, color: DS.accent, fontWeight: '600', marginTop: 3 },
+  card:         { width: 182, backgroundColor: DS.bgCard, borderRadius: DS.radiusCard, borderWidth: 1, borderColor: DS.border, overflow: 'hidden' },
   accentBar:    { height: 4, width: '100%' },
   cardTopRow:   { flexDirection: 'row', alignItems: 'center', gap: 5 },
   verdictDot:   { width: 6, height: 6, borderRadius: 3 },
@@ -984,45 +982,9 @@ const wv = StyleSheet.create({
   cardTapHint:  { fontSize: 10, color: DS.textMuted },
   productTitle: { fontSize: 13, fontWeight: '600', color: DS.textPrimary, lineHeight: 18 },
   brand:        { fontSize: 11, color: DS.textMuted },
-  stat:         { flex: 1, alignItems: 'center', backgroundColor: DS.bgCanvas, borderRadius: 8, paddingVertical: 6 },
-  statVal:      { fontSize: 13, fontWeight: '800' },
+  stat:         { flex: 1, alignItems: 'center', backgroundColor: DS.bgSubtle, borderRadius: 8, paddingVertical: 7 },
+  statVal:      { fontSize: 12, fontWeight: '800' },
   statLabel:    { fontSize: 9, color: DS.textMuted, marginTop: 1, textTransform: 'uppercase', letterSpacing: 0.3 },
-});
-
-// ─── Active Product Card ──────────────────────────────────────────────────────
-
-const STAGE_ORDER_LIST = ['discovery', 'analysis', 'supplier', 'freight', 'calculations', 'brand', 'complete'];
-const STAGE_LABEL_MAP: Record<string, string> = {
-  discovery: 'Find a Product', analysis: 'AI Analysis', supplier: 'Lock In Supplier',
-  freight: 'Choose Freight', calculations: 'Check the Numbers', brand: 'Build Your Brand',
-};
-
-function ActiveProductCard({ session }: { session: any }) {
-  const nav = useNavigation<Nav>();
-  const stage    = session.currentStage;
-  const progress = (STAGE_ORDER_LIST.indexOf(stage) + 1) / STAGE_ORDER_LIST.length;
-
-  return (
-    <TouchableOpacity style={ac.card} onPress={() => nav.navigate('Checklist' as any)} activeOpacity={0.8}>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Text style={ac.label}>Active Build</Text>
-        <Text style={ac.arrow}>→</Text>
-      </View>
-      <Text style={ac.stageName}>{STAGE_LABEL_MAP[stage] ?? stage}</Text>
-      <View style={ac.bar}><View style={[ac.fill, { width: `${Math.round(progress * 100)}%` as any }]} /></View>
-      <Text style={ac.progress}>{Math.round(progress * 100)}% complete</Text>
-    </TouchableOpacity>
-  );
-}
-
-const ac = StyleSheet.create({
-  card:      { backgroundColor: DS.bgCard, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: DS.border, gap: 6 },
-  label:     { fontSize: 11, fontWeight: '700', color: DS.textMuted, letterSpacing: 0.5, textTransform: 'uppercase' },
-  stageName: { fontSize: 16, fontWeight: '700', color: DS.textPrimary },
-  arrow:     { fontSize: 16, color: DS.accent },
-  bar:       { height: 4, backgroundColor: DS.border, borderRadius: 2, overflow: 'hidden' },
-  fill:      { height: 4, backgroundColor: DS.accent, borderRadius: 2 },
-  progress:  { fontSize: 11, color: DS.textMuted },
 });
 
 // ─── Greeting Header ──────────────────────────────────────────────────────────
@@ -1110,100 +1072,736 @@ function GreetingHeader({ vaultCount, analyzed, lookupsLeft, isFree }: { vaultCo
 const gh = StyleSheet.create({
   card: {
     backgroundColor: DS.bgCard,
-    borderRadius: 20,
+    borderRadius: DS.radiusCard,
     padding: 18,
     borderWidth: 1,
     borderColor: DS.border,
-    gap: 10,
+    gap: 14,
   },
   topRow:    { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
-  timeLabel: { fontSize: 12, fontWeight: '600', color: DS.textMuted, letterSpacing: 0.3, textTransform: 'uppercase', marginBottom: 2 },
-  name:      { fontSize: 28, fontWeight: '900', color: DS.textPrimary, letterSpacing: -0.5, lineHeight: 33 },
+  timeLabel: { fontSize: 10, fontWeight: '700', color: DS.textMuted, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 },
+  name:      { fontSize: 30, fontWeight: '900', color: DS.textPrimary, letterSpacing: -0.8, lineHeight: 35 },
   wave:      { fontSize: 26 },
   roleBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
-    backgroundColor: DS.accentLight, borderRadius: 20,
-    paddingHorizontal: 12, paddingVertical: 6,
-    borderWidth: 1, borderColor: DS.accent + '30',
+    backgroundColor: DS.accent, borderRadius: DS.radiusBadge,
+    paddingHorizontal: 12, paddingVertical: 7,
+    flexShrink: 0,
   },
-  roleIcon:  { fontSize: 14 },
-  roleText:  { fontSize: 12, fontWeight: '800', color: DS.accent, letterSpacing: 0.2 },
-  tagline:   { fontSize: 14, color: DS.textSecondary, lineHeight: 21, fontStyle: 'italic' },
-  statsRow: {
-    flexDirection: 'row',
-    backgroundColor: DS.bgCanvas, borderRadius: 10,
-    borderWidth: 1, borderColor: DS.border,
-    paddingVertical: 10,
-  },
-  statCell:       { flex: 1, alignItems: 'center', gap: 2 },
-  statCellBorder: { borderRightWidth: 1, borderRightColor: DS.border },
-  statValue:      { fontSize: 16, fontWeight: '900', color: DS.textPrimary, letterSpacing: -0.5 },
-  statLabel:      { fontSize: 10, fontWeight: '600', color: DS.textMuted },
+  roleIcon:  { fontSize: 12 },
+  roleText:  { fontSize: 11, fontWeight: '800', color: DS.textInverse, letterSpacing: 0.3 },
+  tagline:   { fontSize: 14, color: DS.textSecondary, lineHeight: 20, fontStyle: 'italic' },
+  statsRow:       { flexDirection: 'row', gap: 8 },
+  statCell:       { flex: 1, alignItems: 'center', gap: 3, backgroundColor: DS.bgSubtle, borderRadius: 12, borderWidth: 1, borderColor: DS.border, paddingVertical: 12 },
+  statCellBorder: {},
+  statValue:      { fontSize: 18, fontWeight: '900', color: DS.textPrimary, letterSpacing: -0.5 },
+  statLabel:      { fontSize: 9, fontWeight: '700', color: DS.textMuted, textTransform: 'uppercase', letterSpacing: 0.4 },
 });
 
-// ─── Pipeline Context Banner ──────────────────────────────────────────────────
+// ─── Launch Report HTML generator ────────────────────────────────────────────
 
-function PipelineContextBanner() {
+function generateReportHTML(p: ReturnType<typeof usePipeline>): string {
+  const product  = p.activeProduct;
+  const niche    = p.activeNiche;
+  const supplier = p.selectedSupplier;
+  const freight  = p.freightEstimate;
+  const costs    = p.costModel;
+  const brand    = p.brandData;
+  const recon    = p.reconInsights;
+  const date     = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+
+  const supplierEmail = supplier ? `Subject: Product Inquiry – ${product?.title ?? 'Your Product'}
+
+Dear ${supplier.name} Team,
+
+I am interested in sourcing the following product and would like to discuss a potential long-term partnership.
+
+Product: ${product?.title ?? 'As discussed'}
+Target Quantity: ${costs?.unitsOrdered ?? 500} units (initial order)
+Target Unit Price: $${supplier.unitCost}
+MOQ Required: ${supplier.moq}
+
+Could you please confirm:
+1. Availability and lead time (currently estimated ${supplier.leadTimeDays ?? 30} days)
+2. Sample availability and cost
+3. Customisation options (packaging, labelling)
+4. Payment terms
+
+I look forward to your response.
+
+Best regards,
+${brand?.brandName ?? 'Our Brand'}` : '';
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Launch Report – ${product?.title ?? 'Product'}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, Helvetica, Arial, sans-serif; color: #0D1B4B; background: #F5F7FF; padding: 24px; font-size: 14px; line-height: 1.6; }
+  .page { max-width: 720px; margin: 0 auto; background: #fff; border-radius: 16px; padding: 32px; box-shadow: 0 2px 16px rgba(0,0,0,0.08); }
+  h1 { font-size: 26px; font-weight: 800; color: #2563EB; margin-bottom: 4px; }
+  .meta { font-size: 12px; color: #8196B0; margin-bottom: 32px; }
+  h2 { font-size: 14px; font-weight: 800; color: #2563EB; text-transform: uppercase; letter-spacing: 1px; border-bottom: 2px solid #E6ECFF; padding-bottom: 6px; margin: 28px 0 14px; }
+  .row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #F0F4FF; }
+  .label { color: #5C6B8A; font-weight: 600; }
+  .value { font-weight: 700; color: #0D1B4B; text-align: right; max-width: 60%; }
+  .verdict { display: inline-block; padding: 6px 18px; border-radius: 999px; font-weight: 900; font-size: 16px; margin: 8px 0 16px; }
+  .verdict.launch { background: #D1FAE5; color: #065F46; }
+  .verdict.test { background: #FEF3C7; color: #92400E; }
+  .verdict.hold { background: #FEF3C7; color: #92400E; }
+  .verdict.avoid { background: #FEE2E2; color: #991B1B; }
+  .tag { display: inline-block; background: #EEF2FA; color: #2563EB; border-radius: 6px; padding: 3px 10px; font-size: 12px; font-weight: 600; margin: 3px 3px 3px 0; }
+  .email-block { background: #F5F7FF; border-radius: 10px; padding: 16px; font-family: monospace; font-size: 12px; white-space: pre-wrap; line-height: 1.7; color: #0D1B4B; }
+  ul { padding-left: 18px; }
+  li { margin-bottom: 6px; }
+  .footer { margin-top: 40px; text-align: center; font-size: 11px; color: #8196B0; }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>🚀 Launch Report</h1>
+  <div class="meta">Generated by Siftly · ${date}</div>
+
+  ${niche ? `
+  <h2>Market Research</h2>
+  <div class="row"><span class="label">Niche</span><span class="value">${niche.keyword}</span></div>
+  <div class="row"><span class="label">Marketplace</span><span class="value">${niche.marketplace}</span></div>
+  <div class="row"><span class="label">Niche Score</span><span class="value">${niche.score}/100</span></div>
+  <div class="row"><span class="label">Verdict</span><span class="value">${niche.verdictLabel}</span></div>
+  ` : ''}
+
+  ${product ? `
+  <h2>Product</h2>
+  <div class="row"><span class="label">Title</span><span class="value">${product.title}</span></div>
+  <div class="row"><span class="label">Price</span><span class="value">$${product.price}</span></div>
+  <div class="row"><span class="label">Reviews</span><span class="value">${product.reviews?.toLocaleString() ?? '—'}</span></div>
+  <div class="row"><span class="label">Rating</span><span class="value">${product.rating ?? '—'} ★</span></div>
+  <div class="row"><span class="label">Competition</span><span class="value">${product.competition ?? '—'}</span></div>
+  ${product.salesEstLow ? `<div class="row"><span class="label">Est. Monthly Sales</span><span class="value">${product.salesEstLow}–${product.salesEstHigh} units</span></div>` : ''}
+  ` : ''}
+
+  ${recon ? `
+  <h2>Competitor Teardown</h2>
+  ${recon.complaints?.length ? `<p style="font-weight:700;margin-bottom:6px;">Customer Complaints</p><ul>${recon.complaints.map(c => `<li>${c}</li>`).join('')}</ul>` : ''}
+  ${recon.opportunities?.length ? `<p style="font-weight:700;margin:12px 0 6px;">Opportunities</p><ul>${recon.opportunities.map(o => `<li>${o}</li>`).join('')}</ul>` : ''}
+  ${recon.improvementSpecs?.length ? `<p style="font-weight:700;margin:12px 0 6px;">Improvement Specs</p><ul>${recon.improvementSpecs.map(i => `<li>${i}</li>`).join('')}</ul>` : ''}
+  ` : ''}
+
+  ${supplier ? `
+  <h2>Supplier</h2>
+  <div class="row"><span class="label">Name</span><span class="value">${supplier.name}</span></div>
+  <div class="row"><span class="label">Platform</span><span class="value">${supplier.platform}</span></div>
+  <div class="row"><span class="label">Unit Cost</span><span class="value">$${supplier.unitCost}</span></div>
+  <div class="row"><span class="label">MOQ</span><span class="value">${supplier.moq} units</span></div>
+  ${supplier.leadTimeDays ? `<div class="row"><span class="label">Lead Time</span><span class="value">${supplier.leadTimeDays} days</span></div>` : ''}
+  ${supplier.country ? `<div class="row"><span class="label">Country</span><span class="value">${supplier.country}</span></div>` : ''}
+  ${supplier.url ? `<div class="row"><span class="label">URL</span><span class="value"><a href="${supplier.url}" style="color:#2563EB">View Listing</a></span></div>` : ''}
+  ` : ''}
+
+  ${freight ? `
+  <h2>Freight & Logistics</h2>
+  <div class="row"><span class="label">Mode</span><span class="value">${freight.selectedMode.toUpperCase()}</span></div>
+  <div class="row"><span class="label">Per Unit Cost</span><span class="value">$${freight.perUnitCost}</span></div>
+  <div class="row"><span class="label">Total Freight</span><span class="value">$${freight.totalCost}</span></div>
+  <div class="row"><span class="label">Origin</span><span class="value">${freight.originCountry}</span></div>
+  <div class="row"><span class="label">Destination</span><span class="value">${freight.destinationMarketplace}</span></div>
+  ` : ''}
+
+  ${costs ? `
+  <h2>Financial Model</h2>
+  <div class="row"><span class="label">Selling Price</span><span class="value">$${costs.sellingPrice.toFixed(2)}</span></div>
+  <div class="row"><span class="label">Unit Cost</span><span class="value">$${costs.unitCost.toFixed(2)}</span></div>
+  <div class="row"><span class="label">Freight / Unit</span><span class="value">$${costs.freight.toFixed(2)}</span></div>
+  <div class="row"><span class="label">FBA Fee</span><span class="value">$${costs.fbaFee.toFixed(2)}</span></div>
+  <div class="row"><span class="label">Referral Fee</span><span class="value">$${costs.referralFee.toFixed(2)}</span></div>
+  <div class="row"><span class="label">Total Cost</span><span class="value">$${costs.totalCost.toFixed(2)}</span></div>
+  <div class="row" style="background:#EEF2FA;border-radius:8px;padding:10px;margin-top:8px;"><span class="label">Net Profit / Unit</span><span class="value" style="color:#2563EB;font-size:16px;">$${costs.netProfit.toFixed(2)}</span></div>
+  <div class="row"><span class="label">Margin</span><span class="value">${costs.marginPct.toFixed(1)}%</span></div>
+  <div class="row"><span class="label">ROI</span><span class="value">${costs.roiPct.toFixed(1)}%</span></div>
+  <div class="row"><span class="label">Units Ordered</span><span class="value">${costs.unitsOrdered}</span></div>
+  <div class="row"><span class="label">Total Investment</span><span class="value">$${costs.totalInvestment.toFixed(2)}</span></div>
+  ` : ''}
+
+  ${brand ? `
+  <h2>Brand</h2>
+  <div class="row"><span class="label">Brand Name</span><span class="value">${brand.brandName}</span></div>
+  <div class="row"><span class="label">Product Title</span><span class="value">${brand.productTitle}</span></div>
+  ${brand.tagline ? `<div class="row"><span class="label">Tagline</span><span class="value">${brand.tagline}</span></div>` : ''}
+  ${brand.style ? `<div class="row"><span class="label">Style</span><span class="value">${brand.style}</span></div>` : ''}
+  ${brand.keywords?.length ? `<div class="row"><span class="label">Keywords</span><span class="value">${brand.keywords.join(', ')}</span></div>` : ''}
+  ${brand.listingTitle ? `<div class="row"><span class="label">Listing Title</span><span class="value">${brand.listingTitle}</span></div>` : ''}
+  ${brand.listingBullets?.length ? `<p style="font-weight:700;margin:12px 0 6px;">Listing Bullets</p><ul>${brand.listingBullets.map(b => `<li>${b}</li>`).join('')}</ul>` : ''}
+  ` : ''}
+
+  ${supplier ? `
+  <h2>Supplier Email Template</h2>
+  <div class="email-block">${supplierEmail}</div>
+  ` : ''}
+
+  <div class="footer">Siftly · FBA Launch Report · ${date}</div>
+</div>
+</body>
+</html>`;
+}
+
+// ─── Launch Report Modal ──────────────────────────────────────────────────────
+
+function LaunchReportModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const pipeline  = usePipeline();
-  const nav       = useNavigation<Nav>();
-  const hasData   = pipeline.activeProduct || pipeline.selectedSupplier || pipeline.costModel;
-  if (!hasData) return null;
+  const vault     = useVault();
+  const [busy, setBusy]           = useState<'pdf' | 'email' | 'vault' | null>(null);
+  const [vaultSaved, setVaultSaved] = useState(false);
+
+  const product = pipeline.activeProduct;
+  const costs   = pipeline.costModel;
+  const brand   = pipeline.brandData;
+  const supplier = pipeline.selectedSupplier;
+
+  async function handleDownloadPDF() {
+    setBusy('pdf');
+    try {
+      const html  = generateReportHTML(pipeline);
+      const path  = `${FileSystem.documentDirectory}siftly-launch-report.html`;
+      await FileSystem.writeAsStringAsync(path, html, { encoding: FileSystem.EncodingType.UTF8 });
+      const canShare = await Sharing.isAvailableAsync();
+      if (canShare) {
+        await Sharing.shareAsync(path, { mimeType: 'text/html', dialogTitle: 'Save Launch Report' });
+      } else {
+        Alert.alert('Sharing unavailable', 'Cannot share files on this device.');
+      }
+    } catch (e: any) {
+      Alert.alert('Error', e?.message ?? 'Could not generate report.');
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  function handleEmail() {
+    setBusy('email');
+    const subject = encodeURIComponent(`Launch Report – ${product?.title ?? 'My FBA Product'}`);
+    const body    = encodeURIComponent(
+      `Hi,\n\nPlease find my FBA launch report attached.\n\nProduct: ${product?.title ?? '—'}\nNet Profit: $${costs?.netProfit?.toFixed(2) ?? '—'}/unit\nMargin: ${costs?.marginPct?.toFixed(1) ?? '—'}%\nBrand: ${brand?.brandName ?? '—'}\nSupplier: ${supplier?.name ?? '—'}\n\nGenerated by Siftly.`
+    );
+    Linking.openURL(`mailto:?subject=${subject}&body=${body}`).finally(() => setBusy(null));
+  }
+
+  function handleSaveVault() {
+    if (!product) return;
+    setBusy('vault');
+    const vaultProduct: Product = {
+      title:        product.title,
+      price:        product.price,
+      rating:       product.rating,
+      review_count: product.reviews,
+      asin:         `siftly-${Date.now()}`,
+      image:        '',
+      competition:  (product.competition as any) ?? 'Unknown',
+      opportunity:  costs && costs.marginPct >= 30 ? 'Good' : costs && costs.marginPct >= 20 ? 'Moderate' : 'Saturated',
+      url:          product.url ?? '',
+    };
+    const result = vault.addEntry(vaultProduct, null, 'US', 'USD');
+    setBusy(null);
+    if (result.success) {
+      setVaultSaved(true);
+      Alert.alert('Saved to Vault ✓', `${product.title} has been added to your Winner Vault.`);
+    } else {
+      Alert.alert('Could not save', result.reason === 'save_limit_reached' ? 'You have reached your vault limit. Upgrade to save more.' : 'Something went wrong.');
+    }
+  }
 
   return (
-    <View style={pcb.card}>
-      <Text style={pcb.heading}>Active Pipeline</Text>
-      {pipeline.activeNiche && (
-        <TouchableOpacity style={pcb.row} onPress={() => nav.navigate('Home' as never)}>
-          <Text style={pcb.icon}>🔍</Text>
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: DS.bgCanvas }}>
+        {/* Header */}
+        <View style={rp.header}>
           <View style={{ flex: 1 }}>
-            <Text style={pcb.label}>Niche</Text>
-            <Text style={pcb.value} numberOfLines={1}>{pipeline.activeNiche.keyword}</Text>
+            <Text style={rp.title}>Launch Report</Text>
+            <Text style={rp.subtitle}>{product?.title ?? 'Your Product'}</Text>
           </View>
-          <Text style={pcb.chevron}>›</Text>
-        </TouchableOpacity>
-      )}
-      {pipeline.activeProduct && (
-        <TouchableOpacity style={pcb.row} onPress={() => nav.navigate('Research' as never)}>
-          <Text style={pcb.icon}>📦</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={pcb.label}>Product</Text>
-            <Text style={pcb.value} numberOfLines={1}>{pipeline.activeProduct.title}</Text>
+          <TouchableOpacity onPress={onClose} style={rp.closeBtn}>
+            <Text style={rp.closeTxt}>✕</Text>
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView contentContainerStyle={rp.scroll} showsVerticalScrollIndicator={false}>
+
+          {/* Action buttons */}
+          <View style={rp.actions}>
+            <TouchableOpacity style={rp.actionBtn} onPress={handleDownloadPDF} activeOpacity={0.8} disabled={!!busy}>
+              {busy === 'pdf'
+                ? <ActivityIndicator color="#fff" size="small" />
+                : <><Text style={rp.actionIcon}>📄</Text><Text style={rp.actionLabel}>Download PDF</Text></>
+              }
+            </TouchableOpacity>
+            <TouchableOpacity style={[rp.actionBtn, rp.actionBtnSecondary]} onPress={handleEmail} activeOpacity={0.8} disabled={!!busy}>
+              {busy === 'email'
+                ? <ActivityIndicator color={DS.accent} size="small" />
+                : <><Text style={rp.actionIcon}>✉️</Text><Text style={[rp.actionLabel, { color: DS.accent }]}>Send Email</Text></>
+              }
+            </TouchableOpacity>
+            <TouchableOpacity style={[rp.actionBtn, vaultSaved ? rp.actionBtnSaved : rp.actionBtnSecondary]} onPress={handleSaveVault} activeOpacity={0.8} disabled={!!busy || vaultSaved || !product}>
+              {busy === 'vault'
+                ? <ActivityIndicator color={DS.accent} size="small" />
+                : <><Text style={rp.actionIcon}>{vaultSaved ? '✓' : '🏆'}</Text><Text style={[rp.actionLabel, { color: vaultSaved ? DS.accent : DS.accent }]}>{vaultSaved ? 'Saved!' : 'Save to Vault'}</Text></>
+              }
+            </TouchableOpacity>
           </View>
-          <Text style={pcb.chevron}>›</Text>
-        </TouchableOpacity>
-      )}
-      {pipeline.selectedSupplier && (
-        <TouchableOpacity style={pcb.row} onPress={() => nav.navigate('Sourcing' as never)}>
-          <Text style={pcb.icon}>🏭</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={pcb.label}>Supplier</Text>
-            <Text style={pcb.value} numberOfLines={1}>{pipeline.selectedSupplier.name} · ${pipeline.selectedSupplier.unitCost}/unit</Text>
+
+          {/* Report sections */}
+          {[
+            { title: '🎯 Market Research', rows: [
+              ['Niche', pipeline.activeNiche?.keyword],
+              ['Marketplace', pipeline.activeNiche?.marketplace],
+              ['Score', pipeline.activeNiche?.score ? `${pipeline.activeNiche.score}/100` : null],
+              ['Verdict', pipeline.activeNiche?.verdictLabel],
+            ]},
+            { title: '📦 Product', rows: [
+              ['Title', product?.title],
+              ['Price', product?.price ? `$${product.price}` : null],
+              ['Reviews', product?.reviews ? product.reviews.toLocaleString() : null],
+              ['Rating', product?.rating ? `${product.rating} ★` : null],
+              ['Competition', product?.competition],
+              ['Est. Sales', product?.salesEstLow ? `${product.salesEstLow}–${product.salesEstHigh} units/mo` : null],
+            ]},
+            { title: '🔬 Competitor Teardown', rows: [
+              ['Complaints found', pipeline.reconInsights?.complaints?.length ? `${pipeline.reconInsights.complaints.length} issues` : null],
+              ['Opportunities', pipeline.reconInsights?.opportunities?.length ? `${pipeline.reconInsights.opportunities.length} gaps` : null],
+            ]},
+            { title: '🏭 Supplier', rows: [
+              ['Name', supplier?.name],
+              ['Platform', supplier?.platform],
+              ['Unit Cost', supplier?.unitCost ? `$${supplier.unitCost}` : null],
+              ['MOQ', supplier?.moq ? `${supplier.moq} units` : null],
+              ['Lead Time', supplier?.leadTimeDays ? `${supplier.leadTimeDays} days` : null],
+              ['Country', supplier?.country],
+            ]},
+            { title: '🚢 Freight', rows: [
+              ['Mode', pipeline.freightEstimate?.selectedMode?.toUpperCase()],
+              ['Per Unit', pipeline.freightEstimate?.perUnitCost ? `$${pipeline.freightEstimate.perUnitCost}` : null],
+              ['Total', pipeline.freightEstimate?.totalCost ? `$${pipeline.freightEstimate.totalCost}` : null],
+              ['Origin', pipeline.freightEstimate?.originCountry],
+            ]},
+            { title: '💰 Financials', rows: [
+              ['Selling Price', costs?.sellingPrice ? `$${costs.sellingPrice.toFixed(2)}` : null],
+              ['Unit Cost', costs?.unitCost ? `$${costs.unitCost.toFixed(2)}` : null],
+              ['Freight / Unit', costs?.freight ? `$${costs.freight.toFixed(2)}` : null],
+              ['FBA Fee', costs?.fbaFee ? `$${costs.fbaFee.toFixed(2)}` : null],
+              ['Referral Fee', costs?.referralFee ? `$${costs.referralFee.toFixed(2)}` : null],
+              ['Net Profit / Unit', costs?.netProfit ? `$${costs.netProfit.toFixed(2)}` : null],
+              ['Margin', costs?.marginPct ? `${costs.marginPct.toFixed(1)}%` : null],
+              ['ROI', costs?.roiPct ? `${costs.roiPct.toFixed(1)}%` : null],
+              ['Units Ordered', costs?.unitsOrdered ? `${costs.unitsOrdered}` : null],
+              ['Total Investment', costs?.totalInvestment ? `$${costs.totalInvestment.toFixed(2)}` : null],
+            ]},
+            { title: '✦ Brand', rows: [
+              ['Brand Name', brand?.brandName],
+              ['Product Title', brand?.productTitle],
+              ['Tagline', brand?.tagline],
+              ['Style', brand?.style],
+              ['Keywords', brand?.keywords?.join(', ')],
+            ]},
+          ].map(section => {
+            const validRows = section.rows.filter(([, v]) => v);
+            if (!validRows.length) return null;
+            return (
+              <View key={section.title} style={rp.section}>
+                <Text style={rp.sectionTitle}>{section.title}</Text>
+                {validRows.map(([label, value]) => (
+                  <View key={label} style={rp.row}>
+                    <Text style={rp.rowLabel}>{label}</Text>
+                    <Text style={rp.rowValue}>{value}</Text>
+                  </View>
+                ))}
+              </View>
+            );
+          })}
+
+          {/* Supplier email template */}
+          {supplier && (
+            <View style={rp.section}>
+              <Text style={rp.sectionTitle}>✉️ Supplier Email Template</Text>
+              <View style={rp.emailBlock}>
+                <Text style={rp.emailText}>{`Subject: Product Inquiry – ${product?.title ?? 'Your Product'}
+
+Dear ${supplier.name} Team,
+
+I am interested in sourcing the following product and would like to discuss a potential partnership.
+
+Product: ${product?.title ?? 'As discussed'}
+Target Qty: ${costs?.unitsOrdered ?? 500} units (initial order)
+Target Unit Price: $${supplier.unitCost}
+MOQ: ${supplier.moq}
+
+Could you confirm:
+1. Availability and lead time
+2. Sample availability and cost
+3. Customisation options (packaging, labelling)
+4. Payment terms
+
+Looking forward to hearing from you.
+
+Best regards,
+${brand?.brandName ?? 'Our Brand'}`}</Text>
+              </View>
+            </View>
+          )}
+
+        </ScrollView>
+      </SafeAreaView>
+    </Modal>
+  );
+}
+
+const rp = StyleSheet.create({
+  header:              { flexDirection: 'row', alignItems: 'flex-start', padding: 20, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: DS.border },
+  title:               { fontSize: 20, fontWeight: '800', color: DS.textPrimary, letterSpacing: -0.4 },
+  subtitle:            { fontSize: 13, color: DS.textMuted, marginTop: 2 },
+  closeBtn:            { width: 32, height: 32, borderRadius: 16, backgroundColor: DS.bgCanvas, alignItems: 'center', justifyContent: 'center' },
+  closeTxt:            { fontSize: 14, color: DS.textMuted, fontWeight: '600' },
+  scroll:              { padding: 20, gap: 16, paddingBottom: 48 },
+  actions:             { flexDirection: 'row', gap: 10 },
+  actionBtn:           { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: DS.accent, borderRadius: DS.radiusButton, paddingVertical: 13 },
+  actionBtnSecondary:  { backgroundColor: DS.bgCard, borderWidth: 1, borderColor: DS.border },
+  actionBtnSaved:      { backgroundColor: DS.accent + '18', borderWidth: 1, borderColor: DS.accent + '44' },
+  actionIcon:          { fontSize: 14 },
+  actionLabel:         { fontSize: 12, fontWeight: '800', color: '#fff' },
+  section:             { backgroundColor: DS.bgCard, borderRadius: DS.radiusCard, borderWidth: 1, borderColor: DS.border, overflow: 'hidden' },
+  sectionTitle:        { fontSize: 12, fontWeight: '800', color: DS.textMuted, letterSpacing: 0.8, textTransform: 'uppercase', paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: DS.border },
+  row:                 { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingHorizontal: 16, paddingVertical: 10, borderTopWidth: 1, borderTopColor: DS.border },
+  rowLabel:            { fontSize: 13, color: DS.textSecondary, fontWeight: '500', flex: 1 },
+  rowValue:            { fontSize: 13, color: DS.textPrimary, fontWeight: '700', flex: 1, textAlign: 'right' },
+  emailBlock:          { margin: 12, backgroundColor: DS.bgCanvas, borderRadius: DS.radiusChip, padding: 14 },
+  emailText:           { fontSize: 12, color: DS.textSecondary, lineHeight: 20, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' },
+});
+
+// ─── FBA Launch Journey (lifecycle + checklist, unified) ─────────────────────
+
+const JOURNEY_PHASES = [
+  {
+    key:   'research',
+    icon:  '🎯',
+    label: 'Research',
+    tip:   'Validate demand and competition before spending a dollar. Look for niches with steady search volume, under 300 reviews on top listings, and a price point above $25.',
+    steps: [
+      { key: 'niche',   icon: '🔍', label: 'Pick a Niche',         tab: 'Home'     as keyof TabParamList | null },
+      { key: 'product', icon: '📦', label: 'Research a Product',   tab: 'Research' as keyof TabParamList | null },
+      { key: 'recon',   icon: '🔬', label: 'Teardown Competitors', tab: 'Research' as keyof TabParamList | null },
+    ],
+  },
+  {
+    key:   'source',
+    icon:  '🏭',
+    label: 'Source',
+    tip:   'Contact at least 5 suppliers on Alibaba. Ask for samples before committing. Negotiate MOQ down — most manufacturers will go lower than their listing. Target landed cost under 25% of selling price.',
+    steps: [
+      { key: 'supplier', icon: '🏭', label: 'Find a Supplier',  tab: 'Sourcing' as keyof TabParamList | null },
+      { key: 'freight',  icon: '🚢', label: 'Estimate Freight', tab: 'Sourcing' as keyof TabParamList | null },
+    ],
+  },
+  {
+    key:   'profit',
+    icon:  '💰',
+    label: 'Profit',
+    tip:   'Model your numbers before ordering. Target 30%+ margin after all FBA fees. If the margin is under 20%, renegotiate your unit cost or find a higher price point — not the other way around.',
+    steps: [
+      { key: 'costs', icon: '💰', label: 'Calculate Profit', tab: 'Profit' as keyof TabParamList | null },
+    ],
+  },
+  {
+    key:   'brand',
+    icon:  '✦',
+    label: 'Brand',
+    tip:   'Your brand name and listing are your first impression. Lead the title with your primary keyword. Run auto PPC from day one and aim for 10–15 reviews in the first 30 days via Vine or follow-up.',
+    steps: [
+      { key: 'brand',    icon: '✦',  label: 'Create Your Brand',    tab: 'Brand' as keyof TabParamList | null },
+      { key: 'decision', icon: '📋', label: 'Save Launch Decision', tab: null },
+    ],
+  },
+  {
+    key:   'scale',
+    icon:  '📈',
+    label: 'Scale',
+    tip:   'Once ranked and cash-flow positive, expand with variations or complementary SKUs. Enrol in Brand Registry, build a storefront, and push external traffic via social or influencers to lower your ACoS.',
+    steps: [],
+  },
+];
+
+function getStepSubtitle(key: string, p: ReturnType<typeof usePipeline>): string {
+  switch (key) {
+    case 'niche':    return p.activeNiche?.keyword ?? '';
+    case 'product':  return p.activeProduct?.title ?? '';
+    case 'recon':    return `${p.reconInsights?.complaints?.length ?? 0} review complaints found`;
+    case 'supplier': return p.selectedSupplier ? `${p.selectedSupplier.name} · $${p.selectedSupplier.unitCost}/unit` : '';
+    case 'freight':  return p.freightEstimate ? `$${p.freightEstimate.perUnitCost}/unit · ${p.freightEstimate.selectedMode}` : '';
+    case 'costs':    return p.costModel ? `${p.costModel.marginPct.toFixed(0)}% margin · $${p.costModel.netProfit.toFixed(2)}/unit profit` : '';
+    case 'brand':    return p.brandData?.brandName ?? '';
+    case 'decision': return 'All steps complete — view your verdict';
+    default:         return '';
+  }
+}
+
+function LaunchPipelineCard({ onNichePress }: { onNichePress?: () => void }) {
+  const pipeline = usePipeline();
+  const nav      = useNavigation<Nav>();
+  const [infoOpen,   setInfoOpen]   = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+
+  function handleClearJourney() {
+    Alert.alert(
+      'Start Over?',
+      'This will clear all your current journey progress — niche, product, supplier, costs, and brand. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Start Over', style: 'destructive', onPress: () => pipeline.clearPipeline() },
+      ],
+    );
+  }
+
+  const stepDone: Record<string, boolean> = {
+    niche:    !!pipeline.activeNiche,
+    product:  !!pipeline.activeProduct,
+    recon:    !!pipeline.reconInsights,
+    supplier: !!pipeline.selectedSupplier,
+    freight:  !!pipeline.freightEstimate,
+    costs:    !!pipeline.costModel,
+    brand:    !!pipeline.brandData,
+  };
+  const allMainDone = Object.values(stepDone).every(Boolean);
+  const completionMap: Record<string, boolean> = { ...stepDone, decision: allMainDone };
+
+  const totalSteps     = Object.keys(completionMap).length;
+  const completedSteps = Object.values(completionMap).filter(Boolean).length;
+  const allDone        = completedSteps === totalSteps;
+  const pct            = completedSteps / totalSteps;
+
+  function phaseStatus(phase: typeof JOURNEY_PHASES[number]): 'done' | 'active' | 'upcoming' {
+    if (phase.steps.length === 0) return 'upcoming';
+    const keys = phase.steps.map(s => s.key);
+    if (keys.every(k => completionMap[k])) return 'done';
+    if (keys.some(k => completionMap[k]))  return 'active';
+    return 'upcoming';
+  }
+
+  const phaseStatuses = JOURNEY_PHASES.map(phaseStatus);
+  const currentPhaseIdx = phaseStatuses.findIndex(s => s !== 'done');
+
+  const activeIdx = currentPhaseIdx === -1 ? 0 : currentPhaseIdx;
+
+  const [expanded, setExpanded] = useState<Record<string, boolean>>(() => {
+    const init: Record<string, boolean> = {};
+    JOURNEY_PHASES.forEach((p, i) => { init[p.key] = i === activeIdx; });
+    return init;
+  });
+
+  useEffect(() => {
+    setExpanded(prev => {
+      const next: Record<string, boolean> = {};
+      JOURNEY_PHASES.forEach((p, i) => { next[p.key] = prev[p.key] ?? (i === activeIdx); });
+      next[JOURNEY_PHASES[activeIdx].key] = true;
+      return next;
+    });
+  }, [activeIdx]);
+
+  function togglePhase(key: string) {
+    setExpanded(prev => ({ ...prev, [key]: !prev[key] }));
+  }
+
+  function handleStepPress(step: { key: string; tab: keyof TabParamList | null }) {
+    if (step.key === 'decision') { nav.navigate('LaunchDecision' as never); return; }
+    if (step.key === 'niche') { onNichePress?.(); return; }
+    if (step.tab) nav.navigate(step.tab as never);
+  }
+
+  return (
+    <View style={lp.card}>
+      {/* ── Card header ── */}
+      <View style={lp.cardHeader}>
+        <View style={{ flex: 1, gap: 6 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Text style={lp.cardTitle}>FBA Launch Journey</Text>
+            <TouchableOpacity onPress={() => setInfoOpen(o => !o)} activeOpacity={0.7} style={lp.infoBtn}>
+              <Text style={lp.infoBtnTxt}>{infoOpen ? '✕' : 'ℹ'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleClearJourney} activeOpacity={0.7} style={lp.clearBtn}>
+              <Text style={lp.clearBtnTxt}>Start Over</Text>
+            </TouchableOpacity>
           </View>
-          <Text style={pcb.chevron}>›</Text>
-        </TouchableOpacity>
-      )}
-      {pipeline.costModel && (
-        <View style={[pcb.row, { borderBottomWidth: 0 }]}>
-          <Text style={pcb.icon}>💰</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={pcb.label}>Cost Model</Text>
-            <Text style={pcb.value}>${pipeline.costModel.netProfit.toFixed(2)}/unit profit · {pipeline.costModel.marginPct.toFixed(0)}% margin</Text>
+          {/* Phase dots */}
+          <View style={lp.dotsRow}>
+            {JOURNEY_PHASES.map((p, i) => {
+              const st = phaseStatuses[i];
+              return (
+                <View key={p.key} style={[
+                  lp.dot,
+                  st === 'done'    && lp.dotDone,
+                  st === 'active'  && lp.dotActive,
+                  st === 'upcoming'&& lp.dotUpcoming,
+                ]}>
+                  {st === 'done' && <Text style={lp.dotCheck}>✓</Text>}
+                </View>
+              );
+            })}
           </View>
         </View>
+        <View style={[lp.pill, { backgroundColor: DS.accent + '18', borderColor: DS.accent + '44' }]}>
+          <Text style={[lp.pillText, { color: DS.accent }]}>
+            {allDone ? '✓ Ready' : `${completedSteps}/${totalSteps}`}
+          </Text>
+        </View>
+      </View>
+
+      {/* ── Collapsible info ── */}
+      {infoOpen && (
+        <View style={lp.infoBanner}>
+          <Text style={lp.infoText}>
+            The FBA Launch Journey guides you through every step of launching an Amazon product — from finding a profitable niche, validating demand, locking in a supplier, modelling your numbers, and building your brand, all the way to a documented launch decision.{'\n\n'}
+            Complete all 5 phases to unlock your full Launch Report — a downloadable PDF with every calculation, supplier details, a ready-to-send supplier email, and your brand assets in one place.
+          </Text>
+        </View>
       )}
+
+      {/* ── Phases — only show done/active; upcoming are hidden until reached ── */}
+      {JOURNEY_PHASES
+        .map((phase, phaseIdx) => ({ phase, phaseIdx, status: phaseStatuses[phaseIdx] }))
+        .filter(({ status, phaseIdx }) => status !== 'upcoming' || phaseIdx === activeIdx)
+        .map(({ phase, phaseIdx, status }) => {
+        const isCurrent  = phaseIdx === currentPhaseIdx;
+        const isExpanded = expanded[phase.key] ?? false;
+        const isScale    = phase.steps.length === 0;
+
+        const accentColor = status === 'done' ? DS.accent : status === 'active' ? DS.accent : DS.textMuted;
+        const bgColor     = status === 'done' ? DS.accent + '08' : status === 'active' ? DS.accent + '08' : 'transparent';
+
+        return (
+          <View key={phase.key} style={[lp.phaseOuter, phaseIdx > 0 && lp.phaseBorder]}>
+
+            {/* Phase content */}
+            <View style={[{ flex: 1, backgroundColor: bgColor }]}>
+              <TouchableOpacity style={lp.phaseHeader} onPress={() => togglePhase(phase.key)} activeOpacity={0.72}>
+                <View style={[lp.phaseIconWrap, { backgroundColor: accentColor + '22' }]}>
+                  <Text style={lp.phaseIcon}>{phase.icon}</Text>
+                </View>
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Text style={[lp.phaseLabel, { color: accentColor }]}>{phase.label}</Text>
+                  {!isScale && (
+                    <Text style={lp.phaseCount}>
+                      {phase.steps.filter(s => completionMap[s.key]).length} / {phase.steps.length} done
+                    </Text>
+                  )}
+                  {isScale && <Text style={lp.phaseCount}>Your next chapter</Text>}
+                </View>
+                {isCurrent && !isScale && (
+                  <Text style={lp.hereText}>YOU ARE HERE</Text>
+                )}
+                <Text style={[lp.chevron, { color: accentColor }]}>{isExpanded ? '⌄' : '›'}</Text>
+              </TouchableOpacity>
+
+            {/* Expanded content */}
+            {isExpanded && (
+              <View style={lp.phaseBody}>
+                {/* Tip */}
+                <View style={lp.tipRow}>
+                  <Text style={lp.tipText}>{phase.tip}</Text>
+                </View>
+
+                {/* Steps */}
+                {phase.steps.map((step, stepIdx) => {
+                  const done = completionMap[step.key] ?? false;
+                  const sub  = done ? getStepSubtitle(step.key, pipeline) : '';
+                  return (
+                    <TouchableOpacity
+                      key={step.key}
+                      style={[lp.stepRow, stepIdx === 0 && lp.stepRowFirst]}
+                      onPress={() => handleStepPress(step)}
+                      activeOpacity={0.72}
+                    >
+                      <View style={[lp.dot, { backgroundColor: done ? DS.accent : DS.border }]}>
+                        {done
+                          ? <Text style={lp.dotCheck}>✓</Text>
+                          : <Text style={[lp.dotNum, { color: DS.textMuted }]}>{stepIdx + 1}</Text>
+                        }
+                      </View>
+                      <View style={{ flex: 1, gap: 1 }}>
+                        <Text style={[lp.stepLabel, done && lp.stepLabelDone]}>{step.icon}  {step.label}</Text>
+                        {!!sub && <Text style={lp.stepSub} numberOfLines={1}>{sub}</Text>}
+                      </View>
+                      <Text style={[lp.stepArrow, { color: done ? DS.accent : DS.textMuted }]}>›</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
+            </View>
+          </View>
+        );
+      })}
+
+      {/* ── CTAs when all done ── */}
+      {allDone && (
+        <View style={lp.ctaRow}>
+          <TouchableOpacity style={[lp.cta, { flex: 1 }]} onPress={() => nav.navigate('LaunchDecision' as never)} activeOpacity={0.85}>
+            <Text style={lp.ctaText}>🚀  Launch Decision</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[lp.cta, lp.ctaReport]} onPress={() => setReportOpen(true)} activeOpacity={0.85}>
+            <Text style={lp.ctaText}>📄  Full Report</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      <LaunchReportModal visible={reportOpen} onClose={() => setReportOpen(false)} />
     </View>
   );
 }
 
-const pcb = StyleSheet.create({
-  card:    { backgroundColor: DS.bgCard, borderRadius: DS.radiusCard, borderWidth: 1, borderColor: DS.border, padding: DS.cardPadding, gap: 0 },
-  heading: { fontSize: 13, fontWeight: '700', color: DS.textPrimary, marginBottom: 8, letterSpacing: 0.3 },
-  row:     { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: DS.border },
-  icon:    { fontSize: 16, width: 24, textAlign: 'center' },
-  label:   { fontSize: 10, color: DS.textMuted, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
-  value:   { fontSize: 13, color: DS.textPrimary, fontWeight: '500', marginTop: 1 },
-  chevron: { fontSize: 18, color: DS.textMuted },
+const lp = StyleSheet.create({
+  card:           { backgroundColor: DS.bgCard, borderRadius: DS.radiusCard, borderWidth: 1, borderColor: DS.border, overflow: 'hidden' },
+  cardHeader:     { flexDirection: 'row', alignItems: 'center', gap: 10, padding: DS.cardPadding, paddingBottom: 12 },
+  cardTitle:      { fontSize: 15, fontWeight: '800', color: DS.textPrimary, letterSpacing: -0.3 },
+  cardSubtitle:   { fontSize: 11, color: DS.textMuted, fontWeight: '500' },
+  pill:           { borderRadius: DS.radiusBadge, borderWidth: 1, paddingHorizontal: 9, paddingVertical: 3 },
+  pillText:       { fontSize: 11, fontWeight: '800', letterSpacing: 0.4 },
+  phaseOuter:     {},
+  phaseBorder:    { borderTopWidth: 1, borderTopColor: DS.border },
+  dotsRow:        { flexDirection: 'row', gap: 6, alignItems: 'center' },
+  dot:            { width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  dotDone:        { backgroundColor: DS.accent },
+  dotActive:      { backgroundColor: DS.accent + '33', borderWidth: 2, borderColor: DS.accent },
+  dotUpcoming:    { backgroundColor: DS.border },
+  dotCheck:       { fontSize: 11, fontWeight: '900', color: '#fff' },
+  dotNum:         { fontSize: 10, fontWeight: '800', color: '#fff' },
+  hereText:       { fontSize: 11, fontWeight: '900', color: DS.accent, letterSpacing: 0.4 },
+  phaseHeader:    { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, paddingHorizontal: DS.cardPadding },
+  phaseIconWrap:  { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
+  phaseIcon:      { fontSize: 18 },
+  phaseLabel:     { fontSize: 14, fontWeight: '800', letterSpacing: -0.2 },
+  phaseCount:     { fontSize: 11, color: DS.textMuted, fontWeight: '500' },
+  chevron:        { fontSize: 18, fontWeight: '700' },
+  phaseBody:      { paddingBottom: 14, paddingHorizontal: DS.cardPadding, gap: 0 },
+  tipRow:         { backgroundColor: DS.bgSubtle ?? DS.bgCanvas, borderRadius: DS.radiusChip, padding: 12, marginBottom: 10 },
+  tipText:        { fontSize: 12, color: DS.textSecondary, lineHeight: 18 },
+  stepRow:        { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, borderTopWidth: 1, borderTopColor: DS.border },
+  stepRowFirst:   { borderTopWidth: 0 },
+  stepLabel:      { fontSize: 13, fontWeight: '600', color: DS.textPrimary },
+  stepLabelDone:  { color: DS.textSecondary },
+  stepSub:        { fontSize: 11, color: DS.textMuted, fontWeight: '500' },
+  stepArrow:      { fontSize: 20 },
+  infoBtn:        { width: 22, height: 22, borderRadius: 11, backgroundColor: DS.accent + '18', borderWidth: 1, borderColor: DS.accent + '44', alignItems: 'center', justifyContent: 'center' },
+  infoBtnTxt:     { fontSize: 11, fontWeight: '800', color: DS.accent },
+  clearBtn:       { marginLeft: 'auto' as any, paddingHorizontal: 10, paddingVertical: 4, borderRadius: DS.radiusBadge, borderWidth: 1, borderColor: DS.danger + '40', backgroundColor: DS.danger + '08' },
+  clearBtnTxt:    { fontSize: 10, fontWeight: '700', color: DS.danger },
+  infoBanner:     { backgroundColor: DS.bgCanvas, borderTopWidth: 1, borderTopColor: DS.border, padding: DS.cardPadding },
+  infoText:       { fontSize: 13, color: DS.textSecondary, lineHeight: 20 },
+  ctaRow:         { flexDirection: 'row', gap: 10, margin: DS.cardPadding, marginTop: 4 },
+  cta:            { backgroundColor: DS.accent, borderRadius: DS.radiusButton, paddingVertical: 15, alignItems: 'center' },
+  ctaReport:      { backgroundColor: DS.accent + 'CC' },
+  ctaText:        { fontSize: 13, fontWeight: '800', color: '#fff', letterSpacing: -0.2 },
 });
+
+// ─── Pipeline Context Banner ──────────────────────────────────────────────────
+
 
 // ─── Copilot Screen ───────────────────────────────────────────────────────────
 
@@ -1292,13 +1890,13 @@ function TrendingProducts({ onPick }: { onPick: () => void }) {
 
 const tp = StyleSheet.create({
   wrap:       { gap: 10 },
-  header:     { fontSize: 10, fontWeight: '800', color: DS.textMuted, letterSpacing: 1.2 },
+  header:     { fontSize: 10, fontWeight: '800', color: DS.textMuted, letterSpacing: 1.2, textTransform: 'uppercase' },
   row:        { gap: 10, paddingRight: 4 },
-  card:       { width: 150, backgroundColor: DS.bgCard, borderRadius: DS.radiusCard, borderWidth: 1, borderColor: DS.border, padding: 12, gap: 8 },
+  card:       { width: 152, backgroundColor: DS.bgCard, borderRadius: DS.radiusCard, borderWidth: 1, borderColor: DS.border, padding: 12, gap: 8 },
   cardTop:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  img:        { width: 40, height: 40, borderRadius: 8, backgroundColor: DS.bgSubtle },
-  icon:       { fontSize: 24 },
-  name:       { fontSize: 13, fontWeight: '700', color: DS.textPrimary, lineHeight: 17, minHeight: 34 },
+  img:        { width: 44, height: 44, borderRadius: 10, backgroundColor: DS.bgSubtle },
+  icon:       { fontSize: 26 },
+  name:       { fontSize: 12, fontWeight: '700', color: DS.textPrimary, lineHeight: 17, minHeight: 34 },
   stats:      { flexDirection: 'row', alignItems: 'center', gap: 5 },
   stat:       { fontSize: 11, fontWeight: '600', color: DS.textSecondary },
   statDot:    { fontSize: 11, color: DS.textMuted },
@@ -1307,16 +1905,15 @@ const tp = StyleSheet.create({
 });
 
 export function HomeScreen() {
-  const { vault, activeSession, reloadVault } = useBuilderSession();
-  const { isOnline }                          = useNetworkStatus();
-  const { devMode, usage, remaining, isFree } = useSubscription();
-  const tapCount                              = useRef(0);
-  const tapTimer                              = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { vault, reloadVault }                 = useBuilderSession();
+  const { isOnline }                           = useNetworkStatus();
+  const { devMode, usage, remaining, isFree }  = useSubscription();
+  const tapCount                               = useRef(0);
+  const tapTimer                               = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scrollRef                              = useRef<ScrollView>(null);
 
-  // Modal state lifted here so the launchpad's hero can trigger the
-  // existing AI tools directly (Get a Verdict, Discover).
-  const [showAnalyze,  setShowAnalyze]  = useState(false);
-  const [showOpps,     setShowOpps]     = useState(false);
+  const [showAnalyze,       setShowAnalyze]       = useState(false);
+  const [nicheFocusTrigger, setNicheFocusTrigger] = useState(0);
 
   useFocusEffect(useCallback(() => { reloadVault(); }, [reloadVault]));
 
@@ -1341,7 +1938,7 @@ export function HomeScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: DS.bgCanvas }}>
-      <AppHeader helpKey="copilot" />
+      <AppHeader helpKey="copilot" hideJourneyStrip />
       <OfflineBanner visible={!isOnline} />
       {devMode && (
         <TouchableOpacity onPress={handleSecretTap} activeOpacity={0.8}>
@@ -1366,74 +1963,30 @@ export function HomeScreen() {
 
         {/* ── Discover engine: the full Niche screen, embedded ── */}
         <Text style={hl.sectionLabel}>DON'T HAVE ONE YET? EXPLORE A MARKET TO FIND ONE ↓</Text>
-        <FeatureExplainer text="Search any category or keyword and Siftly scores the whole market — demand, competition, and the gap you could fill. Use this when you don't have a product yet; use 'Get a Verdict' below when you already have one in mind." />
-        <NicheResearchScreen embedded />
+        <FeatureExplainer text="Search any category or keyword and Siftly scores the whole market — demand, competition, and the gap you could fill." />
+        <NicheResearchScreen embedded focusTrigger={nicheFocusTrigger} />
 
-        {/* ── HERO: get a verdict on a specific product ── */}
-        <View style={hl.hero}>
-          <Text style={hl.heroEyebrow}>GOT A PRODUCT IN MIND?</Text>
-          <Text style={hl.heroTitle}>Should I sell this?</Text>
-          <Text style={hl.heroSub}>
-            Search any product by name — get an instant Launch / Test / Avoid verdict based on the top match.
-          </Text>
-          <TouchableOpacity
-            style={hl.heroBtn}
-            onPress={() => setShowAnalyze(true)}
-            activeOpacity={0.85}
-            accessibilityRole="button"
-            accessibilityLabel="Get a verdict on a product"
-          >
-            <Text style={hl.heroBtnTxt}>🔍  Get a Verdict →</Text>
-          </TouchableOpacity>
-        </View>
+        {/* ── Launch checklist ── */}
+        <Text style={hl.sectionLabel}>YOUR LAUNCH CHECKLIST</Text>
+        <LaunchPipelineCard onNichePress={() => {
+          scrollRef.current?.scrollTo({ y: 0, animated: true });
+          setTimeout(() => setNicheFocusTrigger(t => t + 1), 200);
+        }} />
 
         {/* ── Trending products feed ── */}
         <TrendingProducts onPick={() => setShowAnalyze(true)} />
 
-        {/* ── Returning-user context (each self-hides when empty) ── */}
-        {activeSession && <ActiveProductCard session={activeSession} />}
-        <PipelineContextBanner />
+        {/* ── Winner vault ── */}
         <WinnerVaultCard vault={vault} />
 
-        {/* ── AI tool modals (reused) ── */}
         <AnalyzeProductModal visible={showAnalyze} onClose={() => setShowAnalyze(false)} />
-        <FindOpportunitiesModal visible={showOpps} onClose={() => setShowOpps(false)} />
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const hl = StyleSheet.create({
-  hero: {
-    backgroundColor: DS.accent,
-    borderRadius:    DS.radiusHero,
-    padding:         20,
-    gap:             8,
-  },
-  heroEyebrow: { fontSize: 10, fontWeight: '800', color: DS.textInverse, letterSpacing: 2, opacity: 0.85 },
-  heroTitle:   { fontSize: 23, fontWeight: '900', color: DS.textInverse, letterSpacing: -0.6, lineHeight: 28 },
-  heroSub:     { fontSize: 13, color: DS.textInverse, opacity: 0.9, lineHeight: 19 },
-  heroBtn: {
-    backgroundColor: DS.bgCard,
-    borderRadius:    DS.radiusButton,
-    paddingVertical: 14,
-    alignItems:      'center',
-    marginTop:       6,
-  },
-  heroBtnTxt: { fontSize: 15, fontWeight: '800', color: DS.accent, letterSpacing: -0.2 },
-
-  discoverSection: { gap: 10 },
-  sectionLabel:    { fontSize: 10, fontWeight: '800', color: DS.textMuted, letterSpacing: 1.2 },
-  chipGrid:        { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: DS.bgCard, borderRadius: DS.radiusBadge,
-    borderWidth: 1, borderColor: DS.border,
-    paddingHorizontal: 12, paddingVertical: 9,
-  },
-  chipIcon:     { fontSize: 14 },
-  chipLabel:    { fontSize: 12, fontWeight: '600', color: DS.textSecondary },
-  discoverMore: { fontSize: 13, fontWeight: '700', color: DS.accent, marginTop: 2 },
+  sectionLabel: { fontSize: 10, fontWeight: '800', color: DS.textMuted, letterSpacing: 1.2, textTransform: 'uppercase' },
 });
 
 // ─── Copilot Screen (pure AI tools — navigated from header) ──────────────────
@@ -1444,7 +1997,7 @@ export default function CopilotScreen() {
   const intelProfile    = useProductIntelligence();
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: DS.bgCanvas }}>
-      <AppHeader helpKey="copilot" />
+      <AppHeader helpKey="copilot" hideJourneyStrip />
       {navigation.canGoBack() && (
         <TouchableOpacity style={s.backBar} onPress={() => navigation.goBack()} activeOpacity={0.7}>
           <Text style={s.backTxt}>← Back</Text>
@@ -1490,7 +2043,7 @@ const s = StyleSheet.create({
     borderBottomColor: DS.border,
   },
   backTxt:        { fontSize: 13, fontWeight: '700', color: DS.accent },
-  scroll:         { paddingHorizontal: 20, paddingTop: 14, paddingBottom: 40, gap: 20 },
+  scroll:         { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 40, gap: 16 },
   copilotHeader:  { gap: 4 },
   copilotTitle:   { fontSize: 26, fontWeight: '900', color: DS.textPrimary, letterSpacing: -0.5 },
   copilotSub:     { fontSize: 14, color: DS.textSecondary, lineHeight: 20 },
