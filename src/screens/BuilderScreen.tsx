@@ -22,7 +22,7 @@ import { track } from '../lib/analytics';
 
 const STAGE_ACCENT: Record<BuilderStage, string> = {
   discovery:    DS.info,
-  analysis:     DS.indigo,
+  analysis:     DS.accent,
   supplier:     DS.accent,
   freight:      DS.warning,
   calculations: DS.successText,
@@ -60,7 +60,7 @@ const f = StyleSheet.create({
   inputMulti: { height: 100, textAlignVertical: 'top' },
 });
 
-function Btn({ label, onPress, color = DS.indigo, loading = false, disabled = false, outline = false }: {
+function Btn({ label, onPress, color = DS.accent, loading = false, disabled = false, outline = false }: {
   label: string; onPress: () => void; color?: string;
   loading?: boolean; disabled?: boolean; outline?: boolean;
 }) {
@@ -284,7 +284,7 @@ function StageAnalysis({ session, onComplete }: {
 
   if (loading) return (
     <View style={{ alignItems: 'center', paddingVertical: 32, gap: 12 }}>
-      <ActivityIndicator color={DS.indigo} size="large" />
+      <ActivityIndicator color={DS.accent} size="large" />
       <Text style={{ color: DS.textSecondary, fontSize: 13 }}>Running AI analysis...</Text>
     </View>
   );
@@ -292,7 +292,7 @@ function StageAnalysis({ session, onComplete }: {
   if (error) return (
     <View style={{ gap: 12 }}>
       <Text style={{ color: DS.danger, fontSize: 13 }}>{error}</Text>
-      <Btn label="Retry" color={DS.indigo} onPress={runAnalysis} />
+      <Btn label="Retry" color={DS.accent} onPress={runAnalysis} />
     </View>
   );
 
@@ -441,7 +441,7 @@ function StageSupplier({ session, onComplete }: {
           : (s.supplier ?? '').toLowerCase().includes('dhgate') ? DS.info
           : DS.textMuted;
         const platformBg = (s.supplier ?? '').toLowerCase().includes('alibaba') ? DS.warningBg
-          : (s.supplier ?? '').toLowerCase().includes('dhgate') ? '#EFF6FF'
+          : (s.supplier ?? '').toLowerCase().includes('dhgate') ? DS.accentLight
           : DS.bgElevated;
 
         return (
@@ -1302,7 +1302,7 @@ export default function BuilderScreen() {
   if (!loaded) {
     return (
       <SafeAreaView style={bs.safe}>
-        <ActivityIndicator style={{ flex: 1 }} color={DS.indigo} />
+        <ActivityIndicator style={{ flex: 1 }} color={DS.accent} />
       </SafeAreaView>
     );
   }
@@ -1446,7 +1446,7 @@ const sc = StyleSheet.create({
     backgroundColor: DS.bgCard, borderRadius: 16, borderWidth: 1.5, borderColor: DS.border,
     overflow: 'hidden',
   },
-  cardPassed: { borderColor: DS.successText + '50', backgroundColor: '#F0FDF4' },
+  cardPassed: { borderColor: DS.successText + '50', backgroundColor: DS.successBg },
   cardLocked: { opacity: 0.5 },
 
   header:   { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16 },
@@ -1459,7 +1459,7 @@ const sc = StyleSheet.create({
   summary:     { paddingHorizontal: 16, paddingBottom: 14, gap: 3 },
   summaryTxt:  { fontSize: 13, fontWeight: '700', color: DS.textPrimary },
   summaryMeta: { fontSize: 12, color: DS.textSecondary, lineHeight: 18 },
-  goBack:      { fontSize: 11, color: DS.indigo, fontWeight: '700', marginTop: 6 },
+  goBack:      { fontSize: 11, color: DS.accent, fontWeight: '700', marginTop: 6 },
 
   expandedContent: { paddingHorizontal: 16, paddingBottom: 16, gap: 0 },
   activeContent:   { paddingHorizontal: 16, paddingBottom: 16 },
@@ -1470,11 +1470,11 @@ const sc = StyleSheet.create({
 const stg = StyleSheet.create({
   eyebrow: { fontSize: 9, fontWeight: '800', letterSpacing: 1.5, textTransform: 'uppercase', color: DS.textMuted },
 
-  searchBtn:    { width: 48, height: 48, backgroundColor: DS.indigo, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  searchBtn:    { width: 48, height: 48, backgroundColor: DS.accent, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   searchBtnTxt: { fontSize: 18, color: '#fff', fontWeight: '700' },
 
   resultCard:    { borderRadius: 16, borderWidth: 1.5, borderColor: DS.border, backgroundColor: DS.bgCard, padding: 14, gap: 4 },
-  resultCardSel: { borderColor: DS.indigo },
+  resultCardSel: { borderColor: DS.accent },
   resultTitle:   { fontSize: 14, fontWeight: '700', color: DS.textPrimary, flex: 1, lineHeight: 20 },
   resultMeta:    { fontSize: 12, color: DS.textSecondary },
   resultBadge:   { borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3 },
@@ -1533,27 +1533,27 @@ const bs = StyleSheet.create({
 
   header:          { paddingHorizontal: 20, paddingTop: 10, paddingBottom: 12, gap: 3, backgroundColor: DS.bgCard, borderBottomWidth: 1, borderBottomColor: DS.border },
   headerTop:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  eyebrow:         { fontSize: 9, fontWeight: '800', color: DS.indigo, letterSpacing: 2.5 },
+  eyebrow:         { fontSize: 9, fontWeight: '800', color: DS.accent, letterSpacing: 2.5 },
   heroTitle:       { fontSize: 20, fontWeight: '900', color: DS.textPrimary, letterSpacing: -0.6 },
   heroSub:         { fontSize: 13, color: DS.textSecondary, lineHeight: 18 },
   abandonBtn:      { paddingHorizontal: 10, paddingVertical: 4 },
   abandonTxt:      { fontSize: 12, fontWeight: '700', color: DS.textMuted },
   progressTrack:   { height: 4, backgroundColor: DS.bgElevated, borderRadius: 2, overflow: 'hidden', marginTop: 6 },
-  progressFill:    { height: 4, backgroundColor: DS.indigo, borderRadius: 2 },
+  progressFill:    { height: 4, backgroundColor: DS.accent, borderRadius: 2 },
 
   emptyContent: { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 60, alignItems: 'center', gap: 20 },
 
   heroOrb:        { alignItems: 'center', gap: 12 },
   heroOrbInner:   {
     width: 80, height: 80, borderRadius: 26,
-    backgroundColor: DS.indigoLight,
+    backgroundColor: DS.accentLight,
     borderWidth: 1.5, borderColor: DS.accent + '35',
     alignItems: 'center', justifyContent: 'center',
     shadowColor: DS.accent, shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.14, shadowRadius: 16, elevation: 4,
   },
   heroOrbIcon:  { fontSize: 38, color: DS.accent },
-  heroCaption:  { fontSize: 9, fontWeight: '800', color: DS.indigo, letterSpacing: 2.5 },
+  heroCaption:  { fontSize: 9, fontWeight: '800', color: DS.accent, letterSpacing: 2.5 },
 
   stepsPreview: { alignSelf: 'stretch', gap: 0, backgroundColor: DS.bgCard, borderRadius: 16, borderWidth: 1, borderColor: DS.border, overflow: 'hidden' },
   stepRow:      { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: DS.border },
@@ -1562,7 +1562,7 @@ const bs = StyleSheet.create({
   stepLabel:    { fontSize: 14, fontWeight: '600', color: DS.textPrimary },
   stepIcon:     { fontSize: 16 },
 
-  startBtn:     { alignSelf: 'stretch', backgroundColor: DS.indigo, borderRadius: 16, paddingVertical: 18, alignItems: 'center' },
+  startBtn:     { alignSelf: 'stretch', backgroundColor: DS.accent, borderRadius: 16, paddingVertical: 18, alignItems: 'center' },
   startBtnTxt:  { fontSize: 16, fontWeight: '900', color: '#fff', letterSpacing: -0.3 },
 
   blueprintCard: {

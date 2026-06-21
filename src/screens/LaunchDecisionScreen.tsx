@@ -2,7 +2,7 @@ import React, { useMemo, useEffect, useState } from 'react';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator, TextInput, Modal, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -80,7 +80,7 @@ interface ReadinessResult {
 //  11.  Startup capital          5 pts  (bonus if investment < threshold)
 //  12.  Brand readiness          8 pts
 //  13.  Brand completeness       5 pts  (barcode + listing)
-//  14.  Recon differentiation    5 pts
+//  14.  Teardown differentiation    5 pts
 //   Total possible: 111, capped at 100
 //
 // Verdict thresholds:
@@ -324,15 +324,15 @@ function calcReadiness(
   if (recon) {
     const pts = recon.complaints.length >= 3 ? 5 : 3;
     score += pts;
-    factors.push({ label: 'Recon Intel', pts, max: 5, note: `${recon.complaints.length} complaints, ${recon.opportunities.length} angles` });
-    strengths.push(`Review recon: ${recon.complaints.length} buyer complaints and ${recon.opportunities.length} differentiation angles mapped`);
+    factors.push({ label: 'Teardown Intel', pts, max: 5, note: `${recon.complaints.length} complaints, ${recon.opportunities.length} angles` });
+    strengths.push(`Teardown: ${recon.complaints.length} buyer complaints and ${recon.opportunities.length} differentiation angles mapped`);
     if (recon.improvementSpecs.length > 0) {
       strengths.push(`Product improvements identified: ${recon.improvementSpecs[0]}`);
     }
   } else {
-    factors.push({ label: 'Recon Intel', pts: 0, max: 5, note: 'Not completed' });
+    factors.push({ label: 'Teardown Intel', pts: 0, max: 5, note: 'Not completed' });
     if (product) {
-      actions.push('Run Review Recon in Research tab to map buyer complaints and differentiation angles');
+      actions.push('Run Teardown in Research tab to map buyer complaints and differentiation angles');
     }
   }
 
@@ -473,7 +473,7 @@ function calcReadiness(
       }
     }
     if (!recon) {
-      improvements.push('Run Review Recon in Research tab — maps buyer complaints into product improvement specs');
+      improvements.push('Run Teardown in Research tab — maps buyer complaints into product improvement specs');
     }
     if (supplier && supplier.moq > 500) {
       improvements.push(`Negotiate MOQ down from ${supplier.moq} to 300–400 units — reduces launch capital and inventory risk`);
@@ -547,7 +547,24 @@ const STAGE_NAV: Array<{
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function DataRow({ label, value, missing }: { label: string; value: string; missing?: boolean }) {
+function DataRow({ label, value, missing, onPress, navLabel }: {
+  label:     string;
+  value:     string;
+  missing?:  boolean;
+  onPress?:  () => void;
+  navLabel?: string;
+}) {
+  if (missing && onPress) {
+    return (
+      <TouchableOpacity style={d.row} onPress={onPress} activeOpacity={0.75}>
+        <Text style={d.label}>{label}</Text>
+        <View style={d.missingNav}>
+          <Text style={d.valueMissing}>Not done</Text>
+          <Text style={d.navArrow}>→ {navLabel}</Text>
+        </View>
+      </TouchableOpacity>
+    );
+  }
   return (
     <View style={d.row}>
       <Text style={d.label}>{label}</Text>
@@ -556,10 +573,12 @@ function DataRow({ label, value, missing }: { label: string; value: string; miss
   );
 }
 const d = StyleSheet.create({
-  row:         { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: DS.border },
+  row:         { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: DS.border },
   label:       { fontSize: 12, color: DS.textSecondary, flex: 1 },
   value:       { fontSize: 12, fontWeight: '700', color: DS.textPrimary, textAlign: 'right', flex: 1 },
-  valueMissing:{ color: DS.textMuted, fontStyle: 'italic' },
+  valueMissing:{ color: DS.textMuted, fontStyle: 'italic', fontWeight: '400' as const },
+  missingNav:  { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  navArrow:    { fontSize: 11, fontWeight: '800', color: DS.accent, backgroundColor: DS.accentLight, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 },
 });
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -597,7 +616,24 @@ export default function LaunchDecisionScreen() {
   const pipeline      = usePipeline();
   const intelProfile  = useProductIntelligence();
   const decisionSim   = useDecisionSimulation(intelProfile);
-  const [exporting, setExporting] = useState(false);
+  const [exporting, setExporting]   = useState(false);
+  const [qSell, setQSell]           = useState('');
+  const [qCost, setQCost]           = useState('');
+  const [qMoq, setQMoq]             = useState('');
+  const [qFreight, setQFreight]     = useState('');
+
+  type QEField = { key: string; label: string; placeholder: string; keyboard: 'decimal-pad' | 'number-pad' };
+  type QEConfig = { title: string; subtitle: string; fields: QEField[]; onSave: (v: Record<string, string>) => void };
+  const [qeConfig, setQeConfig] = useState<QEConfig | null>(null);
+  const [qeValues, setQeValues] = useState<Record<string, string>>({});
+
+  function openQE(cfg: QEConfig, defaults: Record<string, string> = {}) {
+    const init: Record<string, string> = {};
+    cfg.fields.forEach(f => { init[f.key] = defaults[f.key] ?? ''; });
+    setQeValues(init);
+    setQeConfig(cfg);
+  }
+  function closeQE() { setQeConfig(null); }
 
   async function handleExport() {
     if (exporting) return;
@@ -669,8 +705,8 @@ export default function LaunchDecisionScreen() {
     }
   }
 
-  function navigateToTab(tab: string) {
-    navigation.navigate('Main', { screen: tab });
+  function navigateToTab(tab: string, params?: Record<string, unknown>) {
+    navigation.navigate('Main', { screen: tab, params } as any);
   }
 
   function navigateToLaunchPlan() {
@@ -825,6 +861,96 @@ export default function LaunchDecisionScreen() {
           </TouchableOpacity>
         )}
 
+        {/* Quick Estimate — shown when no cost model so user can preview margins inline */}
+        {!costModel && (
+          <View style={s.quickCard}>
+            <Text style={s.quickCardTitle}>Quick Estimate</Text>
+            <Text style={s.quickCardSub}>Preview your margin here — no need to leave. Open Profit Lab to confirm and save.</Text>
+            <View style={s.quickRow}>
+              <View style={s.quickField}>
+                <Text style={s.quickFieldLbl}>Selling Price ($)</Text>
+                <TextInput
+                  style={s.quickInput}
+                  value={qSell}
+                  onChangeText={setQSell}
+                  keyboardType="decimal-pad"
+                  placeholder="e.g. 29.99"
+                  placeholderTextColor={DS.textMuted}
+                />
+              </View>
+              <View style={s.quickField}>
+                <Text style={s.quickFieldLbl}>Unit Cost ($)</Text>
+                <TextInput
+                  style={s.quickInput}
+                  value={qCost}
+                  onChangeText={setQCost}
+                  keyboardType="decimal-pad"
+                  placeholder="e.g. 8.50"
+                  placeholderTextColor={DS.textMuted}
+                />
+              </View>
+            </View>
+            <View style={s.quickRow}>
+              <View style={s.quickField}>
+                <Text style={s.quickFieldLbl}>MOQ (units)</Text>
+                <TextInput
+                  style={s.quickInput}
+                  value={qMoq}
+                  onChangeText={setQMoq}
+                  keyboardType="number-pad"
+                  placeholder="e.g. 300"
+                  placeholderTextColor={DS.textMuted}
+                />
+              </View>
+              <View style={s.quickField}>
+                <Text style={s.quickFieldLbl}>Freight / unit ($)</Text>
+                <TextInput
+                  style={s.quickInput}
+                  value={qFreight}
+                  onChangeText={setQFreight}
+                  keyboardType="decimal-pad"
+                  placeholder="e.g. 1.50"
+                  placeholderTextColor={DS.textMuted}
+                />
+              </View>
+            </View>
+            {(() => {
+              const sp  = parseFloat(qSell)    || 0;
+              const uc  = parseFloat(qCost)    || 0;
+              const moq = parseInt(qMoq)       || 0;
+              const fr  = parseFloat(qFreight) || 0;
+              if (!sp || !uc) return null;
+              const net    = sp * 0.83 - uc - fr;
+              const margin = (net / sp) * 100;
+              const roi    = (uc + fr) > 0 ? (net / (uc + fr)) * 100 : 0;
+              const invest = moq > 0 ? (uc + fr) * moq * 1.15 : null;
+              const mc = margin >= 30 ? DS.success : margin >= 15 ? DS.warning : DS.danger;
+              const rc = roi    >= 80 ? DS.success : roi    >= 30 ? DS.warning : DS.danger;
+              return (
+                <View style={s.quickResults}>
+                  <View style={s.quickResultItem}>
+                    <Text style={s.quickResultLbl}>Est. Margin</Text>
+                    <Text style={[s.quickResultVal, { color: mc }]}>{margin.toFixed(1)}%</Text>
+                  </View>
+                  <View style={s.quickResultItem}>
+                    <Text style={s.quickResultLbl}>Est. ROI</Text>
+                    <Text style={[s.quickResultVal, { color: rc }]}>{roi.toFixed(0)}%</Text>
+                  </View>
+                  {invest != null && (
+                    <View style={s.quickResultItem}>
+                      <Text style={s.quickResultLbl}>Est. Capital</Text>
+                      <Text style={s.quickResultVal}>${invest.toLocaleString(undefined, { maximumFractionDigits: 0 })}</Text>
+                    </View>
+                  )}
+                </View>
+              );
+            })()}
+            <TouchableOpacity style={s.quickCTA} onPress={() => navigateToTab('Profit')} activeOpacity={0.8}>
+              <Text style={s.quickCTATxt}>Open Profit Lab to confirm →</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* Scoring note */}
         <View style={s.scoringNote}>
           <Text style={s.scoringNoteTxt}>
@@ -854,35 +980,207 @@ export default function LaunchDecisionScreen() {
 
         {/* Pipeline snapshot */}
         <Section title="Pipeline Snapshot">
-          <DataRow label="Niche"        value={activeNiche    ? `${activeNiche.keyword} (${activeNiche.verdictLabel})` : '—'} missing={!activeNiche} />
-          <DataRow label="Product"      value={activeProduct  ? activeProduct.title                                         : '—'} missing={!activeProduct} />
-          {activeProduct && (activeProduct.salesEstLow != null) && (
+          <DataRow
+            label="Niche"
+            value={activeNiche ? `${activeNiche.keyword} (${activeNiche.verdictLabel})` : '—'}
+            missing={!activeNiche}
+            onPress={!activeNiche ? () => navigateToTab('Niche') : undefined}
+            navLabel="Research a Niche"
+          />
+          <DataRow
+            label="Product"
+            value={activeProduct ? activeProduct.title : '—'}
+            missing={!activeProduct}
+            onPress={!activeProduct ? () => navigateToTab('Research') : undefined}
+            navLabel="Find a Product"
+          />
+          {activeProduct && activeProduct.salesEstLow != null && (
+            <DataRow label="Est. Monthly Sales" value={`~${activeProduct.salesEstLow}–${activeProduct.salesEstHigh} units/mo`} />
+          )}
+          {activeProduct && activeProduct.salesEstLow == null && (
             <DataRow
               label="Est. Monthly Sales"
-              value={`~${activeProduct.salesEstLow}–${activeProduct.salesEstHigh} units/mo`}
+              value="—"
+              missing
+              onPress={() => navigateToTab('Research', { autoSearch: activeProduct.asin ?? activeProduct.title })}
+              navLabel="Analyse in Research"
             />
           )}
-          <DataRow label="Supplier"     value={selectedSupplier ? `${selectedSupplier.name} — $${selectedSupplier.unitCost}/unit` : '—'} missing={!selectedSupplier} />
-          <DataRow label="Margin"       value={costModel      ? `${costModel.marginPct.toFixed(1)}%`                        : '—'} missing={!costModel} />
-          <DataRow label="ROI"          value={costModel      ? `${costModel.roiPct.toFixed(0)}%`                           : '—'} missing={!costModel} />
-          <DataRow label="Net Profit"   value={costModel      ? `$${costModel.netProfit.toFixed(2)}/unit`                   : '—'} missing={!costModel} />
-          <DataRow label="Investment"   value={costModel != null ? (costModel.totalInvestment > 0 ? `$${costModel.totalInvestment.toLocaleString()}` : 'Not calculated') : '—'} missing={!costModel} />
+          <DataRow
+            label="Supplier"
+            value={selectedSupplier ? `${selectedSupplier.name} — $${selectedSupplier.unitCost}/unit` : '—'}
+            missing={!selectedSupplier}
+            onPress={!selectedSupplier ? () => navigateToTab('Sourcing') : undefined}
+            navLabel="Find Supplier"
+          />
+          <DataRow
+            label="MOQ"
+            value={selectedSupplier ? `${selectedSupplier.moq.toLocaleString()} units` : '—'}
+            missing={!selectedSupplier}
+            onPress={!selectedSupplier ? () => navigateToTab('Sourcing') : undefined}
+            navLabel="Find Supplier"
+          />
+          <DataRow
+            label="Lead Time"
+            value={selectedSupplier?.leadTimeDays != null ? `~${selectedSupplier.leadTimeDays} days` : '—'}
+            missing={!selectedSupplier?.leadTimeDays}
+            onPress={selectedSupplier ? () => openQE({
+              title: 'Supplier Lead Time',
+              subtitle: 'Days from placing the order to goods arriving at your freight forwarder.',
+              fields: [{ key: 'days', label: 'Lead time (days)', placeholder: 'e.g. 30', keyboard: 'number-pad' }],
+              onSave: v => {
+                const d = parseInt(v.days);
+                if (!isNaN(d) && d > 0) pipeline.setSelectedSupplier({ ...selectedSupplier, leadTimeDays: d });
+                closeQE();
+              },
+            }, { days: selectedSupplier.leadTimeDays != null ? String(selectedSupplier.leadTimeDays) : '' }) : () => navigateToTab('Sourcing')}
+            navLabel={!selectedSupplier ? 'Find Supplier' : 'Enter here'}
+          />
+          <DataRow
+            label="Margin"
+            value={costModel ? `${costModel.marginPct.toFixed(1)}%` : '—'}
+            missing={!costModel}
+            onPress={!costModel ? () => openQE({
+              title: 'Quick Cost Model',
+              subtitle: 'Enter your numbers to calculate margin, ROI, and investment. Refine in Profit Lab anytime.',
+              fields: [
+                { key: 'sell',    label: 'Selling price ($)',   placeholder: 'e.g. 29.99', keyboard: 'decimal-pad' },
+                { key: 'cost',    label: 'Unit cost ($)',       placeholder: 'e.g. 7.50',  keyboard: 'decimal-pad' },
+                { key: 'freight', label: 'Freight / unit ($)',  placeholder: 'e.g. 1.50',  keyboard: 'decimal-pad' },
+                { key: 'units',   label: 'Units to order',      placeholder: 'e.g. 300',   keyboard: 'number-pad'  },
+              ],
+              onSave: v => {
+                const sp  = parseFloat(v.sell)    || 0;
+                const uc  = parseFloat(v.cost)    || 0;
+                const fr  = parseFloat(v.freight) || 0;
+                const qty = parseInt(v.units)     || (selectedSupplier?.moq ?? 300);
+                if (sp > 0 && uc > 0) {
+                  const referralFee = sp * 0.15;
+                  const fbaFee      = sp * 0.15;
+                  const totalCost   = uc + fr + referralFee + fbaFee;
+                  const netProfit   = sp - totalCost;
+                  const marginPct   = (netProfit / sp) * 100;
+                  const roiPct      = (uc + fr) > 0 ? (netProfit / (uc + fr)) * 100 : 0;
+                  pipeline.setCostModel({ sellingPrice: sp, unitCost: uc, freight: fr, fbaFee, referralFee, duties: 0, packaging: 0, netProfit, marginPct, roiPct, totalCost, unitsOrdered: qty, totalInvestment: (uc + fr) * qty, savedAt: new Date().toISOString() });
+                }
+                closeQE();
+              },
+            }, { sell: selectedSupplier ? String(selectedSupplier.unitCost * 3.5) : '', cost: selectedSupplier ? String(selectedSupplier.unitCost) : '', units: selectedSupplier ? String(selectedSupplier.moq) : '' }) : undefined}
+            navLabel="Enter here"
+          />
+          <DataRow
+            label="ROI"
+            value={costModel ? `${costModel.roiPct.toFixed(0)}%` : '—'}
+            missing={!costModel}
+            onPress={!costModel ? () => openQE({
+              title: 'Quick Cost Model',
+              subtitle: 'Enter your numbers to calculate margin, ROI, and investment. Refine in Profit Lab anytime.',
+              fields: [
+                { key: 'sell',    label: 'Selling price ($)',   placeholder: 'e.g. 29.99', keyboard: 'decimal-pad' },
+                { key: 'cost',    label: 'Unit cost ($)',       placeholder: 'e.g. 7.50',  keyboard: 'decimal-pad' },
+                { key: 'freight', label: 'Freight / unit ($)',  placeholder: 'e.g. 1.50',  keyboard: 'decimal-pad' },
+                { key: 'units',   label: 'Units to order',      placeholder: 'e.g. 300',   keyboard: 'number-pad'  },
+              ],
+              onSave: v => {
+                const sp = parseFloat(v.sell) || 0; const uc = parseFloat(v.cost) || 0; const fr = parseFloat(v.freight) || 0; const qty = parseInt(v.units) || 300;
+                if (sp > 0 && uc > 0) { const ref = sp * 0.15; const fba = sp * 0.15; const tc = uc + fr + ref + fba; const np = sp - tc; pipeline.setCostModel({ sellingPrice: sp, unitCost: uc, freight: fr, fbaFee: fba, referralFee: ref, duties: 0, packaging: 0, netProfit: np, marginPct: (np / sp) * 100, roiPct: (uc + fr) > 0 ? (np / (uc + fr)) * 100 : 0, totalCost: tc, unitsOrdered: qty, totalInvestment: (uc + fr) * qty, savedAt: new Date().toISOString() }); }
+                closeQE();
+              },
+            }, { sell: '', cost: selectedSupplier ? String(selectedSupplier.unitCost) : '', units: selectedSupplier ? String(selectedSupplier.moq) : '' }) : undefined}
+            navLabel="Enter here"
+          />
+          <DataRow
+            label="Net Profit"
+            value={costModel ? `$${costModel.netProfit.toFixed(2)}/unit` : '—'}
+            missing={!costModel}
+            onPress={!costModel ? () => openQE({
+              title: 'Quick Cost Model',
+              subtitle: 'Enter your numbers to calculate margin, ROI, and investment. Refine in Profit Lab anytime.',
+              fields: [
+                { key: 'sell',    label: 'Selling price ($)',   placeholder: 'e.g. 29.99', keyboard: 'decimal-pad' },
+                { key: 'cost',    label: 'Unit cost ($)',       placeholder: 'e.g. 7.50',  keyboard: 'decimal-pad' },
+                { key: 'freight', label: 'Freight / unit ($)',  placeholder: 'e.g. 1.50',  keyboard: 'decimal-pad' },
+                { key: 'units',   label: 'Units to order',      placeholder: 'e.g. 300',   keyboard: 'number-pad'  },
+              ],
+              onSave: v => {
+                const sp = parseFloat(v.sell) || 0; const uc = parseFloat(v.cost) || 0; const fr = parseFloat(v.freight) || 0; const qty = parseInt(v.units) || 300;
+                if (sp > 0 && uc > 0) { const ref = sp * 0.15; const fba = sp * 0.15; const tc = uc + fr + ref + fba; const np = sp - tc; pipeline.setCostModel({ sellingPrice: sp, unitCost: uc, freight: fr, fbaFee: fba, referralFee: ref, duties: 0, packaging: 0, netProfit: np, marginPct: (np / sp) * 100, roiPct: (uc + fr) > 0 ? (np / (uc + fr)) * 100 : 0, totalCost: tc, unitsOrdered: qty, totalInvestment: (uc + fr) * qty, savedAt: new Date().toISOString() }); }
+                closeQE();
+              },
+            }, { sell: '', cost: selectedSupplier ? String(selectedSupplier.unitCost) : '', units: selectedSupplier ? String(selectedSupplier.moq) : '' }) : undefined}
+            navLabel="Enter here"
+          />
+          <DataRow
+            label="Investment"
+            value={costModel != null ? (costModel.totalInvestment > 0 ? `$${costModel.totalInvestment.toLocaleString()}` : 'Not calculated') : '—'}
+            missing={!costModel}
+            onPress={!costModel ? () => openQE({
+              title: 'Quick Cost Model',
+              subtitle: 'Enter your numbers to calculate margin, ROI, and investment. Refine in Profit Lab anytime.',
+              fields: [
+                { key: 'sell',    label: 'Selling price ($)',   placeholder: 'e.g. 29.99', keyboard: 'decimal-pad' },
+                { key: 'cost',    label: 'Unit cost ($)',       placeholder: 'e.g. 7.50',  keyboard: 'decimal-pad' },
+                { key: 'freight', label: 'Freight / unit ($)',  placeholder: 'e.g. 1.50',  keyboard: 'decimal-pad' },
+                { key: 'units',   label: 'Units to order',      placeholder: 'e.g. 300',   keyboard: 'number-pad'  },
+              ],
+              onSave: v => {
+                const sp = parseFloat(v.sell) || 0; const uc = parseFloat(v.cost) || 0; const fr = parseFloat(v.freight) || 0; const qty = parseInt(v.units) || 300;
+                if (sp > 0 && uc > 0) { const ref = sp * 0.15; const fba = sp * 0.15; const tc = uc + fr + ref + fba; const np = sp - tc; pipeline.setCostModel({ sellingPrice: sp, unitCost: uc, freight: fr, fbaFee: fba, referralFee: ref, duties: 0, packaging: 0, netProfit: np, marginPct: (np / sp) * 100, roiPct: (uc + fr) > 0 ? (np / (uc + fr)) * 100 : 0, totalCost: tc, unitsOrdered: qty, totalInvestment: (uc + fr) * qty, savedAt: new Date().toISOString() }); }
+                closeQE();
+              },
+            }, { sell: '', cost: selectedSupplier ? String(selectedSupplier.unitCost) : '', units: selectedSupplier ? String(selectedSupplier.moq) : '' }) : undefined}
+            navLabel="Enter here"
+          />
+          <DataRow
+            label="Freight / unit"
+            value={costModel && costModel.freight > 0 ? `$${costModel.freight.toFixed(2)}` : costModel ? 'Not modelled' : '—'}
+            missing={!costModel || costModel.freight === 0}
+            onPress={costModel && costModel.freight === 0 ? () => openQE({
+              title: 'Freight per Unit',
+              subtitle: 'Estimated shipping cost per unit (sea freight ÷ units ordered). Updates your margin and ROI.',
+              fields: [{ key: 'freight', label: 'Freight per unit ($)', placeholder: 'e.g. 1.50', keyboard: 'decimal-pad' }],
+              onSave: v => {
+                const f = parseFloat(v.freight);
+                if (!isNaN(f) && f >= 0 && costModel) {
+                  const totalCost   = costModel.unitCost + f + costModel.fbaFee + costModel.referralFee + costModel.duties + costModel.packaging;
+                  const netProfit   = costModel.sellingPrice - totalCost;
+                  const marginPct   = (netProfit / costModel.sellingPrice) * 100;
+                  const roiPct      = (costModel.unitCost + f) > 0 ? (netProfit / (costModel.unitCost + f)) * 100 : 0;
+                  const totalInv    = (costModel.unitCost + f) * costModel.unitsOrdered;
+                  pipeline.setCostModel({ ...costModel, freight: f, totalCost, netProfit, marginPct, roiPct, totalInvestment: totalInv, savedAt: new Date().toISOString() });
+                }
+                closeQE();
+              },
+            }, { freight: '' }) : !costModel ? () => navigateToTab('Profit') : undefined}
+            navLabel={!costModel ? 'Build Cost Model' : 'Enter here'}
+          />
           {costModel && (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingTop: 4 }}>
               <EstimateLabel type="confirmed" />
               <Text style={{ fontSize: 10, color: DS.textMuted }}>Financials from your confirmed cost model</Text>
             </View>
           )}
-          {!costModel && activeProduct && (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingTop: 4 }}>
-              <EstimateLabel type="directional" />
-              <Text style={{ fontSize: 10, color: DS.textMuted }}>Run Profit Lab to confirm financial data</Text>
-            </View>
-          )}
-          <DataRow label="Brand"        value={brandData      ? brandData.brandName                                         : '—'} missing={!brandData} />
-          <DataRow label="Barcode"      value={brandData?.barcodeIdentifier ? brandData.barcodeIdentifier.replace(/_/g,' ') : '—'} missing={!brandData?.barcodeIdentifier} />
-          <DataRow label="Label"        value={brandData?.labelTemplate     ? brandData.labelTemplate                       : '—'} missing={!brandData?.labelTemplate} />
-          <DataRow label="Recon"        value={reconInsights                ? `${reconInsights.complaints.length} complaints mapped` : '—'} missing={!reconInsights} />
+          <DataRow
+            label="Brand"
+            value={brandData ? brandData.brandName : '—'}
+            missing={!brandData}
+            onPress={!brandData ? () => navigation.navigate('BrandStudio' as any) : undefined}
+            navLabel="Brand Studio"
+          />
+          <DataRow
+            label="Barcode"
+            value={brandData?.barcodeIdentifier ? brandData.barcodeIdentifier.replace(/_/g, ' ') : '—'}
+            missing={!brandData?.barcodeIdentifier}
+            onPress={!brandData?.barcodeIdentifier ? () => navigation.navigate('BrandStudio' as any) : undefined}
+            navLabel="Brand Studio"
+          />
+          <DataRow
+            label="Teardown"
+            value={reconInsights ? `${reconInsights.complaints.length} complaints mapped` : '—'}
+            missing={!reconInsights}
+            onPress={!reconInsights ? () => navigateToTab('Research', { autoRecon: activeProduct?.title ?? activeNiche?.keyword }) : undefined}
+            navLabel="Run Teardown"
+          />
         </Section>
 
         {/* Strengths */}
@@ -1100,6 +1398,46 @@ export default function LaunchDecisionScreen() {
         </TouchableOpacity>
 
       </ScrollView>
+
+      {/* ── Quick Entry Bottom Sheet ─────────────────────────────────────── */}
+      <Modal visible={!!qeConfig} transparent animationType="slide" onRequestClose={closeQE}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+          <TouchableOpacity style={qes.overlay} activeOpacity={1} onPress={closeQE} />
+          {qeConfig && (
+            <View style={qes.sheet}>
+              <View style={qes.handle} />
+              <Text style={qes.title}>{qeConfig.title}</Text>
+              <Text style={qes.sub}>{qeConfig.subtitle}</Text>
+              <View style={qes.fields}>
+                {qeConfig.fields.map((f, i) => (
+                  <View key={f.key} style={qes.fieldWrap}>
+                    <Text style={qes.fieldLbl}>{f.label}</Text>
+                    <TextInput
+                      style={qes.input}
+                      value={qeValues[f.key] ?? ''}
+                      onChangeText={v => setQeValues(prev => ({ ...prev, [f.key]: v }))}
+                      keyboardType={f.keyboard}
+                      placeholder={f.placeholder}
+                      placeholderTextColor={DS.textMuted}
+                      autoFocus={i === 0}
+                      returnKeyType={i < qeConfig.fields.length - 1 ? 'next' : 'done'}
+                    />
+                  </View>
+                ))}
+              </View>
+              <View style={qes.btnRow}>
+                <TouchableOpacity style={qes.cancelBtn} onPress={closeQE} activeOpacity={0.7}>
+                  <Text style={qes.cancelTxt}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={qes.saveBtn} onPress={() => qeConfig.onSave(qeValues)} activeOpacity={0.8}>
+                  <Text style={qes.saveTxt}>Save</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+        </KeyboardAvoidingView>
+      </Modal>
+
     </SafeAreaView>
   );
 }
@@ -1181,6 +1519,42 @@ const s = StyleSheet.create({
   costMissingTitle:  { fontSize: 13, fontWeight: '800', color: DS.textPrimary },
   costMissingBody:   { fontSize: 11, color: DS.textSecondary, lineHeight: 16 },
   costMissingChevron:{ fontSize: 16, color: DS.warning, fontWeight: '700' },
+
+  // ── Quick Estimate ────────────────────────────────────────────────────────
+  quickCard: {
+    backgroundColor: DS.bgCard,
+    borderRadius:    DS.radiusCard,
+    borderWidth:     1,
+    borderColor:     DS.accent + '30',
+    padding:         DS.cardPadding,
+    gap:             12,
+  },
+  quickCardTitle: { fontSize: 13, fontWeight: '800', color: DS.textPrimary },
+  quickCardSub:   { fontSize: 11, color: DS.textSecondary, lineHeight: 16 },
+  quickRow:       { flexDirection: 'row', gap: 10 },
+  quickField:     { flex: 1, gap: 4 },
+  quickFieldLbl:  { fontSize: 10, fontWeight: '600', color: DS.textSecondary },
+  quickInput: {
+    backgroundColor:   DS.bgElevated,
+    borderRadius:      DS.radiusInput,
+    borderWidth:       1,
+    borderColor:       DS.border,
+    paddingHorizontal: 10,
+    paddingVertical:   8,
+    fontSize:          13,
+    color:             DS.textPrimary,
+  },
+  quickResults:     { flexDirection: 'row', gap: 8 },
+  quickResultItem:  { flex: 1, alignItems: 'center', backgroundColor: DS.bgElevated, borderRadius: DS.radiusChip, paddingVertical: 10, gap: 3 },
+  quickResultLbl:   { fontSize: 10, color: DS.textMuted, fontWeight: '600' },
+  quickResultVal:   { fontSize: 16, fontWeight: '900', color: DS.textPrimary },
+  quickCTA: {
+    backgroundColor: DS.accent,
+    borderRadius:    DS.radiusButton,
+    paddingVertical: 12,
+    alignItems:      'center',
+  },
+  quickCTATxt: { fontSize: 13, fontWeight: '800', color: '#FFFFFF' },
 
   // ── Action Centre ─────────────────────────────────────────────────────────
   actionCard: {
@@ -1304,4 +1678,37 @@ const is = StyleSheet.create({
   intelChip:         { alignSelf: 'flex-start' as const, paddingHorizontal: 8, paddingVertical: 3, borderRadius: DS.radiusBadge },
   intelChipTxt:      { fontSize: 10, fontWeight: '800' },
   intelNote:         { fontSize: 10, color: DS.textMuted, lineHeight: 13 },
+});
+
+const qes = StyleSheet.create({
+  overlay:   { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' },
+  sheet: {
+    backgroundColor: DS.bgCard,
+    borderTopLeftRadius:  24,
+    borderTopRightRadius: 24,
+    padding: DS.cardPadding,
+    paddingBottom: 36,
+    gap: 14,
+  },
+  handle:    { width: 36, height: 4, borderRadius: 2, backgroundColor: DS.border, alignSelf: 'center' as const, marginBottom: 4 },
+  title:     { fontSize: 16, fontWeight: '900', color: DS.textPrimary, letterSpacing: -0.3 },
+  sub:       { fontSize: 12, color: DS.textSecondary, lineHeight: 17, marginTop: -6 },
+  fields:    { gap: 12 },
+  fieldWrap: { gap: 4 },
+  fieldLbl:  { fontSize: 11, fontWeight: '700', color: DS.textSecondary },
+  input: {
+    backgroundColor:   DS.bgElevated,
+    borderRadius:      DS.radiusInput,
+    borderWidth:       1,
+    borderColor:       DS.border,
+    paddingHorizontal: 12,
+    paddingVertical:   10,
+    fontSize:          15,
+    color:             DS.textPrimary,
+  },
+  btnRow:    { flexDirection: 'row', gap: 10, marginTop: 4 },
+  cancelBtn: { flex: 1, paddingVertical: 13, borderRadius: DS.radiusButton, backgroundColor: DS.bgElevated, alignItems: 'center' as const },
+  cancelTxt: { fontSize: 14, fontWeight: '700', color: DS.textSecondary },
+  saveBtn:   { flex: 2, paddingVertical: 13, borderRadius: DS.radiusButton, backgroundColor: DS.accent, alignItems: 'center' as const },
+  saveTxt:   { fontSize: 14, fontWeight: '800', color: '#FFFFFF' },
 });

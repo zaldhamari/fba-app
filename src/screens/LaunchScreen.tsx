@@ -135,13 +135,13 @@ function AIModal({ aiKey, onClose }: { aiKey: string | null; onClose: () => void
 }
 const aim = StyleSheet.create({
   header:   { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 20, borderBottomWidth: 1, borderBottomColor: DS.border },
-  iconWrap: { width: 36, height: 36, borderRadius: 10, backgroundColor: DS.indigoLight, alignItems: 'center', justifyContent: 'center' },
+  iconWrap: { width: 36, height: 36, borderRadius: 10, backgroundColor: DS.accentLight, alignItems: 'center', justifyContent: 'center' },
   title:    { flex: 1, fontSize: 16, fontWeight: '800', color: DS.textPrimary, letterSpacing: -0.3, lineHeight: 22 },
   body:     { fontSize: 14, color: DS.textSecondary, lineHeight: 24 },
-  tip:      { backgroundColor: DS.indigoLight, borderRadius: 14, borderWidth: 1, borderColor: DS.border, padding: 14, gap: 6 },
-  tipLabel: { fontSize: 9, fontWeight: '800', color: DS.indigo, letterSpacing: 2 },
+  tip:      { backgroundColor: DS.accentLight, borderRadius: 14, borderWidth: 1, borderColor: DS.border, padding: 14, gap: 6 },
+  tipLabel: { fontSize: 9, fontWeight: '800', color: DS.accent, letterSpacing: 2 },
   tipBody:  { fontSize: 13, color: DS.textSecondary, lineHeight: 20 },
-  btn:      { backgroundColor: DS.indigo, borderRadius: 14, paddingVertical: 15, alignItems: 'center' },
+  btn:      { backgroundColor: DS.accent, borderRadius: 14, paddingVertical: 15, alignItems: 'center' },
   btnText:  { fontSize: 15, fontWeight: '800', color: '#fff' },
 });
 
@@ -207,7 +207,7 @@ function HeroProgressCard({ checked }: { checked: Set<string> }) {
           </View>
           <View style={hero.statDiv} />
           <View style={hero.stat}>
-            <Text style={[hero.statVal, { color: DS.indigo }]}>{remaining}</Text>
+            <Text style={[hero.statVal, { color: DS.accent }]}>{remaining}</Text>
             <Text style={hero.statLabel}>LEFT</Text>
           </View>
           <View style={hero.statDiv} />
@@ -528,8 +528,8 @@ const tl = StyleSheet.create({
   doneTag:   { borderRadius: 8, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 4, flexShrink: 0 },
   doneTagText:{ fontSize: 9, fontWeight: '800', letterSpacing: 0.3 },
 
-  nextBand:  { marginTop: 12, backgroundColor: DS.indigoLight, borderRadius: 10, borderWidth: 1, borderColor: DS.border, padding: 12, gap: 4 },
-  nextLabel: { fontSize: 8, fontWeight: '800', color: DS.indigo, letterSpacing: 2 },
+  nextBand:  { marginTop: 12, backgroundColor: DS.accentLight, borderRadius: 10, borderWidth: 1, borderColor: DS.border, padding: 12, gap: 4 },
+  nextLabel: { fontSize: 8, fontWeight: '800', color: DS.accent, letterSpacing: 2 },
   nextText:  { fontSize: 13, color: DS.textSecondary, lineHeight: 19 },
 
   descBand: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginTop: 14, borderRadius: 10, borderWidth: 1, padding: 10 },
@@ -763,8 +763,8 @@ function ProductTipCard({ productName, phaseId }: { productName: string; phaseId
 const pt = StyleSheet.create({
   header:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   eyebrow:  { fontSize: 8, fontWeight: '800', color: DS.accent, letterSpacing: 2 },
-  badge:    { backgroundColor: DS.indigoLight, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
-  badgeTxt: { fontSize: 9, fontWeight: '800', color: DS.indigo },
+  badge:    { backgroundColor: DS.accentLight, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
+  badgeTxt: { fontSize: 9, fontWeight: '800', color: DS.accent },
   loadRow:  { flexDirection: 'row', alignItems: 'center', gap: 8 },
   loadTxt:  { fontSize: 12, color: DS.textMuted },
   tip:      { fontSize: 13, color: DS.textSecondary, lineHeight: 20 },

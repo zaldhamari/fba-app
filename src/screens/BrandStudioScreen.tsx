@@ -5,9 +5,8 @@ import { safeParseJSON } from '../utils/safeJSON';
 import { STORAGE_KEYS } from '../constants/storage';
 import { useActiveProduct } from '../context/ActiveProductContext';
 import { usePipeline } from '../context/PipelineContext';
-import { PipelineProgressBar } from '../components/PipelineProgressBar';
 import {
-  ScrollView, StyleSheet, View, Text, TouchableOpacity,
+  ScrollView, StyleSheet, View, Text, TouchableOpacity, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
@@ -95,7 +94,7 @@ interface BrandInputs {
 const COLOR_OPTIONS: { id: ColorPalette; label: string; swatch: string }[] = [
   { id: 'blue',   label: 'Ocean',  swatch: DS.accent },
   { id: 'green',  label: 'Nature', swatch: DS.success },
-  { id: 'purple', label: 'Royal',  swatch: DS.indigo },
+  { id: 'purple', label: 'Royal',  swatch: DS.accent },
   { id: 'warm',   label: 'Warm',   swatch: DS.warning },
   { id: 'dark',   label: 'Dark',   swatch: DS.textPrimary },
   { id: 'earth',  label: 'Earth',  swatch: DS.gold },
@@ -112,7 +111,7 @@ const STYLE_OPTIONS: { id: StyleOption; icon: string; color: string; bg: string 
   { id: 'Premium', icon: '✦',  color: DS.accent,         bg: DS.accentLight },
   { id: 'Eco',     icon: '🌿', color: DS.accentDark,    bg: DS.accentLight },
   { id: 'Bold',    icon: '◼',  color: DS.info,           bg: DS.infoBg      },
-  { id: 'Luxury',  icon: '◆',  color: DS.indigo,         bg: DS.indigoLight },
+  { id: 'Luxury',  icon: '◆',  color: DS.accent,         bg: DS.accentLight },
 ];
 
 const STEP_HELP: Record<number, FeatureKey> = {
@@ -449,11 +448,11 @@ const ptp = StyleSheet.create({
     borderWidth: 1.5, borderColor: DS.border, borderRadius: DS.radiusBadge,
     paddingHorizontal: 10, paddingVertical: 5, backgroundColor: DS.bgCard,
   },
-  chipActive: { borderColor: DS.indigo, backgroundColor: DS.indigoLight },
+  chipActive: { borderColor: DS.accent, backgroundColor: DS.accentLight },
   icon:       { fontSize: 11, color: DS.textMuted },
-  iconActive: { color: DS.indigo },
+  iconActive: { color: DS.accent },
   text:       { fontSize: 11, fontWeight: '600', color: DS.textSecondary },
-  textActive: { color: DS.indigo, fontWeight: '700' },
+  textActive: { color: DS.accent, fontWeight: '700' },
 });
 
 // ── Brand concept preview card (fallback when no SVG) ─────────────────────────
@@ -1313,7 +1312,7 @@ const pb = StyleSheet.create({
 function CopilotTipCard({ tip, icon = '💡', accent }: { tip: string; icon?: string; accent?: string }) {
   const [hidden, setHidden] = React.useState(false);
   if (hidden) return null;
-  const col = accent ?? DS.indigo;
+  const col = accent ?? DS.accent;
   return (
     <View style={[ctp.wrap, { borderLeftColor: col, backgroundColor: col + '10' }]}>
       <View style={ctp.inner}>
@@ -1650,8 +1649,8 @@ function LabelContentFields({
   return (
     <AppCard style={lw.card}>
       <View style={lw.header}>
-        <View style={[lw.headerIcon, { backgroundColor: DS.indigo + '15' }]}>
-          <Text style={{ fontSize: 18, color: DS.indigo }}>📋</Text>
+        <View style={[lw.headerIcon, { backgroundColor: DS.accent + '15' }]}>
+          <Text style={{ fontSize: 18, color: DS.accent }}>📋</Text>
         </View>
         <View style={{ flex: 1, gap: 2 }}>
           <Text style={lw.headerTitle}>Label Content</Text>
@@ -1877,7 +1876,7 @@ const BARCODE_ITEMS = [
     full: 'European Article Number',
     desc: 'Required for EU/UK marketplaces. Also obtained via GS1. Some sellers use the same GS1 prefix for both.',
     action: 'Get EAN via GS1 local org',
-    color: DS.indigo,
+    color: DS.accent,
   },
   {
     code: 'FNSKU',
@@ -1979,8 +1978,8 @@ function ListingPreparationCard({
           <Text style={{ fontSize: 11, fontWeight: '700', color: DS.textMuted, textTransform: 'uppercase', letterSpacing: 0.8 }}>Backend Keywords</Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
             {result.generated_keywords.slice(0, 12).map((kw, i) => (
-              <View key={i} style={{ backgroundColor: DS.indigoLight, borderRadius: DS.radiusBadge, paddingHorizontal: 10, paddingVertical: 4 }}>
-                <Text style={{ fontSize: 11, fontWeight: '600', color: DS.indigo }}>{kw}</Text>
+              <View key={i} style={{ backgroundColor: DS.accentLight, borderRadius: DS.radiusBadge, paddingHorizontal: 10, paddingVertical: 4 }}>
+                <Text style={{ fontSize: 11, fontWeight: '600', color: DS.accent }}>{kw}</Text>
               </View>
             ))}
           </View>
@@ -1989,7 +1988,7 @@ function ListingPreparationCard({
 
       {reconInsights && reconInsights.complaints.length > 0 && (
         <View style={{ gap: 8, paddingTop: 10, borderTopWidth: 1, borderTopColor: DS.border }}>
-          <Text style={{ fontSize: 11, fontWeight: '700', color: DS.danger, textTransform: 'uppercase', letterSpacing: 0.8 }}>Customer Pain Points (from Recon)</Text>
+          <Text style={{ fontSize: 11, fontWeight: '700', color: DS.danger, textTransform: 'uppercase', letterSpacing: 0.8 }}>Customer Pain Points (from Teardown)</Text>
           <Text style={{ fontSize: 11, color: DS.textMuted, lineHeight: 16 }}>Address these in your bullets — they are why buyers leave bad reviews.</Text>
           {reconInsights.complaints.slice(0, 3).map((c, i) => (
             <View key={i} style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start' }}>
@@ -2002,10 +2001,10 @@ function ListingPreparationCard({
 
       {reconInsights && reconInsights.positioningAngles.length > 0 && (
         <View style={{ gap: 8, paddingTop: 10, borderTopWidth: 1, borderTopColor: DS.border }}>
-          <Text style={{ fontSize: 11, fontWeight: '700', color: DS.indigo, textTransform: 'uppercase', letterSpacing: 0.8 }}>Positioning Angles (from Recon)</Text>
+          <Text style={{ fontSize: 11, fontWeight: '700', color: DS.accent, textTransform: 'uppercase', letterSpacing: 0.8 }}>Positioning Angles (from Teardown)</Text>
           {reconInsights.positioningAngles.slice(0, 2).map((a, i) => (
             <View key={i} style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start' }}>
-              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: DS.indigo, marginTop: 7, flexShrink: 0 }} />
+              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: DS.accent, marginTop: 7, flexShrink: 0 }} />
               <Text style={{ fontSize: 12, color: DS.textSecondary, lineHeight: 18, flex: 1 }}>{a}</Text>
             </View>
           ))}
@@ -2025,30 +2024,35 @@ function BrandStepSection({
   onExpand: () => void; children?: React.ReactNode;
 }) {
   return (
-    <View style={bss.wrap}>
+    <View style={[
+      bss.card,
+      current && bss.cardActive,
+      locked && bss.cardLocked,
+    ]}>
       <TouchableOpacity
-        style={[bss.header, current && bss.headerCurrent, done && !current && bss.headerDone, locked && bss.headerLocked]}
+        style={bss.header}
         onPress={locked ? undefined : onExpand}
         activeOpacity={locked ? 1 : 0.75}
         disabled={locked}
       >
-        <View style={[bss.num, current && bss.numCurrent, done && !current && bss.numDone]}>
+        <View style={[bss.num, current && bss.numActive, done && !current && bss.numDone, locked && bss.numLocked]}>
           <Text style={[bss.numTxt, (current || done) && bss.numTxtActive]}>
             {done && !current ? '✓' : step.toString()}
           </Text>
         </View>
         <View style={{ flex: 1, gap: 2 }}>
-          <Text style={[bss.title, current && bss.titleCurrent, done && !current && bss.titleDone, locked && bss.titleLocked]}>
-            {title}
+          <Text style={[bss.title, locked && bss.titleLocked]}>
+            {step}. {title}
           </Text>
-          <Text style={bss.sub} numberOfLines={1}>{done && !current ? doneLabel : subtitle}</Text>
+          <Text style={bss.sub} numberOfLines={1}>
+            {done && !current ? doneLabel : subtitle}
+          </Text>
         </View>
-        {locked   && <Text style={bss.lock}>○</Text>}
-        {done && !current && <Text style={bss.editLink}>Edit</Text>}
-        {current  && <View style={bss.pip} />}
+        {locked && <Text style={bss.lockIcon}>🔒</Text>}
       </TouchableOpacity>
-      {!locked && (current || done) && (
-        <View style={[bss.content, done && !current && bss.contentDone]}>
+
+      {current && children && (
+        <View style={bss.content}>
           {children}
         </View>
       )}
@@ -2057,26 +2061,21 @@ function BrandStepSection({
 }
 
 const bss = StyleSheet.create({
-  wrap:          { gap: 0 },
-  header:        { flexDirection: 'row', alignItems: 'center', gap: 12, padding: DS.cardPadding, borderRadius: DS.radiusCard, backgroundColor: DS.bgCard, borderWidth: 1.5, borderColor: DS.border },
-  headerCurrent: { borderColor: DS.accent, shadowColor: DS.accent, shadowOpacity: 0.1, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
-  headerDone:    { borderColor: DS.success + '50', backgroundColor: DS.success + '06' },
-  headerLocked:  { backgroundColor: DS.bgSubtle, opacity: 0.55 },
-  num:           { width: 32, height: 32, borderRadius: 16, backgroundColor: DS.bgElevated, borderWidth: 1.5, borderColor: DS.border, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  numCurrent:    { backgroundColor: DS.accent, borderColor: DS.accent },
-  numDone:       { backgroundColor: DS.success, borderColor: DS.success },
-  numTxt:        { fontSize: 12, fontWeight: '800', color: DS.textMuted },
-  numTxtActive:  { color: '#fff' },
-  title:         { fontSize: 14, fontWeight: '800', color: DS.textPrimary, letterSpacing: -0.3 },
-  titleCurrent:  { color: DS.accent },
-  titleDone:     { color: DS.textPrimary },
-  titleLocked:   { color: DS.textMuted },
-  sub:           { fontSize: 11, color: DS.textMuted, lineHeight: 16 },
-  lock:          { fontSize: 14, color: DS.textMuted },
-  editLink:      { fontSize: 11, fontWeight: '700', color: DS.accent },
-  pip:           { width: 8, height: 8, borderRadius: 4, backgroundColor: DS.accent },
-  content:       { marginTop: 10, borderLeftWidth: 2, borderLeftColor: DS.accent + '40', marginLeft: 15, paddingLeft: 15, gap: DS.sectionGap, paddingBottom: 4 },
-  contentDone:   { borderLeftColor: DS.success + '40' },
+  card:         { backgroundColor: DS.bgCard, borderRadius: DS.radiusCard, borderWidth: 1.5, borderColor: DS.border, overflow: 'hidden' as const },
+  cardActive:   { borderColor: DS.accent, shadowColor: DS.accent, shadowOpacity: 0.12, shadowRadius: 12, shadowOffset: { width: 0, height: 3 }, elevation: 4 },
+  cardLocked:   { backgroundColor: DS.bgSubtle, borderColor: DS.border },
+  header:       { flexDirection: 'row', alignItems: 'center', gap: 12, padding: DS.cardPadding },
+  num:          { width: 34, height: 34, borderRadius: 17, backgroundColor: DS.bgElevated, borderWidth: 1.5, borderColor: DS.border, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  numActive:    { backgroundColor: DS.accent, borderColor: DS.accent },
+  numDone:      { backgroundColor: DS.accent, borderColor: DS.accent },
+  numLocked:    { backgroundColor: DS.bgSubtle, borderColor: DS.border },
+  numTxt:       { fontSize: 13, fontWeight: '800', color: DS.textMuted },
+  numTxtActive: { color: '#fff' },
+  title:        { fontSize: 15, fontWeight: '800', color: DS.textPrimary, letterSpacing: -0.3 },
+  titleLocked:  { color: DS.textMuted },
+  sub:          { fontSize: 12, color: DS.textMuted, lineHeight: 17 },
+  lockIcon:     { fontSize: 14 },
+  content:      { paddingHorizontal: DS.cardPadding, paddingBottom: DS.cardPadding, gap: DS.sectionGap },
 });
 
 function StepContinueBtn({ label, onPress, variant = 'primary' }: { label: string; onPress: () => void; variant?: 'primary' | 'success' }) {
@@ -2213,11 +2212,13 @@ export default function BrandStudioScreen() {
   const [selectedDirection, setSelectedDirection] = useState<string | null>(pipeline.brandData?.brandDirection ?? null);
   const [selectedLogoName, setSelectedLogoName] = useState<string | undefined>(undefined);
   const [brandResult,   setBrandResult]   = useState<BrandResult | null>(null);
+  const [directionChanged, setDirectionChanged] = useState(false);
   const [labelResult,   setLabelResult]   = useState<LabelResult | null>(null);
   const [brandLoading,  setBrandLoading]  = useState(false);
   const [warmingUp,     setWarmingUp]     = useState(false);
   const [labelLoading,  setLabelLoading]  = useState(false);
   const [labelWarmingUp, setLabelWarmingUp] = useState(false);
+  const [insertLoading, setInsertLoading] = useState(false);
   const [brandError,    setBrandError]    = useState('');
   const [labelError,    setLabelError]    = useState('');
   const [exportLoading, setExportLoading] = useState(false);
@@ -2298,6 +2299,7 @@ export default function BrandStudioScreen() {
   }
 
   function handleSelectDirection(dir: BrandDirection) {
+    if (brandResult) setDirectionChanged(true);
     setSelectedDirection(dir.id);
     setInputs(prev => ({
       ...prev,
@@ -2346,6 +2348,7 @@ export default function BrandStudioScreen() {
       });
       await increment('brands');
       setBrandResult(result);
+      setDirectionChanged(false);
       setSelectedLogoName(undefined);
       if (result.logo_svg) {
         const entry: BrandHistoryEntry = { brandName: inputs.brandName, style: inputs.style, assetType: 'logo', svg: result.logo_svg, createdAt: new Date().toISOString() };
@@ -2369,7 +2372,7 @@ export default function BrandStudioScreen() {
       return;
     }
     // Validate netWeight field when it looks like a numeric measurement
-    const nw = (labelFields as any)?.netWeight as string | undefined;
+    const nw = labelFields?.['netWeight'];
     if (nw && /\d/.test(nw)) {
       const validWeightPattern = /^\d+(\.\d+)?\s*(g|kg|oz|lb|lbs|ml|l|cl)\b/i;
       const validCountPattern  = /^\d+\s*\w+/; // "60 capsules", "12 packets" etc.
@@ -2385,7 +2388,7 @@ export default function BrandStudioScreen() {
     try {
       const result = await api.createLabel({
         brand_name:      inputs.brandName || 'Brand',
-        product_name:    inputs.targetAudience || 'Product',
+        product_name:    inputs.brandName || 'Product',
         weight:          '0.5kg',
         style:           inputs.style.toLowerCase(),
         brand_direction: selectedDirection ?? undefined,
@@ -2406,6 +2409,38 @@ export default function BrandStudioScreen() {
       setLabelError(msg);
       track('brand_generation_failed', { type: 'label', error: msg, packaging: packagingType });
     } finally { setLabelLoading(false); }
+  }, [inputs, selectedDirection, packagingType, can, increment]);
+
+  const handleGenerateInsert = useCallback(async () => {
+    if (!isOnline) { setLabelError('No internet connection. Connect and try again.'); return; }
+    if (!can('brands')) { track('paywall_shown', { feature: 'brands', source: 'insert_generator' }); setShowPaywall(true); return; }
+    setInsertLoading(true);
+    setLabelError('');
+    const dir = BRAND_DIRECTIONS.find(d => d.id === selectedDirection);
+    try {
+      const result = await api.createLabel({
+        brand_name:      inputs.brandName || 'Brand',
+        product_name:    inputs.brandName || 'Product',
+        weight:          '0.5kg',
+        style:           inputs.style.toLowerCase(),
+        brand_direction: selectedDirection ?? undefined,
+        color_palette:   inputs.colorPalette,
+        font_style:      inputs.fontStyle,
+        packaging_type:  packagingType,
+        tagline:         inputs.tagline || undefined,
+      });
+      await increment('brands');
+      setLabelResult(result);
+      if (result.insert_svg) {
+        const entry: BrandHistoryEntry = { brandName: inputs.brandName, style: inputs.style, assetType: 'insert', svg: result.insert_svg, createdAt: new Date().toISOString() };
+        await saveToHistory(entry);
+        AsyncStorage.getItem(STORAGE_KEYS.brandHistory).then(r => r && setHistory(JSON.parse(r)));
+      }
+    } catch (err: any) {
+      const msg = err?.message ?? "Couldn't generate insert. Please try again.";
+      setLabelError(msg);
+      track('brand_generation_failed', { type: 'insert', error: msg });
+    } finally { setInsertLoading(false); }
   }, [inputs, selectedDirection, packagingType, can, increment]);
 
   function makeExportHandler(svg: string, filename: string) {
@@ -2431,7 +2466,37 @@ export default function BrandStudioScreen() {
   const handleExportLabel  = labelResult?.label_svg  ? makeExportHandler(labelResult.label_svg,  'siftly-label')  : () => {};
   const handleExportInsert = labelResult?.insert_svg ? makeExportHandler(labelResult.insert_svg, 'siftly-insert') : () => {};
 
-  const productCategory = pipeline.activeNiche?.keyword ?? pipeline.activeProduct?.title ?? activeProduct?.name;
+  const productCategory    = pipeline.activeNiche?.keyword ?? pipeline.activeProduct?.title ?? activeProduct?.name;
+  const effectiveBrandName = selectedLogoName || inputs.brandName;
+
+  function handleRestoreHistory(entry: BrandHistoryEntry) {
+    if (entry.assetType === 'logo') {
+      setBrandResult({
+        logo_svg: entry.svg, brand_name: entry.brandName, name_options: [],
+        tagline: '', style: entry.style,
+        listing: { title: '', bullet_points: [], description: '', backend_keywords: [] },
+        generated_keywords: [],
+      });
+      setDirectionChanged(false);
+      setBrandStep(2);
+    } else if (entry.assetType === 'label') {
+      setLabelResult(prev => ({ insert_svg: prev?.insert_svg ?? '', label_svg: entry.svg }));
+      setBrandStep(4);
+    } else {
+      setLabelResult(prev => ({ label_svg: prev?.label_svg ?? '', insert_svg: entry.svg }));
+      setBrandStep(5);
+    }
+  }
+
+  function handleClearHistory() {
+    Alert.alert('Clear History', 'Remove all saved brand assets?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Clear', style: 'destructive', onPress: () => {
+        AsyncStorage.removeItem(STORAGE_KEYS.brandHistory).catch(() => {});
+        setHistory([]);
+      }},
+    ]);
+  }
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
@@ -2444,7 +2509,6 @@ export default function BrandStudioScreen() {
         </TouchableOpacity>
       )}
       <OfflineBanner visible={!isOnline} />
-      <PipelineProgressBar />
 
       <ScrollView
         style={s.scroll}
@@ -2502,6 +2566,11 @@ export default function BrandStudioScreen() {
           locked={brandStep < 2 && !completedBrandSteps.has(1)}
           onExpand={() => setBrandStep(2)}
         >
+          {directionChanged && brandResult && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 10, borderRadius: DS.radiusChip, backgroundColor: DS.warning + '18', borderWidth: 1, borderColor: DS.warning + '40', marginBottom: 4 }}>
+              <Text style={{ fontSize: 13, color: DS.warning, fontWeight: '600' }}>⚠  Direction changed — tap Regenerate to update your logo.</Text>
+            </View>
+          )}
           <LogoMakerTab
             brandName={inputs.brandName}
             tagline={inputs.tagline}
@@ -2523,6 +2592,20 @@ export default function BrandStudioScreen() {
             onConceptIdx={setActiveConceptIdx}
             directionId={selectedDirection}
           />
+          {brandResult && !labelResult && (
+            <TouchableOpacity
+              onPress={() => { advanceBrandStep(4); setBrandStep(4); }}
+              activeOpacity={0.8}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12, borderRadius: DS.radiusCard, backgroundColor: DS.bgSubtle, borderWidth: 1, borderColor: DS.border }}
+            >
+              <Text style={{ fontSize: 22 }}>📦</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: DS.textPrimary }}>Packaging Insert</Text>
+                <Text style={{ fontSize: 11, color: DS.textSecondary, lineHeight: 16, marginTop: 2 }}>Drive reviews and repeat purchases with a custom post-purchase card — generated in Step 5.</Text>
+              </View>
+              <Text style={{ fontSize: 16, color: DS.textMuted }}>›</Text>
+            </TouchableOpacity>
+          )}
           <StepContinueBtn label="Continue to Barcode Setup →" onPress={() => advanceBrandStep(2)} />
         </BrandStepSection>
 
@@ -2543,7 +2626,7 @@ export default function BrandStudioScreen() {
             accent={DS.accent}
           />
           <BarcodeWorkflowCard
-            brandName={selectedLogoName || inputs.brandName}
+            brandName={effectiveBrandName}
             onSave={(mode, ident, place, pack, gs1, fnsku) => {
               setBarcodeMode(mode); setBarcodeIdent(ident);
               setBarcodePlace(place); setBarcodePackage(pack);
@@ -2564,7 +2647,7 @@ export default function BrandStudioScreen() {
           step={4}
           title="Label & Packaging"
           subtitle="Packaging type, label content, and shelf preview"
-          doneLabel={labelTemplate ? `${PACKAGING_TYPES.find(p => p.id === packagingType)?.label ?? 'Label'} · ${(labelFields as any)?.productName || inputs.brandName}` : 'Designed'}
+          doneLabel={labelTemplate ? `${PACKAGING_TYPES.find(p => p.id === packagingType)?.label ?? 'Label'} · ${labelFields?.['productName'] || inputs.brandName}` : 'Designed'}
           current={brandStep === 4}
           done={completedBrandSteps.has(4)}
           locked={brandStep < 4 && !completedBrandSteps.has(3)}
@@ -2587,12 +2670,12 @@ export default function BrandStudioScreen() {
             exportLoading={exportLoading}
             exportError={exportError}
             onExport={handleExportLabel}
-            accentColor={DS.indigo}
+            accentColor={DS.accent}
             packagingType={packagingType}
             onPackagingType={setPackagingType}
           />
           <LabelContentFields
-            brandName={selectedLogoName || inputs.brandName}
+            brandName={effectiveBrandName}
             tagline={inputs.tagline || brandResult?.tagline || ''}
             onSave={(flds) => {
               setLabelFields(flds); setLabelTemplate(packagingType); setLabelBarcodeP(barcodePlace);
@@ -2602,7 +2685,7 @@ export default function BrandStudioScreen() {
             barcodePlacement={barcodePlace}
           />
           <PackagingMockupCard
-            brandName={selectedLogoName || inputs.brandName}
+            brandName={effectiveBrandName}
             colorPalette={inputs.colorPalette}
             tagline={inputs.tagline || brandResult?.tagline || ''}
           />
@@ -2621,8 +2704,8 @@ export default function BrandStudioScreen() {
           onExpand={() => setBrandStep(5)}
         >
           <PackagingInsertTab
-            brandName={inputs.brandName} loading={labelLoading} result={labelResult}
-            onGenerate={handleGenerateLabel} genError={labelError}
+            brandName={inputs.brandName} loading={insertLoading} result={labelResult}
+            onGenerate={handleGenerateInsert} genError={labelError}
             exportLoading={exportLoading} exportError={exportError} onExport={handleExportInsert}
             accentColor={DS.accent}
           />
@@ -2642,8 +2725,8 @@ export default function BrandStudioScreen() {
         >
           <CopilotTipCard
             icon="📝"
-            tip="Your bullets should directly address customer complaints from Recon. Complaints = your strongest selling points when solved correctly."
-            accent={DS.indigo}
+            tip="Your bullets should directly address customer complaints from Teardown. Complaints = your strongest selling points when solved correctly."
+            accent={DS.accent}
           />
           {brandResult ? (
             <ListingPreparationCard result={brandResult} niche={pipeline.activeNiche?.keyword} reconInsights={pipeline.reconInsights} />
@@ -2664,7 +2747,7 @@ export default function BrandStudioScreen() {
 
           {inputs.brandName.trim().length > 0 && (
             <BrandPipelineActions
-              brandName={selectedLogoName || inputs.brandName}
+              brandName={effectiveBrandName}
               productTitle={pipeline.activeProduct?.title ?? inputs.brandName}
               tagline={inputs.tagline || brandResult?.tagline || ''}
               keywords={brandResult?.generated_keywords ?? []}
@@ -2707,7 +2790,12 @@ export default function BrandStudioScreen() {
         {/* Recent Assets */}
         {history.length > 0 && (
           <>
-            <SectionHeader title="Recent Assets" style={s.sectionHead} />
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: -4 }}>
+              <SectionHeader title="Recent Assets" style={s.sectionHead} />
+              <TouchableOpacity onPress={handleClearHistory} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Text style={{ fontSize: 12, fontWeight: '600', color: DS.danger }}>Clear</Text>
+              </TouchableOpacity>
+            </View>
             <AppCard style={{ gap: 0 }}>
               {history.map((entry, i) => {
                 const daysAgo = Math.floor((Date.now() - new Date(entry.createdAt).getTime()) / 86_400_000);
@@ -2722,6 +2810,13 @@ export default function BrandStudioScreen() {
                     </View>
                     <TouchableOpacity
                       style={bh.reExport}
+                      onPress={() => handleRestoreHistory(entry)}
+                      activeOpacity={0.75}
+                    >
+                      <Text style={bh.reExportTxt}>Restore</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[bh.reExport, { marginLeft: 6 }]}
                       onPress={makeExportHandler(entry.svg, `siftly-${entry.assetType}`)}
                       activeOpacity={0.75}
                     >
@@ -2760,17 +2855,6 @@ const s = StyleSheet.create({
     borderBottomColor: DS.border,
     gap:               3,
   },
-  eyebrow: {
-    fontSize: 9, fontWeight: '800', color: DS.pink,
-    letterSpacing: 2.5,
-  },
-  heroTitle: {
-    fontSize: 20, fontWeight: '900', color: DS.textPrimary, letterSpacing: -0.7,
-  },
-  heroSub: {
-    fontSize: 13, color: DS.textSecondary, lineHeight: 18,
-  },
-
   scroll:  { flex: 1 },
   content: {
     paddingHorizontal: DS.pagePadding,

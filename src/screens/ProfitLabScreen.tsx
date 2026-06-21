@@ -1,7 +1,7 @@
 /**
  * ProfitLabScreen — Multi-calculator Profit Lab
  *
- * 9 calculators accessed via a compact 3×3 selector grid.
+ * 5 calculators accessed via a selector grid.
  * Only one workspace is shown at a time — no stacked scroll clutter.
  * Preserves the Siftly DS, card style, and all existing FBA logic.
  */
@@ -25,7 +25,6 @@ import {
 import { STORAGE_KEYS } from '../constants/storage';
 import { useCurrency } from '../context/CurrencyContext';
 import { usePipeline } from '../context/PipelineContext';
-import { PipelineProgressBar } from '../components/PipelineProgressBar';
 import type { CurrencyCode, MarketplaceId } from '../context/CurrencyContext';
 import { useActiveProduct } from '../context/ActiveProductContext';
 import { HelpButton } from '../components/HelpModal';
@@ -119,7 +118,7 @@ function CalcBtn({ label, onPress }: { label: string; onPress: () => void }) {
 }
 const cb = StyleSheet.create({
   btn: {
-    backgroundColor: DS.indigo, borderRadius: DS.radiusButton,
+    backgroundColor: DS.accent, borderRadius: DS.radiusButton,
     paddingVertical: 14, alignItems: 'center', marginTop: 4,
   },
   txt: { fontSize: 15, fontWeight: '800', color: '#fff', letterSpacing: -0.2 },
@@ -192,78 +191,103 @@ const SCENARIO_CFG: Record<Scenario, { label: string; freightMult: number; dutyM
 function CalcSelector({ active, onSelect }: { active: CalcType; onSelect: (id: CalcType) => void }) {
   const [expanded, setExpanded] = useState(active !== 'fba');
   const activeCalcInfo = CALCS.find(c => c.id === active) ?? CALCS[0];
+  const otherCalcs = CALCS.filter(c => c.id !== active);
+
+  if (expanded) {
+    return (
+      <View style={sel.expandedWrap}>
+        <Text style={sel.expandedTitle}>Calculators</Text>
+        <Text style={sel.expandedSub}>Select a workspace</Text>
+
+        <TouchableOpacity style={sel.featuredTile} onPress={() => setExpanded(false)} activeOpacity={0.85}>
+          {activeCalcInfo.badge && (
+            <View style={[sel.featBadge, activeCalcInfo.badge === 'Popular' && sel.featBadgeAmber]}>
+              <Text style={sel.featBadgeTxt}>{activeCalcInfo.badge.toUpperCase()}</Text>
+            </View>
+          )}
+          <Text style={sel.featIcon}>{activeCalcInfo.icon}</Text>
+          <Text style={sel.featName}>{activeCalcInfo.name}</Text>
+          <Text style={sel.featDesc}>{activeCalcInfo.desc}</Text>
+        </TouchableOpacity>
+
+        <View style={sel.grid}>
+          {otherCalcs.map(c => (
+            <TouchableOpacity
+              key={c.id}
+              style={sel.tile}
+              onPress={() => { onSelect(c.id); setExpanded(false); }}
+              activeOpacity={0.8}
+            >
+              {c.badge && (
+                <View style={[sel.tileBadge, c.badge === 'Popular' && sel.tileBadgeAmber]}>
+                  <Text style={[sel.tileBadgeTxt, c.badge === 'Popular' && sel.tileBadgeTxtAmber]}>
+                    {c.badge.toUpperCase()}
+                  </Text>
+                </View>
+              )}
+              <Text style={sel.tileIcon}>{c.icon}</Text>
+              <Text style={sel.tileName}>{c.name}</Text>
+              <Text style={sel.tileDesc}>{c.desc}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <TouchableOpacity style={sel.doneBtn} onPress={() => setExpanded(false)} activeOpacity={0.85}>
+          <Text style={sel.doneTxt}>Done ▲</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <AppCard style={sel.card}>
-      <TouchableOpacity
-        style={sel.headerRow}
-        onPress={() => setExpanded(e => !e)}
-        activeOpacity={0.75}
-      >
+      <TouchableOpacity style={sel.headerRow} onPress={() => setExpanded(true)} activeOpacity={0.75}>
+        <Text style={sel.activeIcon}>{activeCalcInfo.icon}</Text>
         <View style={{ flex: 1, gap: 2 }}>
-          <Text style={sel.heading}>
-            {activeCalcInfo.icon} {activeCalcInfo.name}
-          </Text>
-          {active !== 'fba' && (
-            <Text style={sel.activeSub}>{activeCalcInfo.desc}</Text>
-          )}
+          <Text style={sel.heading}>{activeCalcInfo.name}</Text>
+          <Text style={sel.activeSub}>{activeCalcInfo.desc}</Text>
         </View>
-        <Text style={sel.switchLink}>{expanded ? 'Done ▲' : 'Switch ▼'}</Text>
+        <Text style={sel.switchLink}>Switch ▼</Text>
       </TouchableOpacity>
-
-      {expanded && (
-        <View style={sel.grid}>
-          {CALCS.map(c => {
-            const isActive = c.id === active;
-            return (
-              <TouchableOpacity
-                key={c.id}
-                style={[sel.tile, isActive && sel.tileActive]}
-                onPress={() => { onSelect(c.id); setExpanded(false); }}
-                activeOpacity={0.75}
-              >
-                <Text style={sel.icon}>{c.icon}</Text>
-                <Text style={[sel.name, isActive && sel.nameActive]} numberOfLines={2}>{c.name}</Text>
-                <Text style={sel.desc} numberOfLines={1}>{c.desc}</Text>
-                {c.badge ? (
-                  <View style={[sel.badge, isActive && sel.badgeActive]}>
-                    <Text style={[sel.badgeTxt, isActive && sel.badgeTxtActive]}>{c.badge}</Text>
-                  </View>
-                ) : null}
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      )}
+      <Text style={sel.descLine}>{activeCalcInfo.summary}</Text>
     </AppCard>
   );
 }
 const sel = StyleSheet.create({
-  card:        { gap: 10 },
-  headerRow:   { flexDirection: 'row', alignItems: 'center' },
-  heading:     { fontSize: 15, fontWeight: '800', color: DS.textPrimary, letterSpacing: -0.3 },
-  activeSub:   { fontSize: 11, color: DS.textMuted },
-  switchLink:  { fontSize: 12, fontWeight: '700', color: DS.accent },
-  grid:        { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  card:           { gap: 8 },
+  headerRow:      { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  activeIcon:     { fontSize: 26 },
+  heading:        { fontSize: 16, fontWeight: '800', color: DS.textPrimary, letterSpacing: -0.3 },
+  activeSub:      { fontSize: 12, color: DS.textMuted },
+  switchLink:     { fontSize: 13, fontWeight: '700', color: DS.accent },
+  descLine:       { fontSize: 12, color: DS.textMuted, fontStyle: 'italic' as const, lineHeight: 17 },
+  expandedWrap:   { gap: 14, paddingBottom: 8 },
+  expandedTitle:  { fontSize: 26, fontWeight: '900', color: DS.textPrimary, letterSpacing: -0.6, textAlign: 'center' as const },
+  expandedSub:    { fontSize: 14, color: DS.textMuted, textAlign: 'center' as const, marginTop: -8 },
+  featuredTile:   { borderWidth: 2, borderColor: DS.accent, borderRadius: 20, backgroundColor: DS.accentLight, padding: 20, alignItems: 'center' as const, gap: 6 },
+  featBadge:      { position: 'absolute' as const, top: 12, right: 12, backgroundColor: DS.accent, borderRadius: DS.radiusBadge, paddingHorizontal: 10, paddingVertical: 4 },
+  featBadgeAmber: { backgroundColor: DS.warning },
+  featBadgeTxt:   { fontSize: 10, fontWeight: '800', color: '#fff', letterSpacing: 0.5 },
+  featIcon:       { fontSize: 40 },
+  featName:       { fontSize: 18, fontWeight: '800', color: DS.accent, letterSpacing: -0.3 },
+  featDesc:       { fontSize: 13, color: DS.textMuted },
+  grid:           { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   tile: {
-    width:         '31%', minHeight: 86,
-    borderWidth:   1.5, borderColor: DS.border,
-    borderRadius:  16, padding: 10,
-    alignItems:    'flex-start', gap: 2,
-    backgroundColor: DS.bgSubtle,
+    width: '47%', flex: 1, minHeight: 110,
+    borderWidth: 1.5, borderColor: DS.border,
+    borderRadius: 18, padding: 14,
+    alignItems: 'center' as const, gap: 4,
+    backgroundColor: DS.bgCard,
   },
-  tileActive:  { borderColor: DS.indigo, backgroundColor: DS.indigoLight },
-  icon:        { fontSize: 20, marginBottom: 2 },
-  name:        { fontSize: 12, fontWeight: '800', color: DS.textPrimary, letterSpacing: -0.2 },
-  nameActive:  { color: DS.indigo },
-  desc:        { fontSize: 10, color: DS.textMuted },
-  badge: {
-    marginTop: 3, backgroundColor: DS.bgElevated,
-    borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1,
-  },
-  badgeActive:  { backgroundColor: DS.indigoLight },
-  badgeTxt:     { fontSize: 8, fontWeight: '700', color: DS.textMuted, letterSpacing: 0.3 },
-  badgeTxtActive: { color: DS.indigo },
+  tileBadge:      { backgroundColor: DS.accentLight, borderRadius: DS.radiusBadge, paddingHorizontal: 8, paddingVertical: 3 },
+  tileBadgeAmber: { backgroundColor: DS.warning + '20' },
+  tileBadgeTxt:   { fontSize: 9, fontWeight: '800', color: DS.accent, letterSpacing: 0.5 },
+  tileBadgeTxtAmber: { color: DS.warning },
+  tileIcon:       { fontSize: 30, marginBottom: 2 },
+  tileName:       { fontSize: 13, fontWeight: '800', color: DS.textPrimary, letterSpacing: -0.2, textAlign: 'center' as const },
+  tileDesc:       { fontSize: 11, color: DS.textMuted, textAlign: 'center' as const },
+  doneBtn:        { backgroundColor: DS.accent, borderRadius: 28, paddingVertical: 14, paddingHorizontal: 36, alignSelf: 'center' as const, marginTop: 4 },
+  doneTxt:        { fontSize: 15, fontWeight: '800', color: '#fff' },
 });
 
 // ─── Pipeline action buttons (cost model + launch decision) ──────────────────
@@ -432,7 +456,7 @@ const av = StyleSheet.create({
 });
 
 function FBAWorkspace({
-  onSave, onUnsave, saveLoading, saveSuccess, saveError, latestEntry, activeProductPrice, activeProductName, onFeasibility,
+  onSave, onUnsave, saveLoading, saveSuccess, saveError, latestEntry, activeProductPrice, activeProductName,
 }: {
   onSave: (netProfit: number, margin: number, roi: number, inputs: FBAInputs, currency: CurrencyCode, marketplaceId: MarketplaceId, productName: string, hsCode: string, asin: string, confidenceScore: number) => void;
   onUnsave: () => void;
@@ -440,7 +464,6 @@ function FBAWorkspace({
   latestEntry: VaultEntry | null;
   activeProductPrice: number | null;
   activeProductName: string;
-  onFeasibility: () => void;
 }) {
   const { fmtLocal, symbol, currency, marketplace } = useCurrency();
   const pipeline = usePipeline();
@@ -714,85 +737,94 @@ function FBAWorkspace({
         </View>
       )}
 
-      {/* Launch Decision CTA */}
-      <TouchableOpacity style={fc.banner} onPress={onFeasibility} activeOpacity={0.82}>
-        <View style={fc.left}>
-          <View style={fc.topRow}>
-            <Text style={fc.label}>LAUNCH DECISION</Text>
-            <HelpButton featureKey="feasibility" size="sm" />
-          </View>
-          <Text style={fc.title}>Is this product worth launching?</Text>
-          <Text style={fc.sub}>Combine Amazon product, supplier costs, risk, capital, and readiness into one decision.</Text>
-          <View style={fc.cta}>
-            <Text style={fc.ctaTxt}>Get Launch Decision  →</Text>
-          </View>
-        </View>
-      </TouchableOpacity>
 
-      {/* Summary */}
-      <AppCard style={{ gap: 16 }}>
-        <View style={ws.heroRow}>
-          <View style={{ gap: 2 }}>
-            <Text style={ws.heroLabel}>Estimated Net Profit</Text>
-            <Text style={[ws.heroValue, { color: sc.netProfit < 0 ? DS.danger : DS.success }]}>
+      {/* Results card — green top bar + 3 metrics + breakdown */}
+      <AppCard style={{ gap: 0, overflow: 'hidden' }}>
+        {/* Green accent bar */}
+        <View style={{ height: 4, backgroundColor: sc.netProfit < 0 ? DS.danger : DS.success, marginHorizontal: -20, marginTop: -20, marginBottom: 16 }} />
+
+        {/* 3 metric row */}
+        <View style={ws.metricsRow}>
+          <View style={ws.metricBlock}>
+            <Text style={ws.metricLblTop}>Net Profit</Text>
+            <Text style={[ws.metricBig, { color: sc.netProfit < 0 ? DS.danger : DS.success }]}>
               {sc.netProfit < 0 ? '-' : ''}{fmtLocal(Math.abs(sc.netProfit))}
             </Text>
-            <Text style={ws.heroUnit}>per unit · {profile.amazonMarketplace}</Text>
-            {n(committed.freight) === 0 && <EstimateLabel type="estimated" />}
+            <Text style={ws.metricUnit}>/unit</Text>
           </View>
-          <StatusBadge
-            label={sc.netProfit <= 0 ? 'Loss' : sc.isViable ? 'Healthy' : 'Thin'}
-            variant={badgeV} dot
-          />
+          <View style={ws.metDiv} />
+          <View style={ws.metricBlock}>
+            <Text style={ws.metricLblTop}>Margin</Text>
+            <Text style={[ws.metricBig, { color: sc.margin < 15 ? DS.danger : sc.margin < 25 ? DS.warning : DS.success }]}>
+              {sc.margin.toFixed(0)}%
+            </Text>
+          </View>
+          <View style={ws.metDiv} />
+          <View style={ws.metricBlock}>
+            <Text style={ws.metricLblTop}>ROI</Text>
+            <Text style={[ws.metricBig, { color: sc.roi < 30 ? DS.warning : DS.success }]}>
+              {sc.roi.toFixed(0)}%
+            </Text>
+          </View>
         </View>
+
         {scenario !== 'expected' && (
-          <Text style={ws.hint}>
+          <Text style={[ws.hint, { marginBottom: 8 }]}>
             {SCENARIO_CFG[scenario].label}: freight ×{SCENARIO_CFG[scenario].freightMult.toFixed(2)}, duties ×{SCENARIO_CFG[scenario].dutyMult.toFixed(2)}
           </Text>
         )}
-        <View style={ws.metrics}>
-          {[
-            { label: 'Margin',  val: `${sc.margin.toFixed(1)}%`,  warn: sc.margin < 15 },
-            { label: 'ROI',     val: `${sc.roi.toFixed(0)}%`,      warn: sc.roi    < 30 },
-            { label: 'Revenue', val: fmtLocal(sc.sellingPrice),    warn: false },
-            { label: 'Costs',   val: fmtLocal(sc.totalCost),       warn: false },
-          ].map((m, i, a) => (
-            <React.Fragment key={m.label}>
-              <View style={ws.metric}>
-                <Text style={[ws.metricVal, m.warn && { color: DS.warning }]}>{m.val}</Text>
-                <Text style={ws.metricLbl}>{m.label}</Text>
-              </View>
-              {i < a.length - 1 && <View style={ws.metDiv} />}
-            </React.Fragment>
-          ))}
+
+        {/* Divider */}
+        <View style={{ height: 1, backgroundColor: DS.border, marginHorizontal: -20, marginBottom: 12 }} />
+
+        {/* Breakdown rows */}
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6 }}>
+          <Text style={ws.bkLabel}>Revenue</Text>
+          <Text style={[ws.bkVal, { color: DS.textPrimary }]}>{fmtLocal(sc.sellingPrice)}</Text>
         </View>
+        {c.costAmounts.filter(row => row.label !== 'Total costs' && row.amount > 0).map(row => (
+          <View key={row.label} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, borderTopWidth: 1, borderTopColor: DS.border }}>
+            <Text style={ws.bkLabel}>{row.label}</Text>
+            <Text style={[ws.bkVal, { color: DS.danger }]}>-{fmtLocal(row.amount)}</Text>
+          </View>
+        ))}
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, borderTopWidth: 1, borderTopColor: DS.border }}>
+          <Text style={[ws.bkLabel, { fontWeight: '800', color: DS.textPrimary }]}>Net</Text>
+          <Text style={[ws.bkVal, { color: sc.netProfit < 0 ? DS.danger : DS.success, fontWeight: '900' }]}>
+            {sc.netProfit < 0 ? '-' : ''}{fmtLocal(Math.abs(sc.netProfit))}
+          </Text>
+        </View>
+
+        {n(committed.freight) === 0 && <EstimateLabel type="estimated" />}
         <AccuracyBadge level="planning" />
-        <ConfidenceBar score={confidence} />
+
+        {/* Save to History link */}
+        <TouchableOpacity
+          style={{ alignSelf: 'flex-end', marginTop: 4 }}
+          onPress={() => saveSuccess
+            ? onUnsave()
+            : onSave(sc.netProfit, sc.margin, sc.roi, committed, currency, marketplace, productName, hsCode, loadedAsin, confidence)
+          }
+          disabled={saveLoading}
+          activeOpacity={0.7}
+        >
+          <Text style={{ fontSize: 12, color: saveSuccess ? DS.success : DS.accent, fontWeight: '700' }}>
+            {saveLoading ? 'Saving…' : saveSuccess ? '✓ Saved' : 'Save to History'}
+          </Text>
+        </TouchableOpacity>
       </AppCard>
 
-      {/* Advisor verdict — the decision + the single best move */}
+      {/* Advisor verdict */}
       <AdvisorVerdict c={sc} productCost={n(committed.productCost)} fmtLocal={fmtLocal} />
 
-      {/* Cost breakdown */}
-      <AppCard style={{ gap: 12 }}>
-        <Text style={ws.cardTitle}>Cost Breakdown</Text>
-        {c.costAmounts.map(row => (
-          <Row
-            key={row.label}
-            label={row.label}
-            value={`-${fmtLocal(row.amount)}`}
-            highlight={row.label === 'Total costs'}
-          />
-        ))}
-        <Text style={ws.disclaimer}>{profile.fbaFeeDisclaimer}</Text>
-      </AppCard>
-
-      {/* Stress Test — scenario comparison + sensitivity, combined */}
+      {/* Confidence + stress test */}
       <AppCard style={{ gap: 8 }}>
+        <ConfidenceBar score={confidence} />
         <TouchableOpacity style={ws.collapseRow} onPress={() => setShowStressTest(v => !v)} activeOpacity={0.7}>
           <Text style={ws.collapseTitle}>Stress Test</Text>
           <Text style={ws.collapseChev}>{showStressTest ? '▲' : '▼'}</Text>
         </TouchableOpacity>
+
         {showStressTest && (
           <View style={{ gap: 16 }}>
             <View style={{ gap: 4 }}>
@@ -843,25 +875,14 @@ function FBAWorkspace({
         )}
       </AppCard>
 
-      {/* Save */}
-      <View style={{ gap: 8 }}>
-        {saveSuccess && (
-          <View style={ws.banner}><Text style={ws.bannerTxt}>✓  Calculation saved</Text></View>
-        )}
+      {/* Save errors / disclaimer */}
+      <View style={{ gap: 4 }}>
         {saveError !== '' && (
           <View style={[ws.banner, { backgroundColor: DS.dangerBg }]}>
             <Text style={[ws.bannerTxt, { color: DS.danger }]}>{saveError}</Text>
           </View>
         )}
         <Text style={ws.disclaimer}>{profile.marketplaceDisclaimer}</Text>
-        <SecondaryButton
-          label={saveLoading ? 'Saving…' : saveSuccess ? 'Tap to unsave ✕' : 'Save to History'}
-          onPress={() => saveSuccess
-            ? onUnsave()
-            : onSave(sc.netProfit, sc.margin, sc.roi, committed, currency, marketplace, productName, hsCode, loadedAsin, confidence)
-          }
-          icon={saveSuccess ? '✕' : '✦'} disabled={saveLoading} loading={saveLoading}
-        />
         {saveSuccess && (
           <FeasibilityHeart
             type="calculation"
@@ -953,12 +974,13 @@ function FBAWorkspace({
         ) : (
           <View style={{ gap: 6 }}>
             <Text style={ws.hint}>No saved products available.</Text>
-            <Text style={[ws.hint, { color: DS.indigo, fontWeight: '600' }]}>
+            <Text style={[ws.hint, { color: DS.accent, fontWeight: '600' }]}>
               Research a product first — then load it here.
             </Text>
           </View>
         )}
       </AppCard>
+
     </View>
   );
 }
@@ -1072,7 +1094,7 @@ function PPCWorkspace() {
           <View style={ws.heroRow}>
             <View style={{ gap: 2 }}>
               <Text style={ws.heroLabel}>Daily Ad Budget</Text>
-              <Text style={[ws.heroValue, { color: DS.indigo }]}>{symbol}{dailyBudget.toFixed(2)}</Text>
+              <Text style={[ws.heroValue, { color: DS.accent }]}>{symbol}{dailyBudget.toFixed(2)}</Text>
               <Text style={ws.heroUnit}>to sell {u} units/day at {acosN}% ACoS</Text>
             </View>
           </View>
@@ -1235,7 +1257,7 @@ const cmp = StyleSheet.create({
   closeBtn:    { fontSize: 20, color: DS.textMuted, fontWeight: '300' },
   body:        { padding: 20, gap: 0, paddingBottom: 16 },
   footer:      { padding: 20, borderTopWidth: 1, borderTopColor: DS.border, backgroundColor: DS.bgCard },
-  doneBtn:     { backgroundColor: DS.indigo, borderRadius: 14, paddingVertical: 14, alignItems: 'center' },
+  doneBtn:     { backgroundColor: DS.accent, borderRadius: 14, paddingVertical: 14, alignItems: 'center' },
   doneTxt:     { fontSize: 15, fontWeight: '800', color: '#fff' },
   disclaimer:  { fontSize: 11, color: DS.textMuted, lineHeight: 16, fontStyle: 'italic', marginTop: 16 },
 
@@ -1247,8 +1269,8 @@ const cmp = StyleSheet.create({
   companyHdr:  { fontSize: 12, fontWeight: '800', color: DS.textPrimary, letterSpacing: -0.2, textAlign: 'center' },
   dataVal:     { fontSize: 12, fontWeight: '600', color: DS.textSecondary, textAlign: 'center' },
   dataValBest: { color: DS.accent, fontWeight: '800' },
-  badgePill:   { backgroundColor: DS.indigoLight, borderRadius: 4, paddingHorizontal: 4, paddingVertical: 2, marginTop: 3 },
-  badgePillTxt:{ fontSize: 8, fontWeight: '800', color: DS.indigo, textAlign: 'center' },
+  badgePill:   { backgroundColor: DS.accentLight, borderRadius: 4, paddingHorizontal: 4, paddingVertical: 2, marginTop: 3 },
+  badgePillTxt:{ fontSize: 8, fontWeight: '800', color: DS.accent, textAlign: 'center' },
 });
 
 const FREIGHT_ORIGIN_OPTS: { id: ShipOrigin; label: string }[] = [
@@ -1257,17 +1279,6 @@ const FREIGHT_ORIGIN_OPTS: { id: ShipOrigin; label: string }[] = [
   { id: 'IN', label: 'India'   },
   { id: 'TR', label: 'Turkey'  },
 ];
-const FREIGHT_MODE_OPTS: { id: ShipMode; label: string }[] = [
-  { id: 'sea',     label: 'Sea'     },
-  { id: 'air',     label: 'Air'     },
-  { id: 'express', label: 'Express' },
-];
-const FREIGHT_PRIORITY_OPTS: { id: FreightPriority; label: string }[] = [
-  { id: 'cost',     label: 'Cheapest' },
-  { id: 'speed',    label: 'Fastest'  },
-  { id: 'balanced', label: 'Balanced' },
-];
-
 function FreightWorkspace() {
   const { fmt, marketplace } = useCurrency();
   const profile = getMarketplaceProfile(marketplace);
@@ -2032,20 +2043,27 @@ const ws = StyleSheet.create({
   heroValue:  { fontSize: 36, fontWeight: '900', letterSpacing: -1.2, lineHeight: 42 },
   heroUnit:   { fontSize: 12, color: DS.textMuted, marginTop: -4 },
 
-  metrics:    { flexDirection: 'row', alignItems: 'center', backgroundColor: DS.bgSubtle, borderRadius: 14, padding: 14 },
-  metric:     { flex: 1, alignItems: 'center', gap: 3 },
-  metricVal:  { fontSize: 14, fontWeight: '900', color: DS.textPrimary, letterSpacing: -0.4 },
-  metricLbl:  { fontSize: 9, fontWeight: '600', color: DS.textMuted, textTransform: 'uppercase', letterSpacing: 0.4 },
-  metDiv:     { width: 1, height: 28, backgroundColor: DS.border },
+  metrics:       { flexDirection: 'row', alignItems: 'center', backgroundColor: DS.bgSubtle, borderRadius: 14, padding: 14 },
+  metric:        { flex: 1, alignItems: 'center', gap: 3 },
+  metricVal:     { fontSize: 14, fontWeight: '900', color: DS.textPrimary, letterSpacing: -0.4 },
+  metricLbl:     { fontSize: 9, fontWeight: '600', color: DS.textMuted, textTransform: 'uppercase', letterSpacing: 0.4 },
+  metDiv:        { width: 1, height: 28, backgroundColor: DS.border },
+  metricsRow:    { flexDirection: 'row', alignItems: 'center', paddingBottom: 12 },
+  metricBlock:   { flex: 1, alignItems: 'center', gap: 2 },
+  metricLblTop:  { fontSize: 10, fontWeight: '700', color: DS.textMuted, textTransform: 'uppercase' as const, letterSpacing: 0.5 },
+  metricBig:     { fontSize: 28, fontWeight: '900', letterSpacing: -0.8, lineHeight: 34 },
+  metricUnit:    { fontSize: 11, color: DS.textMuted },
+  bkLabel:       { fontSize: 13, color: DS.textSecondary, flex: 1 },
+  bkVal:         { fontSize: 13, fontWeight: '700' },
 
   cardTitle:  { fontSize: 15, fontWeight: '800', color: DS.textPrimary, letterSpacing: -0.3 },
   hint:       { fontSize: 12, color: DS.textMuted, lineHeight: 17 },
   disclaimer: { fontSize: 11, color: DS.textMuted, lineHeight: 16, fontStyle: 'italic' },
 
-  warnBox:    { backgroundColor: DS.warningBg, borderRadius: 12, borderWidth: 1, borderColor: '#FDE68A', padding: 12, gap: 8 },
+  warnBox:    { backgroundColor: DS.warningBg, borderRadius: 12, borderWidth: 1, borderColor: DS.warning + '50', padding: 12, gap: 8 },
   warnRow:    { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
   warnIcon:   { fontSize: 12, color: DS.warningText, marginTop: 1 },
-  warnTxt:    { flex: 1, fontSize: 12, color: '#92400E', lineHeight: 17 },
+  warnTxt:    { flex: 1, fontSize: 12, color: DS.warningText, lineHeight: 17 },
 
   chipLabel:  { fontSize: 9, fontWeight: '800', color: DS.textMuted, letterSpacing: 1.5 },
   chips:      { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
@@ -2054,9 +2072,9 @@ const ws = StyleSheet.create({
     borderWidth: 1, borderColor: DS.border,
     borderRadius: 20, backgroundColor: DS.bgSubtle,
   },
-  chipActive: { backgroundColor: DS.indigoLight, borderColor: DS.indigo },
+  chipActive: { backgroundColor: DS.accentLight, borderColor: DS.accent },
   chipTxt:    { fontSize: 11, fontWeight: '600', color: DS.textSecondary },
-  chipTxtActive: { color: DS.indigo, fontWeight: '700' },
+  chipTxtActive: { color: DS.accent, fontWeight: '700' },
 
   acosHint:   { backgroundColor: DS.bgSubtle, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 },
   acosHintTxt:{ fontSize: 13, fontWeight: '700' },
@@ -2078,7 +2096,7 @@ const ws = StyleSheet.create({
 
   toggleRow:     { flexDirection: 'row', alignItems: 'center', gap: 10 },
   toggleBox:     { width: 20, height: 20, borderWidth: 1.5, borderColor: DS.border, borderRadius: 4, alignItems: 'center', justifyContent: 'center', backgroundColor: DS.bgSubtle },
-  toggleBoxActive: { backgroundColor: DS.indigo, borderColor: DS.indigo },
+  toggleBoxActive: { backgroundColor: DS.accent, borderColor: DS.accent },
   toggleCheck:   { fontSize: 12, fontWeight: '900', color: '#fff' },
   toggleTxt:     { fontSize: 13, fontWeight: '600', color: DS.textSecondary, flex: 1 },
 
@@ -2096,7 +2114,7 @@ const ws = StyleSheet.create({
 
   // Helper accordion (fee helper / HS helper)
   helperLink:    { paddingVertical: 4 },
-  helperLinkTxt: { fontSize: 12, fontWeight: '600', color: DS.indigo },
+  helperLinkTxt: { fontSize: 12, fontWeight: '600', color: DS.accent },
   helperBox:     { backgroundColor: DS.bgSubtle, borderRadius: 10, padding: 10, gap: 6 },
   helperTitle:   { fontSize: 12, fontWeight: '800', color: DS.textPrimary },
   helperRow:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
@@ -2112,7 +2130,7 @@ const lp = StyleSheet.create({
   verdict:      { fontSize: 10, color: DS.textMuted, fontStyle: 'italic' },
   badge:        { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, flexShrink: 0 },
   badgeTxt:     { fontSize: 10, fontWeight: '800' },
-  loadBtn:      { backgroundColor: DS.indigo, borderRadius: DS.radiusButton, paddingVertical: 12, alignItems: 'center' },
+  loadBtn:      { backgroundColor: DS.accent, borderRadius: DS.radiusButton, paddingVertical: 12, alignItems: 'center' },
   loadBtnTxt:   { fontSize: 14, fontWeight: '800', color: '#fff', letterSpacing: -0.2 },
 });
 
@@ -2168,10 +2186,10 @@ const fc2 = StyleSheet.create({
   companyName:    { fontSize: 14, fontWeight: '800', color: DS.textPrimary, letterSpacing: -0.3 },
   specialization: { fontSize: 10, color: DS.textMuted },
   badge: {
-    backgroundColor: DS.indigoLight, borderRadius: 6,
+    backgroundColor: DS.accentLight, borderRadius: 6,
     paddingHorizontal: 6, paddingVertical: 2,
   },
-  badgeTxt: { fontSize: 9, fontWeight: '800', color: DS.indigo },
+  badgeTxt: { fontSize: 9, fontWeight: '800', color: DS.accent },
   scoreNum:  { fontSize: 22, fontWeight: '900', color: DS.accent, letterSpacing: -0.5 },
   scoreLbl:  { fontSize: 9, fontWeight: '600', color: DS.textMuted },
 
@@ -2188,14 +2206,14 @@ const fc2 = StyleSheet.create({
   metaVal:   { fontSize: 11, fontWeight: '800', color: DS.textPrimary },
 
   selectBtn: {
-    backgroundColor: DS.indigoLight, borderRadius: DS.radiusButton,
-    borderWidth: 1, borderColor: DS.indigo + '40',
+    backgroundColor: DS.accentLight, borderRadius: DS.radiusButton,
+    borderWidth: 1, borderColor: DS.accent + '40',
     paddingVertical: 10, alignItems: 'center',
   },
   selectBtnSaved: {
     backgroundColor: DS.accent, borderColor: DS.accent,
   },
-  selectBtnTxt:      { fontSize: 13, fontWeight: '700', color: DS.indigo },
+  selectBtnTxt:      { fontSize: 13, fontWeight: '700', color: DS.accent },
   selectBtnTxtSaved: { color: '#fff' },
 
   estBadge:    { backgroundColor: DS.warningBg, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
@@ -2226,11 +2244,11 @@ const fc2 = StyleSheet.create({
   actionBtnTxtActive: { color: DS.warningText, fontWeight: '800' },
 
   quoteBtn: {
-    borderWidth: 1, borderColor: DS.indigo + '50',
+    borderWidth: 1, borderColor: DS.accent + '50',
     borderRadius: 10, paddingVertical: 9,
-    alignItems: 'center', backgroundColor: DS.indigoLight,
+    alignItems: 'center', backgroundColor: DS.accentLight,
   },
-  quoteBtnTxt: { fontSize: 13, fontWeight: '700', color: DS.indigo },
+  quoteBtnTxt: { fontSize: 13, fontWeight: '700', color: DS.accent },
 });
 
 // Freight search card styles
@@ -2261,8 +2279,8 @@ const fsc = StyleSheet.create({
     backgroundColor: DS.bgSubtle,
   },
   segBtnActive: {
-    backgroundColor: DS.indigo, borderColor: DS.indigo,
-    shadowColor: DS.indigo, shadowOffset: { width: 0, height: 2 },
+    backgroundColor: DS.accent, borderColor: DS.accent,
+    shadowColor: DS.accent, shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25, shadowRadius: 4, elevation: 3,
   },
   segTxt:        { fontSize: 12, fontWeight: '700', color: DS.textSecondary },
@@ -2271,17 +2289,17 @@ const fsc = StyleSheet.create({
   segModeIcon:   { fontSize: 14 },
 
   cbmPill: {
-    backgroundColor: DS.indigoLight, borderRadius: 8,
+    backgroundColor: DS.accentLight, borderRadius: 8,
     paddingHorizontal: 10, paddingVertical: 6,
     alignSelf: 'flex-start',
   },
-  cbmTxt: { fontSize: 11, fontWeight: '600', color: DS.indigo },
+  cbmTxt: { fontSize: 11, fontWeight: '600', color: DS.accent },
 
   searchBtnWrap: { padding: 16, paddingTop: 0 },
   searchBtn: {
-    backgroundColor: DS.indigo, borderRadius: DS.radiusButton,
+    backgroundColor: DS.accent, borderRadius: DS.radiusButton,
     paddingVertical: 15, alignItems: 'center',
-    shadowColor: DS.indigo, shadowOffset: { width: 0, height: 3 },
+    shadowColor: DS.accent, shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.3, shadowRadius: 6, elevation: 4,
   },
   searchBtnDisabled: {
@@ -2295,57 +2313,34 @@ const fsc = StyleSheet.create({
 
 function SavedHistoryCard({ item }: { item: FBASaved }) {
   const isLegacy = !item.currency;
-  const date     = new Date(item.savedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   const daysOld  = Math.floor((Date.now() - new Date(item.savedAt).getTime()) / 86_400_000);
+  const timeAgo  = daysOld === 0 ? 'today' : daysOld === 1 ? '1d ago' : `${daysOld}d ago`;
   const isStale  = daysOld > 45;
   return (
     <View style={hist.card}>
-      <View style={hist.cardTop}>
+      <View style={hist.row}>
         <Text style={hist.cardName} numberOfLines={1}>{item.productName ?? 'Untitled calculation'}</Text>
-        {isLegacy
-          ? <View style={hist.legacyBadge}><Text style={hist.legacyTxt}>Legacy</Text></View>
-          : <Text style={hist.cardMkt}>{item.amazonMarketplace}</Text>}
-      </View>
-      {isLegacy ? (
-        <Text style={hist.legacyNote}>Saved without currency metadata — values not displayed</Text>
-      ) : (
-        <View style={hist.cardRow}>
-          <Text style={[hist.cardStat, { color: item.netProfit >= 0 ? DS.accent : DS.danger }]}>
-            {item.currency} {item.netProfit.toFixed(2)}
+        {!isLegacy && (
+          <Text style={hist.rightMeta} numberOfLines={1}>
+            {item.margin.toFixed(0)}% · {item.roi.toFixed(0)}% · {timeAgo}
           </Text>
-          <Text style={hist.cardStat}>Margin {item.margin.toFixed(1)}%</Text>
-          <Text style={hist.cardStat}>ROI {item.roi.toFixed(0)}%</Text>
-          {item.hsCode ? <Text style={hist.cardStat}>HS {item.hsCode}</Text> : null}
-        </View>
-      )}
-      <View style={hist.dateRow}>
-        <Text style={hist.cardDate}>{date}</Text>
-        {isStale && (
-          <View style={hist.staleBadge}>
-            <Text style={hist.staleTxt}>⚠ {daysOld}d old — re-verify fees</Text>
-          </View>
         )}
       </View>
+      {isStale && (
+        <Text style={hist.staleTxt}>⚠ {daysOld}d old — re-verify fees</Text>
+      )}
     </View>
   );
 }
 const hist = StyleSheet.create({
-  card:        { paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: DS.border, gap: 4 },
-  cardTop:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  cardName:    { fontSize: 13, fontWeight: '700', color: DS.textPrimary, flex: 1 },
-  cardMkt:     { fontSize: 10, fontWeight: '600', color: DS.textMuted },
-  cardRow:     { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  cardStat:    { fontSize: 11, fontWeight: '600', color: DS.textSecondary },
-  cardDate:    { fontSize: 10, color: DS.textMuted },
-  dateRow:     { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  staleBadge:  { backgroundColor: DS.warningBg, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2, borderWidth: 1, borderColor: '#FDE68A' },
-  staleTxt:    { fontSize: 9, fontWeight: '700', color: DS.warningText },
-  legacyBadge: { backgroundColor: DS.bgSubtle, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
-  legacyTxt:   { fontSize: 9, fontWeight: '700', color: DS.textMuted },
-  legacyNote:  { fontSize: 11, color: DS.textMuted, fontStyle: 'italic' },
-  headerRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  title:       { fontSize: 13, fontWeight: '800', color: DS.textPrimary },
-  clearAll:    { fontSize: 11, fontWeight: '700', color: DS.textMuted },
+  card:      { paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: DS.border },
+  row:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  cardName:  { fontSize: 14, fontWeight: '700', color: DS.textPrimary, flex: 1 },
+  rightMeta: { fontSize: 12, color: DS.textMuted, fontWeight: '500', flexShrink: 0 },
+  staleTxt:  { fontSize: 10, color: DS.warning, fontWeight: '600', marginTop: 3 },
+  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  title:     { fontSize: 13, fontWeight: '800', color: DS.textPrimary },
+  clearAll:  { fontSize: 11, fontWeight: '700', color: DS.textMuted },
 });
 
 type NavProp = StackNavigationProp<RootStackParamList, 'Main'>;
@@ -2374,7 +2369,7 @@ export default function ProfitLabScreen() {
   useEffect(() => {
     if (saveSuccess) {
       AsyncStorage.getItem(STORAGE_KEYS.savedCalculations)
-        .then(raw => { if (raw) setSavedCalcs(JSON.parse(raw)); })
+        .then(raw => { if (raw) { const p = safeParseJSON<FBASaved[]>(raw); if (p) setSavedCalcs(p); } })
         .catch(() => {});
     }
   }, [saveSuccess]);
@@ -2402,6 +2397,22 @@ export default function ProfitLabScreen() {
         STORAGE_KEYS.savedCalculations,
         JSON.stringify([entry, ...existing].slice(0, 50)),
       );
+      pipeline.setCostModel({
+        sellingPrice:    n(inputs.sellingPrice),
+        unitCost:        n(inputs.productCost),
+        freight:         n(inputs.freight),
+        fbaFee:          n(inputs.fbaFees),
+        referralFee:     n(inputs.referralFee),
+        duties:          n(inputs.duties),
+        packaging:       n(inputs.packaging),
+        netProfit,
+        marginPct:       margin,
+        roiPct:          roi,
+        totalCost:       n(inputs.productCost) + n(inputs.freight) + n(inputs.fbaFees) + n(inputs.referralFee) + n(inputs.duties) + n(inputs.packaging),
+        unitsOrdered:    n(inputs.unitsOrdered),
+        totalInvestment: (n(inputs.productCost) + n(inputs.freight) + n(inputs.duties) + n(inputs.packaging)) * n(inputs.unitsOrdered),
+        savedAt,
+      });
       setSaveSuccess(true);
       setLastSavedAt(savedAt);
     } catch (err: any) {
@@ -2457,7 +2468,6 @@ export default function ProfitLabScreen() {
       <Toast message={toastMsg} visible={toastVisible} onHide={hideToast} type={toastType} />
       <AppHeader helpKey={CALC_HELP[calcType]} />
       <OfflineBanner visible={!isOnline} />
-      <PipelineProgressBar />
 
       <ScrollView
         style={s.scroll}
@@ -2485,7 +2495,6 @@ export default function ProfitLabScreen() {
             latestEntry={latestEntry}
             activeProductPrice={activeProduct?.price ?? null}
             activeProductName={activeProduct?.name ?? ''}
-            onFeasibility={() => navigation.navigate('LaunchDecision' as any)}
           />
         )}
         {calcType === 'breakeven' && <BreakevenWorkspace />}
@@ -2533,18 +2542,8 @@ export default function ProfitLabScreen() {
 
 const s = StyleSheet.create({
   safe:    { flex: 1, backgroundColor: DS.bgCanvas },
-  header: {
-    paddingHorizontal: DS.pagePadding, paddingTop: 10, paddingBottom: 12,
-    backgroundColor: DS.bgCard,
-    borderBottomWidth: 1, borderBottomColor: DS.border,
-    gap: 2,
-  },
-  eyebrow:   { fontSize: 9, fontWeight: '800', color: DS.indigo, letterSpacing: 2.5 },
-  headerRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  heroTitle: { fontSize: 20, fontWeight: '900', color: DS.textPrimary, letterSpacing: -0.6 },
-  heroSub:   { fontSize: 12, color: DS.textSecondary },
-  calcDesc:  { backgroundColor: DS.indigoLight, borderRadius: 12, borderWidth: 1, borderColor: DS.indigo + '30', paddingHorizontal: 14, paddingVertical: 10 },
-  calcDescText: { fontSize: 13, color: DS.indigo, lineHeight: 20, fontWeight: '500' },
+  calcDesc:  { backgroundColor: DS.accentLight, borderRadius: 12, borderWidth: 1, borderColor: DS.accent + '30', paddingHorizontal: 14, paddingVertical: 10 },
+  calcDescText: { fontSize: 13, color: DS.accent, lineHeight: 20, fontWeight: '500' },
   scroll:    { flex: 1 },
   content:   {
     paddingHorizontal: DS.pagePadding,
@@ -2556,15 +2555,15 @@ const s = StyleSheet.create({
 
 const fc = StyleSheet.create({
   banner: {
-    backgroundColor: DS.indigoLight,
-    borderRadius: DS.radiusCard, borderWidth: 1, borderColor: DS.indigo + '30',
+    backgroundColor: DS.accentLight,
+    borderRadius: DS.radiusCard, borderWidth: 1, borderColor: DS.accent + '30',
     padding: 18,
   },
   left:   { gap: 6 },
   topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 },
-  label:  { fontSize: 9, fontWeight: '800', color: DS.indigo, letterSpacing: 2 },
+  label:  { fontSize: 9, fontWeight: '800', color: DS.accent, letterSpacing: 2 },
   title:  { fontSize: 17, fontWeight: '900', color: DS.textPrimary, letterSpacing: -0.5 },
   sub:    { fontSize: 12, color: DS.textSecondary, lineHeight: 17 },
-  cta:    { backgroundColor: DS.indigo, borderRadius: DS.radiusButton, paddingVertical: 10, paddingHorizontal: 16, alignSelf: 'flex-start', marginTop: 4 },
+  cta:    { backgroundColor: DS.accent, borderRadius: DS.radiusButton, paddingVertical: 10, paddingHorizontal: 16, alignSelf: 'flex-start', marginTop: 4 },
   ctaTxt: { fontSize: 13, fontWeight: '800', color: '#fff', letterSpacing: -0.2 },
 });
