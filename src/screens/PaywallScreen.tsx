@@ -186,14 +186,14 @@ function PlanCard({
   const plan = PLANS[tier];
 
   const cardBorderColor = isRecommended
-    ? DS.indigo
+    ? DS.accent
     : tier === 'operator'
-    ? DS.indigo
+    ? DS.accent
     : isSelected
     ? DS.accent
     : DS.border;
 
-  const cardBg = isRecommended ? DS.indigoLight : DS.bgCard;
+  const cardBg = isRecommended ? DS.accentLight : DS.bgCard;
 
   const eyebrow = isCurrent
     ? 'CURRENT PLAN'
@@ -202,9 +202,9 @@ function PlanCard({
   const eyebrowColor = isCurrent
     ? DS.textMuted
     : isRecommended
-    ? DS.indigo
+    ? DS.accent
     : tier === 'operator'
-    ? DS.indigo
+    ? DS.accent
     : DS.textMuted;
 
   const ctaLabel = tier === 'explorer'
@@ -235,7 +235,7 @@ function PlanCard({
           <Text style={pc.desc} numberOfLines={2}>{PLAN_DESCRIPTIONS[tier]}</Text>
         </View>
         <View style={pc.priceCol}>
-          <Text style={[pc.price, isRecommended && { color: DS.indigo }]}>
+          <Text style={[pc.price, isRecommended && { color: DS.accent }]}>
             {priceLabel}
           </Text>
           <Text style={pc.billing}>{billingNote}</Text>
@@ -246,7 +246,7 @@ function PlanCard({
       <View style={pc.divider} />
       {PLAN_FEATURES[tier].map((f, i) => (
         <View key={i} style={pc.feature}>
-          <Text style={[pc.featureCheck, isRecommended && { color: DS.indigo }]}>✓</Text>
+          <Text style={[pc.featureCheck, isRecommended && { color: DS.accent }]}>✓</Text>
           <Text style={pc.featureText}>{f}</Text>
         </View>
       ))}
@@ -292,7 +292,7 @@ const pc = StyleSheet.create({
     overflow:     'hidden',
   },
   cardShadow: {
-    shadowColor:   DS.indigo,
+    shadowColor:   DS.accent,
     shadowOffset:  { width: 0, height: 4 },
     shadowOpacity: 0.16,
     shadowRadius:  16,
@@ -367,7 +367,7 @@ function ComparisonCard() {
 const cmp = StyleSheet.create({
   card:       { overflow: 'hidden' },
   row:        { flexDirection: 'row', alignItems: 'center' },
-  headerRow:  { backgroundColor: DS.indigoLight, paddingVertical: 12 },
+  headerRow:  { backgroundColor: DS.accentLight, paddingVertical: 12 },
   rowAlt:     { backgroundColor: DS.bgSubtle },
   cell: {
     flex: 1, paddingVertical: 11, paddingHorizontal: 8,
@@ -379,9 +379,9 @@ const cmp = StyleSheet.create({
     paddingVertical: 11, paddingHorizontal: 14,
     borderRightWidth: 1, borderRightColor: DS.borderLight,
   },
-  labelIcon:  { fontSize: 11, color: DS.indigo },
+  labelIcon:  { fontSize: 11, color: DS.accent },
   labelText:  { fontSize: 11, fontWeight: '600', color: DS.textSecondary, flex: 1 },
-  headerText: { fontSize: 10, fontWeight: '800', color: DS.indigo, textAlign: 'center' },
+  headerText: { fontSize: 10, fontWeight: '800', color: DS.accent, textAlign: 'center' },
   valCell:    { fontWeight: '600', color: DS.textPrimary },
   valCheck:   { color: DS.accent, fontWeight: '800' },
   valEmpty:   { color: DS.textMuted, fontWeight: '400' },
@@ -760,15 +760,15 @@ const s = StyleSheet.create({
     alignItems:        'center',
     gap:               6,
     alignSelf:         'flex-start',
-    backgroundColor:   DS.indigoLight,
+    backgroundColor:   DS.accentLight,
     borderRadius:      DS.radiusBadge,
     paddingHorizontal: 12,
     paddingVertical:   6,
     borderWidth:       1,
-    borderColor:       DS.indigoLight,
+    borderColor:       DS.accentLight,
   },
-  logoPillIcon: { fontSize: 11, color: DS.indigo },
-  logoPillText: { fontSize: 10, fontWeight: '900', color: DS.indigo, letterSpacing: 1 },
+  logoPillIcon: { fontSize: 11, color: DS.accent },
+  logoPillText: { fontSize: 10, fontWeight: '900', color: DS.accent, letterSpacing: 1 },
   heroTitle: {
     fontSize: 32, fontWeight: '900', color: DS.textPrimary,
     letterSpacing: -1, lineHeight: 38,
@@ -785,10 +785,10 @@ const s = StyleSheet.create({
   heroBullet:  { flexDirection: 'row', alignItems: 'center', gap: 10 },
   heroBulletIcon: {
     width: 32, height: 32, borderRadius: 10,
-    backgroundColor: DS.indigoLight,
+    backgroundColor: DS.accentLight,
     alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
-  heroBulletGlyph: { fontSize: 14, color: DS.indigo, fontWeight: '700' },
+  heroBulletGlyph: { fontSize: 14, color: DS.accent, fontWeight: '700' },
   heroBulletText:  { fontSize: 13, color: DS.textSecondary, flex: 1, lineHeight: 19 },
 
   sectionHead: { marginBottom: -8 },

@@ -669,7 +669,7 @@ const v = StyleSheet.create({
   orb1: {
     position: 'absolute', top: -60, right: -60,
     width: 260, height: 260, borderRadius: 130,
-    backgroundColor: DS.indigoLight, opacity: 0.6,
+    backgroundColor: DS.accentLight, opacity: 0.6,
   },
   orb2: {
     position: 'absolute', bottom: 40, left: -80,
@@ -714,7 +714,7 @@ const v = StyleSheet.create({
   termsText: {
     fontSize: 11, color: DS.textMuted, textAlign: 'center', lineHeight: 18,
   },
-  termsLink: { color: DS.indigo, fontWeight: '600' },
+  termsLink: { color: DS.accent, fontWeight: '600' },
 
   // ── Forgot ─────────────────────────────────────────────────────────────
   forgotIcon: {

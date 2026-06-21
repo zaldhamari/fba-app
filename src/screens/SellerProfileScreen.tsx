@@ -40,7 +40,7 @@ const PRICE_OPTIONS: { priceMin: number; priceMax: number; label: string; sub: s
 
 const COMPETITION_OPTIONS: { value: CompetitionThreshold; label: string; sub: string; color: string }[] = [
   { value: 100,  label: 'Easy wins',       sub: 'Top seller has under 100 reviews',  color: DS.accent       },
-  { value: 300,  label: 'I can compete',   sub: 'Top seller has under 300 reviews',  color: DS.indigo       },
+  { value: 300,  label: 'I can compete',   sub: 'Top seller has under 300 reviews',  color: DS.accent       },
   { value: 500,  label: 'Bring it on',     sub: 'Top seller has under 500 reviews',  color: DS.warning      },
   { value: 1000, label: 'No limit',        sub: 'Show me everything',                color: DS.danger       },
 ];
@@ -326,15 +326,15 @@ const s = StyleSheet.create({
     paddingHorizontal: 20, paddingTop: 12, paddingBottom: 16, gap: 12,
   },
   backBtn:  { paddingHorizontal: 4, paddingVertical: 4, minWidth: 44 },
-  backTxt:  { fontSize: 15, fontWeight: '700', color: DS.indigo },
+  backTxt:  { fontSize: 15, fontWeight: '700', color: DS.accent },
 
   progressWrap: { flex: 1, gap: 6 },
   progressBg:   { height: 4, backgroundColor: DS.bgElevated, borderRadius: 2, overflow: 'hidden' },
-  progressFill: { height: 4, backgroundColor: DS.indigo, borderRadius: 2 },
+  progressFill: { height: 4, backgroundColor: DS.accent, borderRadius: 2 },
   progressTxt:  { fontSize: 10, fontWeight: '700', color: DS.textMuted, textAlign: 'right' },
 
   qHead:  { gap: 6, paddingTop: 8 },
-  qNum:   { fontSize: 9, fontWeight: '800', color: DS.indigo, letterSpacing: 2.5 },
+  qNum:   { fontSize: 9, fontWeight: '800', color: DS.accent, letterSpacing: 2.5 },
   qTitle: { fontSize: 26, fontWeight: '900', color: DS.textPrimary, letterSpacing: -0.8, lineHeight: 32 },
   qSub:   { fontSize: 13, color: DS.textSecondary, lineHeight: 19 },
 
@@ -343,39 +343,39 @@ const s = StyleSheet.create({
 
   marketCard: {
     width: '30%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: DS.bgCard, borderRadius: 18, borderWidth: 1.5,
+    backgroundColor: DS.bgCard, borderRadius: DS.radiusCard, borderWidth: 1.5,
     borderColor: DS.border, gap: 4,
   },
-  marketCardSel: { borderColor: DS.indigo, backgroundColor: DS.indigoLight },
+  marketCardSel: { borderColor: DS.accent, backgroundColor: DS.accent + '10' },
   marketFlag:    { fontSize: 28 },
   marketCode:    { fontSize: 13, fontWeight: '800', color: DS.textPrimary },
   marketCur:     { fontSize: 10, color: DS.textMuted, fontWeight: '500' },
 
   optCard: {
     flexDirection: 'row', alignItems: 'center', gap: 14,
-    backgroundColor: DS.bgCard, borderRadius: 16, borderWidth: 1.5,
+    backgroundColor: DS.bgCard, borderRadius: DS.radiusCard, borderWidth: 1.5,
     borderColor: DS.border, padding: 16,
   },
-  optCardSel: { borderColor: DS.indigo, backgroundColor: DS.indigoLight },
+  optCardSel: { borderColor: DS.accent, backgroundColor: DS.accent + '10' },
 
   optCheck: {
     width: 24, height: 24, borderRadius: 12, borderWidth: 2,
     borderColor: DS.border, alignItems: 'center', justifyContent: 'center',
     flexShrink: 0,
   },
-  optCheckSel:  { backgroundColor: DS.indigo, borderColor: DS.indigo },
+  optCheckSel:  { backgroundColor: DS.accent, borderColor: DS.accent },
   optCheckTick: { fontSize: 12, fontWeight: '900', color: '#fff' },
 
   optInfo:     { flex: 1, gap: 2 },
   optLabel:    { fontSize: 15, fontWeight: '700', color: DS.textPrimary },
-  optSel:      { color: DS.indigo },
+  optSel:      { color: DS.accent },
   optSubLabel: { fontSize: 12, color: DS.textSecondary, lineHeight: 17 },
 
-  hint:    { backgroundColor: DS.indigoLight, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: DS.indigo + '30' },
-  hintTxt: { fontSize: 12, color: DS.indigo, lineHeight: 18 },
+  hint:    { backgroundColor: DS.accent + '10', borderRadius: DS.radiusButton, padding: 14, borderWidth: 1, borderColor: DS.accent + '30' },
+  hintTxt: { fontSize: 12, color: DS.accent, lineHeight: 18 },
 
   footer:        { paddingHorizontal: 24, paddingBottom: 32, paddingTop: 12, gap: 12 },
-  nextBtn:       { backgroundColor: DS.indigo, borderRadius: 16, paddingVertical: 16, alignItems: 'center' },
+  nextBtn:       { backgroundColor: DS.accent, borderRadius: DS.radiusButton, paddingVertical: 16, alignItems: 'center' },
   nextBtnDisabled:{ opacity: 0.35 },
   nextTxt:       { fontSize: 16, fontWeight: '800', color: '#fff', letterSpacing: -0.3 },
 

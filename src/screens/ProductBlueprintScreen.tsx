@@ -75,7 +75,7 @@ const PHASES: Phase[] = [
     icon:     '▣',
     title:    'Label Generator & Branding',
     subtitle: 'Create professional product identity from brand name to packaging.',
-    color:    DS.indigo,
+    color:    DS.accent,
     stage:    'brand',
     features: [
       'AI-generated brand names',
