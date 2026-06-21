@@ -135,7 +135,7 @@ export function trendsToMetrics(kw: string, trends: TrendData, totalFound: numbe
     { label: 'Search Volume', value: totalFound > 0 ? totalFound.toLocaleString() : '—',                    icon: '◎', color: DS.info,   bg: DS.infoBg },
     { label: 'Trend Score',   value: trends.interest_score != null ? `${trends.interest_score}/100` : '—',  icon: '↗', color: trendColor, bg: trendBg  },
     { label: 'Trend',         value: trendLabel,                                                             icon: '↗', color: trendColor, bg: trendBg  },
-    { label: 'SEO Score',     value: `${seoScore}/10`,                                                       icon: '✦', color: DS.indigo,  bg: DS.indigoLight },
+    { label: 'SEO Score',     value: `${seoScore}/10`,                                                       icon: '✦', color: DS.accent,  bg: DS.accentLight },
   ];
 }
 

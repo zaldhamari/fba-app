@@ -10,6 +10,7 @@ import { SupplierDisplay, OutreachEmail } from './types';
 import { SmartBadgeStrip, am } from './SharedComponents';
 import { prm, numHL, hlBg, hlTxt, scoreSupplierForCompare, buildSupplierReasons, CMP_LABEL_W, CMP_CELL_W, HL } from './ProductCards';
 import { openURL } from './utils';
+import { roughLandedCost, roughROIPct, roiColor } from '../../lib/financialEngine';
 
 // ── Grade colors ──────────────────────────────────────────────────────────────
 
@@ -27,8 +28,8 @@ export const PLATFORM_COLORS: Record<string, { bg: string; color: string }> = {
   'Alibaba':               { bg: '#FFF4E0', color: '#E8720C' },
   'AliExpress Wholesale':  { bg: '#FFF0ED', color: '#E62335' },
   'DHgate':                { bg: DS.infoBg,     color: DS.info   },
-  'Made-in-China':         { bg: '#F0FDF4',     color: '#16A34A' },
-  'Global Sources':        { bg: DS.indigoLight, color: DS.indigo },
+  'Made-in-China':         { bg: DS.successBg,  color: DS.successText },
+  'Global Sources':        { bg: DS.accentLight, color: DS.accent },
   '1688 (Domestic China)': { bg: '#FFF7ED', color: DS.warningText },
   '1688':                  { bg: '#FFF7ED', color: DS.warningText },
 };
@@ -40,6 +41,7 @@ interface SupplierCardProps {
   inCompare:             boolean;
   analyzeLoading:        boolean;
   outreachLoading:       boolean;
+  isEmailOpen:           boolean;
   onView:                () => void;
   onAnalyze:             () => void;
   onToggleCompare:       () => void;
@@ -49,85 +51,113 @@ interface SupplierCardProps {
   onSelect?:             () => void;
   isSelected?:           boolean;
   grade?:                string;
+  sellingPrice?:         number;
 }
 
 export function SupplierCard({
-  item, inCompare, analyzeLoading, outreachLoading,
+  item, inCompare, analyzeLoading, outreachLoading, isEmailOpen,
   onView, onAnalyze, onToggleCompare, onOutreach, onAttachFeasibility, isFeasAttached,
-  onSelect, isSelected, grade,
+  onSelect, isSelected, grade, sellingPrice,
 }: SupplierCardProps) {
   const { fmt } = useCurrency();
-  const hasLink      = !!item.url;
-  const isGold       = item.badge === 'Gold Supplier';
-  const priceDisplay = item.priceUSD != null ? `${fmt(item.priceUSD)}/unit` : item.price;
-  const pStyle       = PLATFORM_COLORS[item.platform] ?? { bg: DS.bgSubtle, color: DS.textSecondary };
-  const gradeColor   = grade ? (GRADE_COLOR[grade] ?? DS.textMuted) : null;
+  const hasLink    = !!item.url;
+  const isGold     = item.badge === 'Gold Supplier';
+  const unitCost   = item.priceUSD;
+  const landed     = unitCost != null && unitCost > 0 ? roughLandedCost(unitCost) : null;
+  const roi        = unitCost != null && unitCost > 0 && sellingPrice != null && sellingPrice > 0
+    ? roughROIPct(sellingPrice, unitCost) : null;
+  const investment = unitCost != null && unitCost > 0 ? unitCost * item.moqNum : null;
+  const isHighMoq  = item.moqNum >= 300;
 
   return (
-    <AppCard padding={14} radius={18} style={sc.card}>
-      {/* Header */}
+    <AppCard padding={14} radius={18} style={[sc.card, isSelected && sc.cardSelected]}>
+
+      {/* Header: name + grade badge */}
       <View style={sc.header}>
-        <View style={sc.nameLine}>
-          <Text style={sc.country}>{item.country}</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={sc.name} numberOfLines={1}>{item.name}</Text>
-            <View style={[sc.platBadge, { backgroundColor: pStyle.bg }]}>
-              <Text style={[sc.platText, { color: pStyle.color }]}>{item.platform}</Text>
-            </View>
+        <View style={{ flex: 1, gap: 3 }}>
+          <Text style={sc.name} numberOfLines={2}>{item.name}</Text>
+          <View style={sc.trustRow}>
+            <Text style={[sc.trustIcon, isGold && { color: DS.warningText }]}>{isGold ? '★' : '✓'}</Text>
+            <Text style={sc.trustTxt}>{isGold ? 'Gold Supplier' : 'Verified'}</Text>
+            {item.country ? <Text style={sc.trustDot}>·</Text> : null}
+            {item.country ? <Text style={sc.trustTxt}>{item.country}</Text> : null}
           </View>
         </View>
-        <View style={{ gap: 4 }}>
-          <View style={[sc.trustBadge, isGold ? sc.trustGold : sc.trustVerified]}>
-            <Text style={[sc.trustText, isGold ? sc.trustTextGold : sc.trustTextVerified]}>
-              {isGold ? '★ Gold' : '✓ Verified'}
-            </Text>
+        {grade && (
+          <View style={[sc.gradeBadge, { backgroundColor: (GRADE_COLOR[grade] ?? DS.textMuted) + '18' }]}>
+            <Text style={[sc.gradeTxt, { color: GRADE_COLOR[grade] ?? DS.textMuted }]}>Grade {grade}</Text>
           </View>
-          {gradeColor && (
-            <View style={[sc.trustBadge, { backgroundColor: gradeColor + '18' }]}>
-              <Text style={[sc.trustText, { color: gradeColor }]}>Grade {grade}</Text>
-            </View>
-          )}
-        </View>
+        )}
       </View>
 
-      {/* Stats */}
+      {/* Wide price range warning */}
       {item.wideRange && (
         <View style={sc.rangeNote}>
           <Text style={sc.rangeNoteTxt}>⚠ Wide price range — using high estimate for safer calculations</Text>
         </View>
       )}
-      <View style={sc.stats}>
-        <View style={sc.stat}>
-          <Text style={[sc.statVal, { color: DS.accent }]}>{priceDisplay}</Text>
-          <Text style={sc.statLbl}>{item.wideRange ? 'Price (range)' : 'Unit Price'}</Text>
+
+      {/* 4-cell metrics grid */}
+      <View style={sc.metricsGrid}>
+        <View style={sc.metricCell}>
+          <Text style={[sc.metricVal, { color: DS.accent }]}>
+            {unitCost != null ? fmt(unitCost) : item.price}
+          </Text>
+          <Text style={sc.metricLbl}>Unit Cost</Text>
         </View>
-        <View style={sc.div} />
-        <View style={sc.stat}>
-          <Text style={sc.statVal}>{item.moq}</Text>
-          <Text style={sc.statLbl}>Min. Order</Text>
+        <View style={sc.metricCell}>
+          <Text style={[sc.metricVal, isHighMoq && { color: DS.warning }]}>
+            {item.moq}
+          </Text>
+          <Text style={sc.metricLbl}>MOQ</Text>
         </View>
-        <View style={sc.div} />
-        <View style={sc.stat}>
-          <Text style={[sc.statVal, { color: DS.info }]}>{item.trust.toFixed(1)}</Text>
-          <Text style={sc.statLbl}>Score (est.)</Text>
-        </View>
+        {landed != null && (
+          <View style={sc.metricCell}>
+            <Text style={sc.metricVal}>{fmt(landed)}</Text>
+            <Text style={sc.metricLbl}>~Landed</Text>
+          </View>
+        )}
+        {roi != null && (
+          <View style={sc.metricCell}>
+            <Text style={[sc.metricVal, { color: roiColor(roi) }]}>
+              {Math.max(0, roi).toFixed(0)}%
+            </Text>
+            <Text style={sc.metricLbl}>~ROI</Text>
+          </View>
+        )}
       </View>
 
-      <SmartBadgeStrip badges={item.badges} finalScore={item.finalScore} />
+      {/* Investment / MOQ note */}
+      {investment != null && investment > 0 && !isHighMoq && (
+        <View style={sc.investNote}>
+          <Text style={sc.investIcon}>$</Text>
+          <Text style={sc.investTxt}>
+            Requires ~{fmt(investment, 0)} initial inventory investment.
+          </Text>
+        </View>
+      )}
+      {isHighMoq && investment != null && (
+        <View style={sc.moqWarn}>
+          <Text style={sc.moqWarnIcon}>⚠</Text>
+          <Text style={sc.moqWarnTxt}>
+            High MOQ.{roi != null ? ' Better ROI but requires' : ' Requires'} ~{fmt(investment, 0)} investment.
+          </Text>
+        </View>
+      )}
 
-      {/* Primary action */}
+      {/* View on platform — mirrors "View on Amazon" in Research */}
       <TouchableOpacity
-        style={[sc.viewBtn, !hasLink && sc.disabledBtn]}
+        style={[sc.platformBtn, !hasLink && sc.platformBtnDisabled]}
         onPress={onView}
         activeOpacity={hasLink ? 0.8 : 1}
         disabled={!hasLink}
       >
-        <Text style={[sc.viewTxt, !hasLink && sc.disabledTxt]}>
+        <Text style={[sc.platformBtnTxt, !hasLink && sc.platformBtnTxtDisabled]}>
           {hasLink ? `↗  View on ${item.platform}` : 'Link unavailable'}
         </Text>
       </TouchableOpacity>
 
-      {/* Secondary actions */}
+      {/* Actions row — mirrors Research pill buttons */}
       <View style={sc.actionsRow}>
         <TouchableOpacity
           style={[sc.actionBtn, sc.analyzeBtn, analyzeLoading && { opacity: 0.6 }]}
@@ -149,82 +179,83 @@ export function SupplierCard({
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[sc.actionBtn, sc.outreachBtn, outreachLoading && { opacity: 0.6 }]}
+          style={[sc.actionBtn, isEmailOpen ? sc.emailBtnActive : sc.emailBtn, outreachLoading && { opacity: 0.6 }]}
           onPress={onOutreach}
           activeOpacity={0.8}
           disabled={outreachLoading}
         >
-          <Text style={sc.outreachTxt}>{outreachLoading ? '…' : '✉  Email'}</Text>
+          <Text style={[sc.emailTxt, isEmailOpen && sc.emailTxtActive]}>
+            {outreachLoading ? '…' : isEmailOpen ? '✕  Email' : '✉  Email'}
+          </Text>
         </TouchableOpacity>
       </View>
 
-      {onAttachFeasibility && (
-        <TouchableOpacity
-          style={[sc.feasBtn, isFeasAttached && sc.feasBtnSaved]}
-          onPress={onAttachFeasibility}
-          activeOpacity={0.8}
-        >
-          <Text style={[sc.feasTxt, isFeasAttached && sc.feasTxtSaved]}>
-            {isFeasAttached ? '✕  Remove' : '→  Attach to Pipeline'}
-          </Text>
-        </TouchableOpacity>
-      )}
+      {/* Lock In — primary CTA, mirrors "Find Suppliers →" in Research */}
       {onSelect && (
         <TouchableOpacity
-          style={[sc.feasBtn, isSelected ? sc.selectBtnSelected : sc.selectBtn]}
+          style={[sc.lockInBtn, isSelected && sc.lockInBtnSelected]}
           onPress={onSelect}
-          activeOpacity={0.8}
+          activeOpacity={0.85}
         >
-          <Text style={[sc.feasTxt, isSelected && sc.selectTxtSelected]}>
-            {isSelected ? '✓  Supplier Selected' : '→  Lock in This Supplier'}
+          <Text style={[sc.lockInTxt, isSelected && sc.lockInTxtSelected]}>
+            {isSelected ? '✓  Supplier Selected' : 'Lock In This Supplier'}
           </Text>
         </TouchableOpacity>
       )}
+
     </AppCard>
   );
 }
 const sc = StyleSheet.create({
   card:             { gap: 12 },
-  rangeNote:        { backgroundColor: DS.warningBg, borderRadius: 8, padding: 8, borderWidth: 1, borderColor: '#FDE68A' },
-  rangeNoteTxt:     { fontSize: 11, color: '#92400E', lineHeight: 16 },
+  cardSelected:     { borderWidth: 1.5, borderColor: DS.success },
+  rangeNote:        { backgroundColor: DS.warningBg, borderRadius: 8, padding: 8, borderWidth: 1, borderColor: DS.warning + '50' },
+  rangeNoteTxt:     { fontSize: 11, color: DS.warningText, lineHeight: 16 },
   header:           { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 },
-  nameLine:         { flexDirection: 'row', alignItems: 'flex-start', gap: 8, flex: 1 },
-  country:          { fontSize: 22, marginTop: 2 },
-  name:             { fontSize: 13, fontWeight: '700', color: DS.textPrimary, letterSpacing: -0.2, lineHeight: 18 },
-  platBadge:        { borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2, alignSelf: 'flex-start', marginTop: 3 },
-  platText:         { fontSize: 10, fontWeight: '800', letterSpacing: 0.2 },
-  trustBadge:       { borderRadius: DS.radiusBadge, paddingHorizontal: 9, paddingVertical: 4, flexShrink: 0 },
-  trustGold:        { backgroundColor: DS.goldLight },
-  trustVerified:    { backgroundColor: DS.accentLight },
-  trustText:        { fontSize: 11, fontWeight: '800' },
-  trustTextGold:    { color: DS.gold },
-  trustTextVerified:{ color: DS.accentDark },
-  stats:            { flexDirection: 'row', alignItems: 'center', backgroundColor: DS.bgSubtle, borderRadius: 12, padding: 11 },
-  stat:             { flex: 1, alignItems: 'center', gap: 3 },
-  statVal:          { fontSize: 12, fontWeight: '800', color: DS.textPrimary, letterSpacing: -0.2 },
-  statLbl:          { fontSize: 8, fontWeight: '600', color: DS.textMuted, textTransform: 'uppercase', letterSpacing: 0.4, textAlign: 'center' },
-  div:              { width: 1, height: 26, backgroundColor: DS.border },
-  viewBtn:          { backgroundColor: DS.info, borderRadius: 12, paddingVertical: 10, alignItems: 'center' },
-  disabledBtn:      { backgroundColor: DS.bgSubtle, borderWidth: 1, borderColor: DS.border },
-  viewTxt:          { fontSize: 13, fontWeight: '800', color: '#fff', letterSpacing: -0.2 },
-  disabledTxt:      { color: DS.textMuted },
-  actionsRow:       { flexDirection: 'row', gap: 7 },
-  actionBtn:        { flex: 1, borderRadius: 10, paddingVertical: 8, alignItems: 'center' },
-  analyzeBtn:       { backgroundColor: DS.indigoLight },
-  analyzeTxt:       { fontSize: 11, fontWeight: '700', color: DS.indigo },
+  name:             { fontSize: 14, fontWeight: '700', color: DS.textPrimary, letterSpacing: -0.3, lineHeight: 19 },
+  trustRow:         { flexDirection: 'row', alignItems: 'center', gap: 4, flexWrap: 'wrap' as const },
+  trustIcon:        { fontSize: 11, color: DS.success, fontWeight: '700' as const },
+  trustTxt:         { fontSize: 11, color: DS.textMuted, fontWeight: '600' as const },
+  trustDot:         { fontSize: 11, color: DS.border },
+  gradeBadge:       { borderRadius: DS.radiusBadge, paddingHorizontal: 9, paddingVertical: 4 },
+  gradeTxt:         { fontSize: 11, fontWeight: '800' as const },
+  metricsGrid:      { flexDirection: 'row', backgroundColor: DS.bgSubtle, borderRadius: 12, padding: 10 },
+  metricCell:       { flex: 1, alignItems: 'center' as const, gap: 3 },
+  metricVal:        { fontSize: 13, fontWeight: '800' as const, color: DS.textPrimary, letterSpacing: -0.3 },
+  metricLbl:        { fontSize: 8, fontWeight: '600' as const, color: DS.textMuted, textTransform: 'uppercase' as const, letterSpacing: 0.4 },
+  investNote:       { flexDirection: 'row', alignItems: 'flex-start' as const, gap: 6, backgroundColor: DS.success + '12', borderRadius: 8, padding: 9, borderWidth: 1, borderColor: DS.success + '30' },
+  investIcon:       { fontSize: 13, color: DS.success, fontWeight: '800' as const, marginTop: 1 },
+  investTxt:        { flex: 1, fontSize: 11, color: DS.success, fontWeight: '600' as const, lineHeight: 16 },
+  moqWarn:          { flexDirection: 'row', alignItems: 'flex-start' as const, gap: 6, backgroundColor: DS.warningBg, borderRadius: 8, padding: 9, borderWidth: 1, borderColor: DS.warning + '50' },
+  moqWarnIcon:      { fontSize: 13, color: DS.warningText, fontWeight: '800' as const, marginTop: 1 },
+  moqWarnTxt:       { flex: 1, fontSize: 11, color: DS.warningText, fontWeight: '600' as const, lineHeight: 16 },
+  // Platform link button — mirrors "View on Amazon" in Research
+  platformBtn:        { backgroundColor: DS.bgSubtle, borderRadius: 12, paddingVertical: 10, alignItems: 'center' as const, borderWidth: 1, borderColor: DS.border },
+  platformBtnDisabled:{ opacity: 0.5 },
+  platformBtnTxt:     { fontSize: 13, fontWeight: '700' as const, color: DS.textSecondary, letterSpacing: -0.2 },
+  platformBtnTxtDisabled: { color: DS.textMuted },
+  // Action pills — mirrors Research card pill buttons
+  actionsRow:       { flexDirection: 'row', gap: 6 },
+  actionBtn:        { flex: 1, borderRadius: DS.radiusButton, paddingVertical: 11, alignItems: 'center' as const },
+  analyzeBtn:       { backgroundColor: DS.accentLight, borderWidth: 1, borderColor: DS.accent + '44' },
+  analyzeTxt:       { fontSize: 12, fontWeight: '700' as const, color: DS.accent },
   compareBtn:       { backgroundColor: DS.bgSubtle, borderWidth: 1, borderColor: DS.border },
   compareActive:    { backgroundColor: DS.accentLight, borderWidth: 1, borderColor: DS.accent },
-  compareTxt:       { fontSize: 11, fontWeight: '700', color: DS.textSecondary },
+  compareTxt:       { fontSize: 12, fontWeight: '700' as const, color: DS.textSecondary },
   compareTxtActive: { color: DS.accent },
-  outreachBtn:      { backgroundColor: DS.indigoLight, borderWidth: 1, borderColor: DS.indigoLight },
-  outreachTxt:      { fontSize: 11, fontWeight: '700', color: DS.indigo },
-  feasBtn:          { borderRadius: 10, paddingVertical: 7, alignItems: 'center' as const, backgroundColor: DS.indigoLight, borderWidth: 1, borderColor: DS.indigo + '44' },
+  emailBtn:         { backgroundColor: DS.bgSubtle, borderWidth: 1, borderColor: DS.border },
+  emailBtnActive:   { backgroundColor: DS.dangerBg ?? DS.bgSubtle, borderWidth: 1, borderColor: DS.danger + '44' },
+  emailTxt:         { fontSize: 12, fontWeight: '700' as const, color: DS.textSecondary },
+  emailTxtActive:   { color: DS.dangerText },
+  // Lock In CTA — mirrors "Find Suppliers →" in Research
+  lockInBtn:        { backgroundColor: DS.accent, borderRadius: DS.radiusButton, paddingVertical: 13, alignItems: 'center' as const },
+  lockInBtnSelected:{ backgroundColor: DS.success },
+  lockInTxt:        { fontSize: 13, fontWeight: '800' as const, color: '#fff', letterSpacing: -0.2 },
+  lockInTxtSelected:{ color: '#fff' },
+  feasBtn:          { borderRadius: 10, paddingVertical: 7, alignItems: 'center' as const, backgroundColor: DS.accentLight, borderWidth: 1, borderColor: DS.accent + '44' },
   feasBtnSaved:     { backgroundColor: DS.bgSubtle, borderColor: DS.border },
-  feasTxt:          { fontSize: 11, fontWeight: '700' as const, color: DS.indigo },
+  feasTxt:          { fontSize: 11, fontWeight: '700' as const, color: DS.accent },
   feasTxtSaved:     { color: DS.textMuted },
-  selectBtn:        { borderRadius: 10, paddingVertical: 9, alignItems: 'center' as const, backgroundColor: DS.accentLight, borderWidth: 1.5, borderColor: DS.accent + '44' },
-  selectBtnSelected:{ borderRadius: 10, paddingVertical: 9, alignItems: 'center' as const, backgroundColor: DS.success + '12', borderWidth: 1.5, borderColor: DS.success },
-  selectTxtSelected:{ color: DS.success },
 });
 
 // ── Premium Compare suppliers modal ──────────────────────────────────────────
@@ -394,7 +425,7 @@ export function CompareSuppliersModal({
 
 // ── Outreach email card ───────────────────────────────────────────────────────
 
-export function OutreachEmailCard({ email }: { email: OutreachEmail }) {
+export function OutreachEmailCard({ email, onDismiss }: { email: OutreachEmail; onDismiss?: () => void }) {
   const [copied, setCopied] = React.useState(false);
 
   function handleCopy() {
@@ -407,9 +438,16 @@ export function OutreachEmailCard({ email }: { email: OutreachEmail }) {
   return (
     <AppCard padding={16} radius={18} style={oe.card}>
       <View style={oe.header}>
-        <Text style={oe.headerTxt}>✉  Outreach Script</Text>
-        {email.supplierName && (
-          <Text style={oe.supplierName}>{email.supplierName}</Text>
+        <View style={{ flex: 1, gap: 2 }}>
+          <Text style={oe.headerTxt}>✉  Outreach Script</Text>
+          {email.supplierName && (
+            <Text style={oe.supplierName}>{email.supplierName}</Text>
+          )}
+        </View>
+        {onDismiss && (
+          <TouchableOpacity onPress={onDismiss} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} activeOpacity={0.7}>
+            <Text style={oe.dismissTxt}>✕</Text>
+          </TouchableOpacity>
         )}
       </View>
       <Text style={oe.hint}>Use this as your message when contacting the supplier on their platform.</Text>
@@ -443,9 +481,10 @@ export function OutreachEmailCard({ email }: { email: OutreachEmail }) {
 }
 const oe = StyleSheet.create({
   card:         { gap: 14 },
-  header:       { backgroundColor: DS.indigoLight, borderRadius: 10, padding: 10, gap: 2 },
-  headerTxt:    { fontSize: 12, fontWeight: '800', color: DS.indigo, letterSpacing: 0.2 },
-  supplierName: { fontSize: 11, color: DS.indigo + 'aa', fontWeight: '600' },
+  header:       { flexDirection: 'row', alignItems: 'flex-start', backgroundColor: DS.accentLight, borderRadius: 10, padding: 10, gap: 8 },
+  headerTxt:    { fontSize: 12, fontWeight: '800', color: DS.accent, letterSpacing: 0.2 },
+  supplierName: { fontSize: 11, color: DS.accent + 'aa', fontWeight: '600' },
+  dismissTxt:   { fontSize: 16, color: DS.accent, fontWeight: '600', lineHeight: 20 },
   hint:         { fontSize: 12, color: DS.textMuted, lineHeight: 17 },
   subjectRow:   { gap: 4 },
   label:        { fontSize: 9, fontWeight: '800', color: DS.textMuted, textTransform: 'uppercase', letterSpacing: 0.8 },
@@ -458,6 +497,6 @@ const oe = StyleSheet.create({
   btnRow:       { flexDirection: 'row', gap: 10 },
   copyBtn:      { flex: 1, borderRadius: 12, paddingVertical: 13, alignItems: 'center', borderWidth: 1, borderColor: DS.border, backgroundColor: DS.bgSubtle },
   copyTxt:      { fontSize: 13, fontWeight: '700', color: DS.textSecondary },
-  messageBtn:   { flex: 1, borderRadius: 12, paddingVertical: 13, alignItems: 'center', backgroundColor: DS.indigo },
+  messageBtn:   { flex: 1, borderRadius: 12, paddingVertical: 13, alignItems: 'center', backgroundColor: DS.accent },
   messageTxt:   { fontSize: 13, fontWeight: '700', color: '#fff' },
 });

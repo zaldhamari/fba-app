@@ -64,4 +64,7 @@ export const STORAGE_KEYS = {
 
   // Dynamic sourcing tasks injected into Launch Plan
   sourcingTasks: 'siftly_sourcing_tasks_v1',
+
+  // Supplier compare selections (persisted across tab switches)
+  compareIds: 'siftly_compare_ids_v1',
 } as const;

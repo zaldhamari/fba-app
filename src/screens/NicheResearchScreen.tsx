@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TextInput,
   TouchableOpacity, ActivityIndicator, Alert,
@@ -12,7 +12,6 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { DS } from '../components/ds';
 import { api } from '../services/api';
 import { AppHeader } from '../components/AppHeader';
-import { PipelineProgressBar } from '../components/PipelineProgressBar';
 import { useCurrency } from '../context/CurrencyContext';
 import { useSellerProfile } from '../hooks/useSellerProfile';
 import { usePipeline } from '../context/PipelineContext';
@@ -105,7 +104,7 @@ function Stat({ label, value, sub }: { label: string; value: string; sub?: strin
 
 // ── Main screen ───────────────────────────────────────────────────────────────
 
-export default function NicheResearchScreen({ embedded = false }: { embedded?: boolean } = {}) {
+export default function NicheResearchScreen({ embedded = false, focusTrigger = 0 }: { embedded?: boolean; focusTrigger?: number } = {}) {
   const { marketplace, symbol: currencySymbol } = useCurrency();
   const { profile }     = useSellerProfile();
   const pipeline        = usePipeline();
@@ -113,6 +112,14 @@ export default function NicheResearchScreen({ embedded = false }: { embedded?: b
   const route           = useRoute<any>();
   const { isOnline }    = useNetworkStatus();
   const { can, increment } = useSubscription();
+
+  const searchInputRef  = useRef<TextInput>(null);
+
+  useEffect(() => {
+    if (!focusTrigger) return;
+    const t = setTimeout(() => searchInputRef.current?.focus(), 350);
+    return () => clearTimeout(t);
+  }, [focusTrigger]);
 
   const [keyword,   setKeyword]   = useState('');
   const [priceMin,  setPriceMin]  = useState('15');
@@ -221,6 +228,7 @@ export default function NicheResearchScreen({ embedded = false }: { embedded?: b
         <View style={s.searchCard}>
           <View style={s.searchRow}>
             <TextInput
+              ref={searchInputRef}
               style={s.input}
               value={keyword}
               onChangeText={setKeyword}
@@ -262,18 +270,6 @@ export default function NicheResearchScreen({ embedded = false }: { embedded?: b
           <UsageQuotaBar feature="keywords" />
         </View>
 
-        {intelProfile && !loading && (
-          <ProductQuickIntel
-            profile={intelProfile}
-            reconInsights={pipeline.reconInsights}
-            label={`Active Product: ${intelProfile.productTitle}`}
-          />
-        )}
-        {!intelProfile && !pipeline.activeProduct && !loading && (
-          <View style={s.intelPrompt}>
-            <Text style={s.intelPromptTxt}>Select a product in Research to unlock product intelligence</Text>
-          </View>
-        )}
 
         {/* Quick-start niches — only when no search yet */}
         {!report && !loading && (
@@ -306,29 +302,6 @@ export default function NicheResearchScreen({ embedded = false }: { embedded?: b
               ))}
             </View>
 
-            <View style={s.howItWorks}>
-              <Text style={s.howTitle}>YOUR FBA RESEARCH LIFECYCLE</Text>
-              <View style={s.howRow}>
-                <View style={s.howStep}><Text style={s.howNum}>1</Text></View>
-                <Text style={s.howTxt}><Text style={{ fontWeight: '700' }}>Niche</Text> — Find high-demand, low-competition markets. Start here.</Text>
-              </View>
-              <View style={s.howRow}>
-                <View style={s.howStep}><Text style={s.howNum}>2</Text></View>
-                <Text style={s.howTxt}><Text style={{ fontWeight: '700' }}>Research</Text> — Validate specific products: demand, reviews, competition.</Text>
-              </View>
-              <View style={s.howRow}>
-                <View style={s.howStep}><Text style={s.howNum}>3</Text></View>
-                <Text style={s.howTxt}><Text style={{ fontWeight: '700' }}>Sourcing</Text> — Find a supplier, confirm MOQ, estimate freight.</Text>
-              </View>
-              <View style={s.howRow}>
-                <View style={s.howStep}><Text style={s.howNum}>4</Text></View>
-                <Text style={s.howTxt}><Text style={{ fontWeight: '700' }}>Profit</Text> — Model your FBA numbers. Know margin before you spend.</Text>
-              </View>
-              <View style={s.howRow}>
-                <View style={s.howStep}><Text style={s.howNum}>5</Text></View>
-                <Text style={s.howTxt}><Text style={{ fontWeight: '700' }}>Home</Text> — AI reviews everything and tells you: Launch, Test, or Avoid.</Text>
-              </View>
-            </View>
           </View>
         )}
 
@@ -409,7 +382,7 @@ export default function NicheResearchScreen({ embedded = false }: { embedded?: b
                   }}
                   activeOpacity={0.88}
                 >
-                  <Text style={s.handoffBtnReconTxt}>Run Review Recon →</Text>
+                  <Text style={s.handoffBtnReconTxt}>Run Teardown →</Text>
                   <Text style={s.handoffBtnHint}>What complaints can you exploit?</Text>
                 </TouchableOpacity>
               </View>
@@ -534,7 +507,6 @@ export default function NicheResearchScreen({ embedded = false }: { embedded?: b
     <SafeAreaView style={s.container} edges={['top']}>
       <PaywallModal visible={showPaywall} onClose={() => setShowPaywall(false)} featureContext="Niche research" />
       <AppHeader helpKey="niche" />
-      <PipelineProgressBar />
       <OfflineBanner visible={!isOnline} />
       <ScrollView style={s.scroll} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         {nicheBody}
@@ -575,13 +547,13 @@ const s = StyleSheet.create({
   searchRow: { flexDirection: 'row', gap: 8 },
   input: {
     flex:              1,
-    backgroundColor:   DS.bgElevated,
+    backgroundColor:   DS.bgCard,
     borderRadius:      DS.radiusInput,
-    borderWidth:       1,
+    borderWidth:       1.5,
     borderColor:       DS.border,
     paddingHorizontal: 14,
     paddingVertical:   12,
-    fontSize:          14,
+    fontSize:          15,
     color:             DS.textPrimary,
   },
   searchBtn: {
@@ -683,7 +655,7 @@ const s = StyleSheet.create({
     gap:             3,
   },
   handoffBtnAmazon:    { backgroundColor: DS.accent },
-  handoffBtnRecon:     { backgroundColor: DS.indigo },
+  handoffBtnRecon:     { backgroundColor: DS.accent },
   handoffBtnAmazonTxt: { fontSize: 14, fontWeight: '900', color: '#fff', letterSpacing: -0.2 },
   handoffBtnReconTxt:  { fontSize: 14, fontWeight: '900', color: '#fff', letterSpacing: -0.2 },
   handoffBtnHint:      { fontSize: 11, color: 'rgba(255,255,255,0.72)', fontWeight: '500' },

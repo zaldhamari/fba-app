@@ -76,14 +76,12 @@ export const CMP_CELL_W  = 110;
 // ── Product card — Market mode ────────────────────────────────────────────────
 
 export function ProductMarketCard({
-  item, onSelect, isSelected,
+  item,
   inCompare, canCompare, onToggleCompare, onAnalyze, analyzeLoading,
   onTrackInPipeline, isTracked,
   onSave, isSaved, saveLoading,
 }: {
   item: ProductDisplay;
-  onSelect: () => void;
-  isSelected: boolean;
   inCompare?: boolean;
   canCompare?: boolean;
   onToggleCompare?: () => void;
@@ -98,7 +96,7 @@ export function ProductMarketCard({
   const { fmt } = useCurrency();
   const hasLink = !!item.url;
 
-  const oppLabel = item.badge === 'Promising' ? 'LAUNCH' : item.badge === 'Saturated' ? 'AVOID' : 'TEST';
+  const oppLabel = (item.badge ?? 'Moderate').toUpperCase();
   const oppColor = item.badge === 'Promising' ? DS.successText : item.badge === 'Saturated' ? DS.dangerText : DS.warningText;
   const oppBg    = item.badge === 'Promising' ? DS.successBg   : item.badge === 'Saturated' ? DS.dangerBg  : DS.warningBg;
   const compColor = item.competition === 'Low' ? DS.successText : item.competition === 'High' ? DS.dangerText : DS.warningText;
@@ -106,7 +104,7 @@ export function ProductMarketCard({
   const oppSignals = buildOpportunitySignals(item);
 
   return (
-    <AppCard padding={14} radius={18} style={[pmc.card, isSelected && pmc.cardSelected]}>
+    <AppCard padding={14} radius={18} style={pmc.card}>
 
       {/* ── Header ─── */}
       <View style={pmc.header}>
@@ -119,11 +117,10 @@ export function ProductMarketCard({
           <Text style={pmc.productName} numberOfLines={2}>{item.name}</Text>
           <View style={pmc.badgesRow}>
             <View style={[pmc.oppPill, { backgroundColor: oppBg }]}>
+              <View style={[pmc.oppDot, { backgroundColor: oppColor }]} />
               <Text style={[pmc.oppTxt, { color: oppColor }]}>{oppLabel}</Text>
             </View>
-            <View style={[pmc.compPill, { backgroundColor: compBg }]}>
-              <Text style={[pmc.compTxt, { color: compColor }]}>{item.competition} Comp</Text>
-            </View>
+            <Text style={[pmc.compText, { color: compColor }]}>{item.competition} competition</Text>
           </View>
         </View>
       </View>
@@ -267,16 +264,6 @@ export function ProductMarketCard({
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[pmc.actionBtn, isSelected ? pmc.selectedBtn : pmc.selectBtn]}
-          onPress={onSelect}
-          activeOpacity={0.8}
-        >
-          <Text style={[pmc.selectTxt, isSelected && pmc.selectedTxt]}>
-            {isSelected ? '★  Selected' : '☆  Select'}
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
           style={[pmc.actionBtn, isSaved ? pmc.savedBtn : pmc.saveBtn, saveLoading && { opacity: 0.6 }]}
           onPress={onSave}
           activeOpacity={0.8}
@@ -296,7 +283,7 @@ export function ProductMarketCard({
           activeOpacity={0.8}
         >
           <Text style={[pmc.pipelineTxt, isTracked && pmc.pipelineTxtActive]}>
-            {isTracked ? '★  In Pipeline — View Launch Decision' : '→  Add to Pipeline'}
+            {isTracked ? '⬡  Continue to Sourcing →' : '⬡  Find Suppliers →'}
           </Text>
         </TouchableOpacity>
       )}
@@ -314,10 +301,10 @@ const pmc = StyleSheet.create({
   imgPlaceholder:   { fontSize: 22 },
   productName:      { fontSize: 13, fontWeight: '700', color: DS.textPrimary, letterSpacing: -0.2, lineHeight: 18 },
   badgesRow:        { flexDirection: 'row', gap: 5, flexWrap: 'wrap' },
-  oppPill:          { borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 },
+  oppPill:          { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
+  oppDot:           { width: 6, height: 6, borderRadius: 3, flexShrink: 0 },
   oppTxt:           { fontSize: 10, fontWeight: '800', letterSpacing: 0.3 },
-  compPill:         { borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 },
-  compTxt:          { fontSize: 10, fontWeight: '700' },
+  compText:         { fontSize: 12, fontWeight: '600', alignSelf: 'center' },
   // Stats
   stats:            { flexDirection: 'row', alignItems: 'center', backgroundColor: DS.bgSubtle, borderRadius: 12, paddingVertical: 10 },
   stat:             { flex: 1, alignItems: 'center', gap: 2 },
@@ -340,26 +327,22 @@ const pmc = StyleSheet.create({
   amazonTxtDisabled:{ color: DS.textMuted },
   // Actions row
   actionsRow:       { flexDirection: 'row', gap: 6 },
-  actionBtn:        { flex: 1, borderRadius: 10, paddingVertical: 9, alignItems: 'center' as const },
-  analyzeBtn:       { backgroundColor: DS.indigoLight, borderWidth: 1, borderColor: DS.indigo + '44' },
-  analyzeTxt:       { fontSize: 12, fontWeight: '700', color: DS.indigo },
+  actionBtn:        { flex: 1, borderRadius: DS.radiusButton, paddingVertical: 11, alignItems: 'center' as const },
+  analyzeBtn:       { backgroundColor: DS.accentLight, borderWidth: 1, borderColor: DS.accent + '44' },
+  analyzeTxt:       { fontSize: 13, fontWeight: '700', color: DS.accent },
   compareBtn:       { backgroundColor: DS.bgSubtle, borderWidth: 1, borderColor: DS.border },
   compareActive:    { backgroundColor: DS.accentLight, borderWidth: 1, borderColor: DS.accent },
-  compareTxt:       { fontSize: 12, fontWeight: '700', color: DS.textSecondary },
+  compareTxt:       { fontSize: 13, fontWeight: '700', color: DS.textSecondary },
   compareTxtActive: { color: DS.accent },
-  selectBtn:        { backgroundColor: DS.bgSubtle, borderWidth: 1, borderColor: DS.border },
-  selectedBtn:      { backgroundColor: DS.accentLight, borderWidth: 1, borderColor: DS.accent },
-  selectTxt:        { fontSize: 12, fontWeight: '700', color: DS.textSecondary },
-  selectedTxt:      { color: DS.accent },
   saveBtn:          { backgroundColor: DS.bgSubtle, borderWidth: 1, borderColor: DS.border },
   savedBtn:         { backgroundColor: DS.success + '18', borderWidth: 1, borderColor: DS.success },
-  saveTxt:          { fontSize: 12, fontWeight: '700', color: DS.textSecondary },
+  saveTxt:          { fontSize: 13, fontWeight: '700', color: DS.textSecondary },
   savedTxt:         { color: DS.success },
   // Pipeline CTA
-  pipelineBtn:      { borderRadius: 10, paddingVertical: 9, alignItems: 'center' as const, backgroundColor: DS.bgElevated, borderWidth: 1, borderColor: DS.border },
-  pipelineBtnActive:{ backgroundColor: DS.accentLight, borderColor: DS.accent },
-  pipelineTxt:      { fontSize: 12, fontWeight: '700' as const, color: DS.textSecondary },
-  pipelineTxtActive:{ color: DS.accent, fontWeight: '800' as const },
+  pipelineBtn:      { borderRadius: DS.radiusButton, paddingVertical: 12, alignItems: 'center' as const, backgroundColor: DS.accent, borderWidth: 0 },
+  pipelineBtnActive:{ backgroundColor: DS.accent },
+  pipelineTxt:      { fontSize: 13, fontWeight: '800' as const, color: '#fff', letterSpacing: -0.2 },
+  pipelineTxtActive:{ color: '#fff' },
 });
 
 // ── Premium Compare products modal ───────────────────────────────────────────
@@ -387,7 +370,7 @@ export function CompareProductsModal({
   const rawConf = scores[safeIdx] > 0 ? ((scores[safeIdx] - second) / scores[safeIdx]) * 100 : 50;
   const conf    = Math.round(Math.min(97, Math.max(54, 65 + rawConf * 0.3)));
   const reasons = buildProductReasons(winner, items);
-  const vLabel  = winner.badge === 'Promising' ? 'LAUNCH' : winner.badge === 'Saturated' ? 'AVOID' : 'TEST';
+  const vLabel  = winner.badge === 'Promising' ? 'PROCEED' : winner.badge === 'Saturated' ? 'SKIP' : 'EXPLORE';
   const vColor  = winner.badge === 'Promising' ? DS.successText : winner.badge === 'Saturated' ? DS.dangerText : DS.warningText;
   const vBg     = winner.badge === 'Promising' ? DS.successBg   : winner.badge === 'Saturated' ? DS.dangerBg  : DS.warningBg;
 
@@ -490,7 +473,7 @@ export function CompareProductsModal({
                 {items.map((p, i) => {
                   const isSel  = i === safeIdx;
                   const isAuto = i === autoIdx;
-                  const bLabel = p.badge === 'Promising' ? 'LAUNCH' : p.badge === 'Saturated' ? 'AVOID' : 'TEST';
+                  const bLabel = p.badge === 'Promising' ? 'PROCEED' : p.badge === 'Saturated' ? 'SKIP' : 'EXPLORE';
                   const bColor = p.badge === 'Promising' ? DS.successText : p.badge === 'Saturated' ? DS.dangerText : DS.warningText;
                   const bBg    = p.badge === 'Promising' ? DS.successBg   : p.badge === 'Saturated' ? DS.dangerBg  : DS.warningBg;
                   return (
@@ -578,18 +561,18 @@ export const prm = StyleSheet.create({
 
   // Hero
   hero: {
-    backgroundColor: DS.indigoLight, borderRadius: DS.radiusCard,
+    backgroundColor: DS.accentLight, borderRadius: DS.radiusCard,
     padding: 22, overflow: 'hidden', gap: 5,
-    borderWidth: 1, borderColor: `${DS.indigo}22`,
+    borderWidth: 1, borderColor: `${DS.accent}22`,
   },
   heroSupplier: { backgroundColor: DS.accentLight, borderColor: `${DS.accent}22` },
   heroBall1: {
     position: 'absolute', top: -30, right: -30,
-    width: 120, height: 120, borderRadius: 60, backgroundColor: `${DS.indigo}18`,
+    width: 120, height: 120, borderRadius: 60, backgroundColor: `${DS.accent}18`,
   },
   heroBall2: {
     position: 'absolute', bottom: -20, left: -20,
-    width: 80, height: 80, borderRadius: 40, backgroundColor: `${DS.indigo}10`,
+    width: 80, height: 80, borderRadius: 40, backgroundColor: `${DS.accent}10`,
   },
   heroBall1Sup: {
     position: 'absolute', top: -30, right: -30,
@@ -599,12 +582,12 @@ export const prm = StyleSheet.create({
     position: 'absolute', bottom: -20, left: -20,
     width: 80, height: 80, borderRadius: 40, backgroundColor: `${DS.accent}10`,
   },
-  heroEye:     { fontSize: 9, fontWeight: '800', color: DS.indigo, letterSpacing: 2.5 },
+  heroEye:     { fontSize: 9, fontWeight: '800', color: DS.accent, letterSpacing: 2.5 },
   heroH:       { fontSize: 22, fontWeight: '900', color: DS.textPrimary, letterSpacing: -0.8 },
   heroSub:     { fontSize: 13, color: DS.textSecondary, lineHeight: 19 },
   heroChip:    {
     alignSelf: 'flex-start', marginTop: 4,
-    backgroundColor: DS.indigo, borderRadius: DS.radiusBadge,
+    backgroundColor: DS.accent, borderRadius: DS.radiusBadge,
     paddingHorizontal: 12, paddingVertical: 5,
   },
   heroChipTxt: { fontSize: 11, fontWeight: '800', color: '#fff', letterSpacing: 0.3 },
@@ -667,11 +650,11 @@ export const prm = StyleSheet.create({
   colBadge:      { borderRadius: DS.radiusBadge, paddingHorizontal: 7, paddingVertical: 3 },
   colBadgeTxt:   { fontSize: 9, fontWeight: '800', letterSpacing: 0.5 },
   winTag:        { fontSize: 9, fontWeight: '900', color: DS.accentDark, letterSpacing: 0.5 },
-  aiTag:         { fontSize: 9, fontWeight: '800', color: DS.indigo, letterSpacing: 0.5 },
+  aiTag:         { fontSize: 9, fontWeight: '800', color: DS.accent, letterSpacing: 0.5 },
   tapHint:       { fontSize: 10, fontWeight: '600', color: DS.textMuted },
   supCountry:    { fontSize: 22 },
-  platformBadge:    { backgroundColor: DS.indigoLight, borderRadius: DS.radiusBadge, paddingHorizontal: 7, paddingVertical: 3 },
-  platformBadgeTxt: { fontSize: 9, fontWeight: '800', color: DS.indigo, letterSpacing: 0.3 },
+  platformBadge:    { backgroundColor: DS.accentLight, borderRadius: DS.radiusBadge, paddingHorizontal: 7, paddingVertical: 3 },
+  platformBadgeTxt: { fontSize: 9, fontWeight: '800', color: DS.accent, letterSpacing: 0.3 },
 
   // Metric table rows
   mRow:     { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: DS.borderLight },

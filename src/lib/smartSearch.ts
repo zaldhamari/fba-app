@@ -221,20 +221,22 @@ export function deduplicateSuppliers(suppliers: Supplier[]): { results: Supplier
   const kept: Supplier[] = [];
 
   for (const s of suppliers) {
-    // 1. URL exact dedup
+    // 1. URL exact dedup — same listing URL means exact duplicate
     if (s.url) {
       const urlKey = s.url.toLowerCase().replace(/https?:\/\/(www\.)?/, '').split('?')[0];
       if (seenUrls.has(urlKey)) continue;
       seenUrls.add(urlKey);
     }
-    // 2. Same name on same platform (catches same listing from multiple keyword queries)
-    const isDupSamePlatform = kept.some(
-      k => jaccardWords(k.title, s.title) > 0.70 && k.supplier === s.supplier,
-    );
-    if (isDupSamePlatform) continue;
-    // 3. Near-identical name across any platform (aggressive dedup for cross-platform clones)
-    const isDupByName = kept.some(k => jaccardWords(k.title, s.title) > 0.85);
-    if (isDupByName) continue;
+    // 2. Same company name on same platform — genuine duplicate listing
+    // Deliberately NOT deduplicating by product title: different suppliers have
+    // nearly identical titles for the same product, which was collapsing 10 results → 1.
+    const supplierName = (s.supplier ?? '').toLowerCase().trim();
+    if (supplierName) {
+      const isDupSamePlatform = kept.some(
+        k => (k.supplier ?? '').toLowerCase().trim() === supplierName,
+      );
+      if (isDupSamePlatform) continue;
+    }
     kept.push(s);
   }
 

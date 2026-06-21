@@ -79,7 +79,7 @@ const recent = StyleSheet.create({
 // ── Mode segmented control (3 tabs) ──────────────────────────────────────────
 
 export const MODE_TABS: { id: Mode; label: string; color: string }[] = [
-  { id: 'lookup',    label: 'Teardown',  color: DS.indigo  },
+  { id: 'lookup',    label: 'Teardown',  color: DS.accent  },
   { id: 'market',   label: 'Products',  color: DS.info    },
   { id: 'suppliers', label: 'Suppliers', color: DS.accent  },
   { id: 'freight',   label: 'Shipping',  color: DS.warning },
@@ -152,9 +152,9 @@ export function InfoTip({ text }: { text: string }) {
   );
 }
 const tip = StyleSheet.create({
-  wrap: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: DS.indigoLight, borderRadius: DS.radiusBadge, paddingHorizontal: 10, paddingVertical: 4, alignSelf: 'flex-start' },
-  icon: { fontSize: 10, color: DS.indigo },
-  text: { fontSize: 10, fontWeight: '600', color: DS.indigo },
+  wrap: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: DS.accentLight, borderRadius: DS.radiusBadge, paddingHorizontal: 10, paddingVertical: 4, alignSelf: 'flex-start' },
+  icon: { fontSize: 10, color: DS.accent },
+  text: { fontSize: 10, fontWeight: '600', color: DS.accent },
 });
 
 export function StarRating({ rating }: { rating: number }) {
@@ -225,8 +225,8 @@ export function SmartSummaryCard({ summary }: { summary: SmartSearchSummary }) {
 const ss = StyleSheet.create({
   card:        { gap: 0 },
   row:         { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  iconWrap:    { width: 30, height: 30, borderRadius: 10, backgroundColor: DS.indigoLight, alignItems: 'center', justifyContent: 'center' },
-  icon:        { fontSize: 14, color: DS.indigo },
+  iconWrap:    { width: 30, height: 30, borderRadius: 10, backgroundColor: DS.accentLight, alignItems: 'center', justifyContent: 'center' },
+  icon:        { fontSize: 14, color: DS.accent },
   headline:    { fontSize: 12, fontWeight: '700', color: DS.textPrimary, letterSpacing: -0.2, lineHeight: 17 },
   sub:         { fontSize: 10, color: DS.textMuted, marginTop: 2 },
   chevron:     { fontSize: 9, color: DS.textMuted },
@@ -239,15 +239,15 @@ const ss = StyleSheet.create({
 // ── Smart score badge strip ───────────────────────────────────────────────────
 
 const BADGE_STYLE: Record<string, { bg: string; color: string }> = {
-  'Smart Pick':             { bg: DS.indigoLight,   color: DS.indigo    },
+  'Smart Pick':             { bg: DS.accentLight,   color: DS.accent    },
   'Low Competition':        { bg: DS.accentLight,   color: DS.accentDark },
   'High Demand':            { bg: DS.warningBg,     color: DS.warningText },
-  'Quick Win':              { bg: DS.successBg,        color: '#047857'    },
+  'Quick Win':              { bg: DS.successBg,        color: DS.successText },
   'Well Rated':             { bg: DS.goldLight,     color: DS.gold      },
   'Low MOQ':                { bg: DS.accentLight,   color: DS.accentDark },
   'Great Price':            { bg: DS.accentLight,   color: DS.accentDark },
-  'Verified':               { bg: '#EFF6FF',        color: DS.accentDark    },
-  'Private Label Friendly': { bg: '#F5F3FF',        color: '#6D28D9'    },
+  'Verified':               { bg: DS.accentLight,   color: DS.accentDark    },
+  'Private Label Friendly': { bg: DS.bgElevated,    color: DS.textSecondary },
 };
 
 export function SmartBadgeStrip({ badges, finalScore }: { badges?: string[]; finalScore?: number }) {
@@ -339,61 +339,6 @@ const aai = StyleSheet.create({
   answerTxt:        { fontSize: 13, color: DS.textPrimary, lineHeight: 20 },
 });
 
-// ── Selected product banner ───────────────────────────────────────────────────
-
-export function SelectedProductBanner({
-  product, onFindSuppliers, onAskCoPilot, onClear,
-}: {
-  product: ProductDisplay;
-  onFindSuppliers: () => void;
-  onAskCoPilot: () => void;
-  onClear: () => void;
-}) {
-  const { fmt } = useCurrency();
-  return (
-    <AppCard style={spb.card}>
-      <View style={spb.header}>
-        <View style={spb.dot} />
-        <Text style={spb.eyebrow}>SELECTED PRODUCT</Text>
-        <TouchableOpacity onPress={onClear} style={spb.clearBtn} activeOpacity={0.7}>
-          <Text style={spb.clearTxt}>✕</Text>
-        </TouchableOpacity>
-      </View>
-      <Text style={spb.name} numberOfLines={2}>{product.name}</Text>
-      <View style={spb.meta}>
-        {product.price != null && <Text style={spb.price}>{fmt(product.price)}</Text>}
-        {product.rating != null && <StarRating rating={product.rating} />}
-        <Text style={spb.reviews}>{product.reviews}</Text>
-      </View>
-      <View style={spb.actions}>
-        <TouchableOpacity style={spb.suppBtn} onPress={onFindSuppliers} activeOpacity={0.8}>
-          <Text style={spb.suppTxt}>🏭  Find Suppliers</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={spb.pilotBtn} onPress={onAskCoPilot} activeOpacity={0.8}>
-          <Text style={spb.pilotTxt}>⊛  Ask Co-Pilot</Text>
-        </TouchableOpacity>
-      </View>
-    </AppCard>
-  );
-}
-const spb = StyleSheet.create({
-  card:     { gap: 8, borderWidth: 1.5, borderColor: DS.accent },
-  header:   { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  dot:      { width: 8, height: 8, borderRadius: 4, backgroundColor: DS.accent },
-  eyebrow:  { fontSize: 9, fontWeight: '800', color: DS.accent, letterSpacing: 2 },
-  clearBtn: { marginLeft: 'auto' },
-  clearTxt: { fontSize: 14, color: DS.textMuted },
-  name:     { fontSize: 13, fontWeight: '700', color: DS.textPrimary, letterSpacing: -0.2, lineHeight: 18 },
-  meta:     { flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' },
-  price:    { fontSize: 14, fontWeight: '900', color: DS.textPrimary },
-  reviews:  { fontSize: 11, color: DS.textMuted, fontWeight: '500' },
-  actions:  { flexDirection: 'row', gap: 8 },
-  suppBtn:  { flex: 1, backgroundColor: DS.accentLight, borderRadius: 10, paddingVertical: 9, alignItems: 'center' },
-  suppTxt:  { fontSize: 12, fontWeight: '700', color: DS.accentDark },
-  pilotBtn: { flex: 1, backgroundColor: DS.indigoLight, borderRadius: 10, paddingVertical: 9, alignItems: 'center' },
-  pilotTxt: { fontSize: 12, fontWeight: '700', color: DS.indigo },
-});
-
 // ── Empty state ───────────────────────────────────────────────────────────────
 
 export function EmptyState({ icon, title, sub }: { icon: string; title: string; sub: string }) {
@@ -458,9 +403,9 @@ function SignalsBlock({ signals }: { signals: KeepaSignals }) {
       {items.map((item, i) => {
         const isWarn = item.variant === 'warning';
         const isInfo = item.variant === 'info';
-        const bg     = isWarn ? DS.warningBg  : isInfo ? DS.indigoLight : DS.bgSubtle;
-        const border = isWarn ? DS.warning    : isInfo ? DS.indigo      : DS.border;
-        const color  = isWarn ? DS.warningText : isInfo ? DS.indigo     : DS.textSecondary;
+        const bg     = isWarn ? DS.warningBg  : isInfo ? DS.accentLight : DS.bgSubtle;
+        const border = isWarn ? DS.warning    : isInfo ? DS.accent      : DS.border;
+        const color  = isWarn ? DS.warningText : isInfo ? DS.accent     : DS.textSecondary;
         return (
           <View key={i} style={[sig.row, { backgroundColor: bg, borderColor: border }]}>
             <Text style={[sig.txt, { color }]}>{item.text}</Text>
@@ -680,8 +625,8 @@ export function AnalyzeSupplierModal({
   );
 }
 const supm = StyleSheet.create({
-  scoreBox: { backgroundColor: DS.indigoLight, borderRadius: 18, padding: 20, alignItems: 'center', gap: 4 },
-  score:    { fontSize: 32, fontWeight: '900', color: DS.indigo, letterSpacing: -1 },
+  scoreBox: { backgroundColor: DS.accentLight, borderRadius: 18, padding: 20, alignItems: 'center', gap: 4 },
+  score:    { fontSize: 32, fontWeight: '900', color: DS.accent, letterSpacing: -1 },
   grade:    { fontSize: 18, fontWeight: '800', color: DS.textPrimary },
   conf:     { fontSize: 12, color: DS.textSecondary, fontWeight: '500' },
   green:    { fontSize: 13, color: DS.accentDark, lineHeight: 20 },
@@ -782,14 +727,14 @@ const ms = StyleSheet.create({
 
 const KW_TYPE_STYLE: Record<EnrichedKeyword['keywordType'], { color: string; bg: string }> = {
   'Head Term':      { color: DS.info,   bg: DS.infoBg      },
-  'Long-tail':      { color: DS.indigo, bg: DS.indigoLight },
+  'Long-tail':      { color: DS.accent, bg: DS.accentLight },
   'Backend':        { color: DS.textMuted, bg: DS.bgSubtle },
   'PPC Candidate':  { color: DS.warning,  bg: DS.warningBg },
 };
 
 const HINT_COLOR: Record<EnrichedKeyword['usageHint'], string> = {
   'Title candidate':    DS.accent,
-  'Bullet candidate':   DS.indigo,
+  'Bullet candidate':   DS.accent,
   'Backend keyword':    DS.textMuted,
   'PPC test candidate': DS.warning,
 };
@@ -802,7 +747,7 @@ export function KeywordRow({
   onToggle: () => void;
 }) {
   const ts = KW_TYPE_STYLE[kw.keywordType];
-  const scoreColor = kw.seoScore >= 7 ? DS.accent : kw.seoScore >= 5 ? DS.indigo : DS.textMuted;
+  const scoreColor = kw.seoScore >= 7 ? DS.accent : kw.seoScore >= 5 ? DS.accent : DS.textMuted;
   return (
     <View style={kr.row}>
       <View style={kr.left}>
@@ -952,8 +897,8 @@ const sk = StyleSheet.create({
   card:      { gap: 4 },
   header:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 },
   title:     { fontSize: 15, fontWeight: '800', color: DS.textPrimary, letterSpacing: -0.3 },
-  exportBtn: { backgroundColor: DS.indigoLight, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: DS.indigo + '30' },
-  exportTxt: { fontSize: 11, fontWeight: '700', color: DS.indigo },
+  exportBtn: { backgroundColor: DS.accentLight, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: DS.accent + '30' },
+  exportTxt: { fontSize: 11, fontWeight: '700', color: DS.accent },
   est:       { fontSize: 10, color: DS.textMuted, fontStyle: 'italic', marginBottom: 4 },
   empty:     { fontSize: 13, color: DS.textMuted, textAlign: 'center', paddingVertical: 16 },
   divider:   { height: 1, backgroundColor: DS.border, marginVertical: 10 },

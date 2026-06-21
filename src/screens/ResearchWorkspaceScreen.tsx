@@ -32,10 +32,7 @@ import { SkeletonProductCard } from '../components/ds/LoadingSkeleton';
 import { useCurrency } from '../context/CurrencyContext';
 import { useActiveProduct } from '../context/ActiveProductContext';
 import { usePipeline, PipelineReconInsights } from '../context/PipelineContext';
-import { PipelineProgressBar } from '../components/PipelineProgressBar';
-import { roughMarginPct, ppcColor, confidenceColor } from '../lib/financialEngine';
-import { FIN } from '../lib/financialConstants';
-import type { PPCPressure } from '../lib/financialEngine';
+import { confidenceColor } from '../lib/financialEngine';
 import {
   expandProductKeywords,
   deduplicateProducts,
@@ -85,7 +82,6 @@ import {
   SmartSummaryCard,
   SmartBadgeStrip,
   AskAIPanel,
-  SelectedProductBanner,
   EmptyState,
   AnalyzeProductModal,
   KeywordMetricsCard,
@@ -295,9 +291,6 @@ export default function ResearchWorkspaceScreen() {
   // ── Smart search summaries ─────────────────────────────────────────────────
   const [productSummary,  setProductSummary]  = useState<SmartSearchSummary | null>(null);
 
-  // ── Selected product (context for suppliers / copilot) ─────────────────────
-  const [selectedProduct, setSelectedProduct] = useState<ProductDisplay | null>(null);
-
   // ── Save state (per ASIN) ──────────────────────────────────────────────────
   const [savedIds,     setSavedIds]     = useState<Set<string>>(new Set());
   const [saveLoadingId, setSaveLoadingId] = useState<string | null>(null);
@@ -350,17 +343,14 @@ export default function ResearchWorkspaceScreen() {
     setAskAnswer('');
     setAskError('');
     try {
-      const context = selectedProduct
-        ? `Current product: ${selectedProduct.name}, price $${selectedProduct.price ?? 'N/A'}, competition: ${selectedProduct.competition}`
-        : undefined;
-      const res = await api.askAI(q, context);
+      const res = await api.askAI(q, undefined);
       setAskAnswer(res.answer);
     } catch (e: any) {
       setAskError(e?.message ?? 'Something went wrong. Please try again.');
     } finally {
       setAskLoading(false);
     }
-  }, [askQuestion, askLoading, selectedProduct]);
+  }, [askQuestion, askLoading]);
 
   // ── Handlers ───────────────────────────────────────────────────────────────
 
@@ -369,6 +359,7 @@ export default function ResearchWorkspaceScreen() {
     setAmazonError('');
     setProducts([]);
     setProductSummary(null);
+    setRevResult(null); setRevError(''); setDiffResult(null); setDiffError('');
     try {
       // ── 1. Expand keywords based on tier ─────────────────────────────────
       const expanded = expandProductKeywords(q, tier);
@@ -553,15 +544,6 @@ export default function ResearchWorkspaceScreen() {
     else                   { addRecentLookup(q); await handleDirectAnalysis(q); }
   }, [mode, can, runMarketSearch, handleDirectAnalysis, addRecentMarket, addRecentLookup]);
 
-  const handleSearchMarketInstead = useCallback(async () => {
-    const q = searchQuery.trim();
-    if (!q) return;
-    setMode('market');
-    if (!can('research')) { setPaywallFeature('research'); setShowPaywall(true); return; }
-    addRecentMarket(q);
-    await runMarketSearch(q);
-  }, [searchQuery, can, runMarketSearch, addRecentMarket]);
-
   const handleSaveReconInsights = useCallback(() => {
     if (!revResult) return;
     const insights: PipelineReconInsights = {
@@ -604,7 +586,6 @@ export default function ResearchWorkspaceScreen() {
           return;
         }
         setSavedIds(prev => new Set([...prev, item.id]));
-        setSelectedProduct(item);
       }
     } catch (err: any) {
       Alert.alert('Error', err?.message ?? 'Could not update saved products.');
@@ -707,11 +688,6 @@ export default function ResearchWorkspaceScreen() {
   }, []);
 
 
-  const handleSelectProduct = useCallback((item: ProductDisplay) => {
-    setSelectedProduct(prev => prev?.id === item.id ? null : item);
-  }, []);
-
-
   // ── Pipeline track handler ─────────────────────────────────────────────────
 
   const handleTrackInPipeline = useCallback((item: ProductDisplay) => {
@@ -722,7 +698,7 @@ export default function ResearchWorkspaceScreen() {
       savedAt: new Date().toISOString(),
     } as any);
     pipeline.trackPipelineEvent('product_tracked', { title: item.name, asin: item.id });
-    navigation.navigate('LaunchDecision' as any);
+    navigation.navigate('Main', { screen: 'Sourcing' } as any);
   }, [pipeline, setActiveProduct, navigation]);
 
   // ── Derived ────────────────────────────────────────────────────────────────
@@ -760,6 +736,12 @@ export default function ResearchWorkspaceScreen() {
     }
     return (
       <View style={xt.wrap}>
+        <RecentSearches
+          items={recentMarket}
+          accentColor={DS.info}
+          onSelect={selectRecentQuery}
+          onClear={clearRecentMarket}
+        />
         {productSummary && <SmartSummaryCard summary={productSummary} />}
         <SectionHeader
           title="Product Opportunities"
@@ -782,8 +764,6 @@ export default function ResearchWorkspaceScreen() {
             <ProductMarketCard
               key={p.id}
               item={p}
-              onSelect={() => handleSelectProduct(p)}
-              isSelected={selectedProduct?.id === p.id}
               inCompare={compareProductIds.has(p.id)}
               canCompare={comparable}
               onToggleCompare={() => comparable ? toggleProductCompare(p.id) : undefined}
@@ -802,19 +782,10 @@ export default function ResearchWorkspaceScreen() {
             <Text style={fl.eye}>RESEARCH FLOW · STEP 2</Text>
             <Text style={fl.title}>Continue to Supplier Sourcing</Text>
             <Text style={fl.sub}>You've identified {savedIds.size} product {savedIds.size === 1 ? 'opportunity' : 'opportunities'}. Find manufacturers and lock in your unit cost.</Text>
-            {selectedProduct && (
-              <View style={fl.selectedHint}>
-                <Text style={fl.selectedHintTxt}>Selected: {selectedProduct.name.slice(0, 50)}</Text>
-                <Text style={fl.selectedHintPrice}>${selectedProduct.price?.toFixed(2)} · {selectedProduct.competition} competition</Text>
-              </View>
-            )}
             <TouchableOpacity
               style={fl.btn}
               accessibilityRole="button"
               onPress={() => {
-                if (selectedProduct) {
-                  pipeline.setActiveProduct(productToPipelinePayload(selectedProduct));
-                }
                 pipeline.trackPipelineEvent('validate_handoff_suppliers', { query: searchQuery });
                 navigation.navigate('Main', { screen: 'Sourcing' } as any);
               }}
@@ -855,6 +826,12 @@ export default function ResearchWorkspaceScreen() {
 
     return (
       <View style={xt.wrap}>
+        <RecentSearches
+          items={recentLookup}
+          accentColor={DS.accent}
+          onSelect={selectRecentQuery}
+          onClear={clearRecentLookup}
+        />
 
         {/* ── Empty / loading state ─────────────────────────────────────── */}
         {revLoading && (
@@ -964,7 +941,7 @@ export default function ResearchWorkspaceScreen() {
                 <Text style={ri.sectionSub}>Specific changes that would beat the competition on reviews.</Text>
                 {revResult.recommended_improvements.map((imp, i) => (
                   <View key={i} style={ri.listRow}>
-                    <View style={[ri.dot, { backgroundColor: DS.indigo }]} />
+                    <View style={[ri.dot, { backgroundColor: DS.accent }]} />
                     <Text style={ri.listTxt}>{imp}</Text>
                   </View>
                 ))}
@@ -978,7 +955,7 @@ export default function ResearchWorkspaceScreen() {
                 <Text style={ri.sectionSub}>Bundle these to command a higher price and AOV.</Text>
                 {revResult.bundling_ideas.map((b, i) => (
                   <View key={i} style={ri.listRow}>
-                    <View style={[ri.dot, { backgroundColor: DS.infoText ?? DS.indigo }]} />
+                    <View style={[ri.dot, { backgroundColor: DS.infoText ?? DS.accent }]} />
                     <Text style={ri.listTxt}>{b}</Text>
                   </View>
                 ))}
@@ -1033,7 +1010,7 @@ export default function ResearchWorkspaceScreen() {
               <Text style={ri.sectionTitle}>BUNDLE IDEAS</Text>
               {diffResult.bundle_ideas.map((b, i) => (
                 <View key={i} style={ri.listRow}>
-                  <View style={[ri.dot, { backgroundColor: DS.indigo }]} />
+                  <View style={[ri.dot, { backgroundColor: DS.accent }]} />
                   <Text style={ri.listTxt}>{b}</Text>
                 </View>
               ))}
@@ -1071,7 +1048,7 @@ export default function ResearchWorkspaceScreen() {
             <View style={ri.saveInsightsHeader}>
               <Text style={ri.saveInsightsIcon}>⬡</Text>
               <View style={{ flex: 1, gap: 2 }}>
-                <Text style={ri.saveInsightsTitle}>Use Recon Insights for Supplier Specs</Text>
+                <Text style={ri.saveInsightsTitle}>Use Teardown Insights for Supplier Specs</Text>
                 <Text style={ri.saveInsightsSub}>
                   Save pain points, improvements, and angles so your supplier sourcing and brand strategy target what customers actually want.
                 </Text>
@@ -1123,7 +1100,6 @@ export default function ResearchWorkspaceScreen() {
 
       <AppHeader helpKey={mode === 'market' ? 'research' : 'smart_search'} />
       <OfflineBanner visible={!isOnline} />
-      <PipelineProgressBar />
 
       <ScrollView
         style={s.scroll}
@@ -1179,33 +1155,9 @@ export default function ResearchWorkspaceScreen() {
           />
         </AppCard>}
 
-        {/* ── Recent searches ─── */}
-        <RecentSearches
-          items={mode === 'market' ? recentMarket : recentLookup}
-          accentColor={mode === 'market' ? DS.info : DS.indigo}
-          onSelect={selectRecentQuery}
-          onClear={mode === 'market' ? clearRecentMarket : clearRecentLookup}
-        />
-
         {/* ── Mode selector ────────────────────────────────── */}
         <ModeSegment value={mode} onChange={setMode} exclude={['suppliers', 'freight']} />
         <ModeDescStrip mode={mode} />
-
-        {/* ── Selected product banner (all modes) ──────────── */}
-        {selectedProduct && (
-          <SelectedProductBanner
-            product={selectedProduct}
-            onFindSuppliers={() => {
-              if (selectedProduct) {
-                pipeline.setActiveProduct(productToPipelinePayload(selectedProduct));
-              }
-              pipeline.trackPipelineEvent('validate_handoff_suppliers_banner', { title: selectedProduct?.name });
-              navigation.navigate('Main', { screen: 'Sourcing' } as any);
-            }}
-            onAskCoPilot={() => navigation.navigate('Main', { screen: 'Home' } as any)}
-            onClear={() => setSelectedProduct(null)}
-          />
-        )}
 
         {/* ── Product Intelligence Preview ─────────────────────────────────── */}
         {/* Only shown when an activeProduct is set in the pipeline — never blocks browsing */}
@@ -1214,68 +1166,6 @@ export default function ResearchWorkspaceScreen() {
             profile={intelProfile}
             reconInsights={pipeline.reconInsights}
           />
-        )}
-
-        {/* ── Financial Signal Card (shown when product selected + has price) ─── */}
-        {selectedProduct && selectedProduct.price != null && selectedProduct.price > 0 && (
-          <View style={fsc.card}>
-            <Text style={fsc.heading}>📊 Quick Financial Signals</Text>
-            <Text style={fsc.disclaimer}>Directional estimates — verify with Profit Lab before ordering.</Text>
-
-            <View style={fsc.grid}>
-              {/* Rough Margin */}
-              <View style={fsc.cell}>
-                <Text style={fsc.cellLbl}>Est. Margin Range</Text>
-                {(() => {
-                  const price = selectedProduct.price ?? 0;
-                  const landedCostLow  = price * 0.18 * FIN.ROUGH_LANDED_MULT;
-                  const landedCostHigh = price * 0.30 * FIN.ROUGH_LANDED_MULT;
-                  const marginLow  = Math.round(roughMarginPct(price, landedCostHigh));
-                  const marginHigh = Math.round(roughMarginPct(price, landedCostLow));
-                  const color = marginLow >= FIN.MARGIN_ACCEPTABLE ? DS.success : marginLow >= FIN.MARGIN_FLOOR ? DS.warning : DS.danger;
-                  return <Text style={[fsc.cellVal, { color }]}>{marginLow}–{marginHigh}%</Text>;
-                })()}
-                <Text style={fsc.cellSub}>after fees, based on typical landed unit cost 24–41% of price</Text>
-              </View>
-
-              {/* Sales estimate */}
-              {selectedProduct.salesEstMonthly && (
-                <View style={fsc.cell}>
-                  <Text style={fsc.cellLbl}>Est. Monthly Sales</Text>
-                  <Text style={[fsc.cellVal, { color: DS.accent }]}>{selectedProduct.salesEstMonthly}</Text>
-                  <Text style={fsc.cellSub}>{selectedProduct.salesEstDaily ?? ''}</Text>
-                </View>
-              )}
-
-              {/* Revenue band */}
-              {selectedProduct.revenueEstLow != null && selectedProduct.revenueEstHigh != null && (
-                <View style={fsc.cell}>
-                  <Text style={fsc.cellLbl}>Est. Monthly Revenue</Text>
-                  <Text style={[fsc.cellVal, { color: DS.success }]}>
-                    ~${selectedProduct.revenueEstLow.toLocaleString()}–${selectedProduct.revenueEstHigh.toLocaleString()}
-                  </Text>
-                  <Text style={fsc.cellSub}>gross, before Amazon fees</Text>
-                </View>
-              )}
-
-              {/* PPC Pressure */}
-              {selectedProduct.ppcPressure && (
-                <View style={fsc.cell}>
-                  <Text style={fsc.cellLbl}>PPC Pressure</Text>
-                  <Text style={[fsc.cellVal, { color: ppcColor(selectedProduct.ppcPressure as PPCPressure) }]}>
-                    {selectedProduct.ppcPressure}
-                  </Text>
-                  <Text style={fsc.cellSub}>
-                    {selectedProduct.ppcPressure === 'High'
-                      ? 'Expect high CPC — budget aggressively'
-                      : selectedProduct.ppcPressure === 'Medium'
-                      ? 'Moderate ad competition'
-                      : 'Good opportunity for low-cost launch'}
-                  </Text>
-                </View>
-              )}
-            </View>
-          </View>
         )}
 
         {/* ── Mode content ─────────────────────────────────── */}
@@ -1364,12 +1254,12 @@ const ri = StyleSheet.create({
   dot:        { width: 7, height: 7, borderRadius: 4, marginTop: 6, flexShrink: 0 },
   listTxt:    { fontSize: 13, color: DS.textSecondary, lineHeight: 20, flex: 1 },
 
-  saveInsightsCard:      { gap: 12, borderWidth: 1.5, borderColor: DS.indigo + '50', backgroundColor: DS.indigoLight },
+  saveInsightsCard:      { gap: 12, borderWidth: 1.5, borderColor: DS.accent + '50', backgroundColor: DS.accentLight },
   saveInsightsHeader:    { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-  saveInsightsIcon:      { fontSize: 22, color: DS.indigo },
+  saveInsightsIcon:      { fontSize: 22, color: DS.accent },
   saveInsightsTitle:     { fontSize: 14, fontWeight: '800', color: DS.textPrimary, letterSpacing: -0.3 },
   saveInsightsSub:       { fontSize: 12, color: DS.textSecondary, lineHeight: 17 },
-  saveInsightsBtn:       { backgroundColor: DS.indigo, borderRadius: DS.radiusButton, paddingVertical: 13, alignItems: 'center' },
+  saveInsightsBtn:       { backgroundColor: DS.accent, borderRadius: DS.radiusButton, paddingVertical: 13, alignItems: 'center' },
   saveInsightsBtnSaved:  { backgroundColor: DS.success },
   saveInsightsBtnTxt:    { fontSize: 13, fontWeight: '800', color: '#fff', letterSpacing: -0.1 },
   saveInsightsBtnSavedTxt: { color: '#fff' },
@@ -1418,16 +1308,13 @@ const fl = StyleSheet.create({
   sub:              { fontSize: 12, color: DS.textSecondary, lineHeight: 18 },
   btn:              { backgroundColor: DS.accent, borderRadius: 12, paddingVertical: 12, alignItems: 'center' as const, shadowColor: DS.accent, shadowOpacity: 0.25, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
   btnTxt:           { fontSize: 13, fontWeight: '900', color: '#fff', letterSpacing: -0.2 },
-  selectedHint:     { backgroundColor: DS.bgCard, borderRadius: 10, padding: 10, gap: 2, borderWidth: 1, borderColor: DS.border },
-  selectedHintTxt:  { fontSize: 12, fontWeight: '700', color: DS.textPrimary },
-  selectedHintPrice:{ fontSize: 11, color: DS.textMuted },
 });
 
 const pd = StyleSheet.create({
   row:    { flexDirection: 'row' as const, alignItems: 'center' as const, flexWrap: 'wrap' as const, gap: 6, marginBottom: 10 },
   label:  { fontSize: 10, fontWeight: '700', color: DS.textMuted },
-  chip:   { backgroundColor: DS.indigoLight, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: DS.indigo + '30' },
-  chipTxt:{ fontSize: 10, fontWeight: '700', color: DS.indigo },
+  chip:   { backgroundColor: DS.accentLight, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: DS.accent + '30' },
+  chipTxt:{ fontSize: 10, fontWeight: '700', color: DS.accent },
 });
 
 // ── Screen-level styles ───────────────────────────────────────────────────────
@@ -1458,13 +1345,3 @@ const s = StyleSheet.create({
   searchBtn:  { marginTop: 10 },
 });
 
-const fsc = StyleSheet.create({
-  card:       { backgroundColor: DS.bgCard, borderRadius: DS.radiusCard, borderWidth: 1, borderColor: DS.border, padding: DS.cardPadding, gap: 12 },
-  heading:    { fontSize: 13, fontWeight: '800', color: DS.textPrimary, letterSpacing: -0.2 },
-  disclaimer: { fontSize: 11, color: DS.textMuted, fontStyle: 'italic' },
-  grid:       { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  cell:       { minWidth: '44%', flex: 1, backgroundColor: DS.bgSubtle, borderRadius: DS.radiusChip, padding: 10, gap: 3 },
-  cellLbl:    { fontSize: 9, fontWeight: '700', color: DS.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
-  cellVal:    { fontSize: 16, fontWeight: '900', color: DS.textPrimary, letterSpacing: -0.4 },
-  cellSub:    { fontSize: 10, color: DS.textMuted, lineHeight: 14 },
-});

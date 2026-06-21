@@ -9,7 +9,6 @@ import { DS } from '../components/ds';
 import { InputField, PrimaryButton, AppCard } from '../components/ds';
 import { api, Supplier } from '../services/api';
 import { AppHeader } from '../components/AppHeader';
-import { PipelineProgressBar } from '../components/PipelineProgressBar';
 import { useCurrency } from '../context/CurrencyContext';
 import { useSellerProfile } from '../hooks/useSellerProfile';
 import { usePipeline, PipelineReconInsights, PipelineSupplier } from '../context/PipelineContext';
@@ -26,7 +25,7 @@ import type { SupplierLabel } from '../lib/financialEngine';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STORAGE_KEYS } from '../constants/storage';
 import {
-  deduplicateSuppliers, scoreSupplier, detectSupplierType, SmartSearchSummary,
+  deduplicateSuppliers, scoreSupplier, detectSupplierType, buildSupplierQueries, SmartSearchSummary,
 } from '../lib/smartSearch';
 import { supplierToDisplay } from './research/productHelpers';
 import { SupplierDisplay, AnalyzeSupplierResult, OutreachEmail } from './research/types';
@@ -47,35 +46,6 @@ import { useDecisionSimulation } from '../hooks/useDecisionSimulation';
 import { useSubscription } from '../hooks/useSubscription';
 import PaywallModal from '../components/PaywallModal';
 
-// ── Platform supplier stubs ───────────────────────────────────────────────────
-// Injected as full SupplierDisplay items so they render as identical SupplierCards
-// with View / Analyze / Compare / Lock In — price/MOQ are unknown until user visits.
-
-const PLATFORM_DEFS = [
-  { id: 'dhgate',      name: 'DHgate',         country: '🇨🇳', buildUrl: (q: string) => `https://www.dhgate.com/wholesale/search.do?searchkey=${q}` },
-  { id: '1688',        name: '1688',            country: '🇨🇳', buildUrl: (q: string) => `https://s.1688.com/selloffer/offerlist.htm?keywords=${q}` },
-  { id: 'globalsrc',   name: 'Global Sources',  country: '🌐', buildUrl: (q: string) => `https://www.globalsources.com/gsol/I/Products/?keywords=${q}` },
-  { id: 'madeinchina', name: 'Made-in-China',   country: '🇨🇳', buildUrl: (q: string) => `https://www.made-in-china.com/products-search/hot-china-products/${q}.html` },
-];
-
-function buildPlatformSuppliers(productQuery: string): ScoredDisplay[] {
-  const q = encodeURIComponent(productQuery.trim());
-  return PLATFORM_DEFS.map(p => ({
-    id:       `__platform_${p.id}`,
-    name:     `${productQuery} suppliers`,
-    platform: p.name,
-    badge:    'External Platform',
-    moq:      'Quote required',
-    moqNum:   0,
-    price:    'Visit for live prices',
-    priceUSD: null,
-    trust:    0,
-    country:  p.country,
-    url:      p.buildUrl(q),
-    badges:   ['External Platform'],
-    matchReason: 'Tap View to browse live listings — get a real price quote before locking in',
-  }));
-}
 
 // ── Supplier URL resolver ─────────────────────────────────────────────────────
 // Backend always returns alibaba.com URLs regardless of platform. Build the
@@ -124,7 +94,7 @@ function ReconSpecsCard({ insights }: { insights: PipelineReconInsights }) {
         <View style={{ flex: 1, gap: 2 }}>
           <Text style={rsc.title}>Product Specs to Ask Suppliers About</Text>
           <Text style={rsc.sub}>
-            {expanded ? `From Review Recon on "${insights.sourceKeyword}"` : `${questions.length} questions ready — tap to view`}
+            {expanded ? `From Teardown on "${insights.sourceKeyword}"` : `${questions.length} questions ready — tap to view`}
           </Text>
         </View>
         <Text style={rsc.chevron}>{expanded ? '▲' : '▼'}</Text>
@@ -162,19 +132,19 @@ function ReconSpecsCard({ insights }: { insights: PipelineReconInsights }) {
 }
 
 const rsc = StyleSheet.create({
-  card:       { gap: 12, borderWidth: 1.5, borderColor: DS.indigo + '40', backgroundColor: DS.indigoLight },
+  card:       { gap: 12, borderWidth: 1.5, borderColor: DS.accent + '40', backgroundColor: DS.accentLight },
   header:     { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-  iconWrap:   { width: 34, height: 34, borderRadius: 10, backgroundColor: DS.indigo + '18', alignItems: 'center', justifyContent: 'center' },
-  icon:       { fontSize: 17, color: DS.indigo },
+  iconWrap:   { width: 34, height: 34, borderRadius: 10, backgroundColor: DS.accent + '18', alignItems: 'center', justifyContent: 'center' },
+  icon:       { fontSize: 17, color: DS.accent },
   title:      { fontSize: 13, fontWeight: '800', color: DS.textPrimary, letterSpacing: -0.2 },
   sub:        { fontSize: 11, color: DS.textMuted },
-  chevron:    { fontSize: 11, color: DS.indigo, marginTop: 2 },
+  chevron:    { fontSize: 11, color: DS.accent, marginTop: 2 },
   rows:       { gap: 8 },
   row:        { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
-  dot:        { width: 6, height: 6, borderRadius: 3, backgroundColor: DS.indigo, marginTop: 7, flexShrink: 0 },
+  dot:        { width: 6, height: 6, borderRadius: 3, backgroundColor: DS.accent, marginTop: 7, flexShrink: 0 },
   question:   { fontSize: 13, color: DS.textSecondary, lineHeight: 19, flex: 1 },
-  anglesWrap: { gap: 6, paddingTop: 8, borderTopWidth: 1, borderTopColor: DS.indigo + '25' },
-  anglesLabel:{ fontSize: 9, fontWeight: '800', color: DS.indigo, letterSpacing: 1.5 },
+  anglesWrap: { gap: 6, paddingTop: 8, borderTopWidth: 1, borderTopColor: DS.accent + '25' },
+  anglesLabel:{ fontSize: 9, fontWeight: '800', color: DS.accent, letterSpacing: 1.5 },
   angle:      { fontSize: 12, color: DS.textSecondary, lineHeight: 18 },
 });
 
@@ -587,16 +557,16 @@ const sqc = StyleSheet.create({
   editRow:      { flexDirection: 'row', gap: 8 },
   editField:    { flex: 1, gap: 4 },
   editLabel:    { fontSize: 9, fontWeight: '700', color: DS.textMuted, textTransform: 'uppercase' as const, letterSpacing: 0.5 },
-  editInput:    { backgroundColor: DS.bgCard, borderRadius: 8, borderWidth: 1, borderColor: DS.border, paddingHorizontal: 10, paddingVertical: 8, fontSize: 13, color: DS.textPrimary },
+  editInput:    { backgroundColor: DS.bgCard, borderRadius: DS.radiusInput, borderWidth: 1.5, borderColor: DS.border, paddingHorizontal: 14, paddingVertical: 10, fontSize: 13, color: DS.textPrimary },
   editInputNotes:{ minHeight: 52, textAlignVertical: 'top' as const },
-  editSaveBtn:  { backgroundColor: DS.accent, borderRadius: 10, paddingVertical: 10, alignItems: 'center' },
-  editSaveTxt:  { fontSize: 12, fontWeight: '800', color: '#fff' },
+  editSaveBtn:  { backgroundColor: DS.accent, borderRadius: DS.radiusButton, paddingVertical: 13, alignItems: 'center' },
+  editSaveTxt:  { fontSize: 13, fontWeight: '800', color: '#fff', letterSpacing: -0.2 },
   // Actions
   actions:      { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  selectBtn:    { flex: 1, backgroundColor: DS.accent, borderRadius: 10, paddingVertical: 9, alignItems: 'center' },
-  selectTxt:    { fontSize: 11, fontWeight: '800', color: '#fff' },
-  activePill:   { flex: 1, backgroundColor: DS.success + '15', borderRadius: 10, paddingVertical: 9, alignItems: 'center', borderWidth: 1, borderColor: DS.success + '30' },
-  activeTxt:    { fontSize: 11, fontWeight: '800', color: DS.success },
+  selectBtn:    { flex: 1, backgroundColor: DS.accent, borderRadius: DS.radiusButton, paddingVertical: 12, alignItems: 'center' },
+  selectTxt:    { fontSize: 13, fontWeight: '800', color: '#fff', letterSpacing: -0.2 },
+  activePill:   { flex: 1, backgroundColor: DS.success + '15', borderRadius: DS.radiusButton, paddingVertical: 12, alignItems: 'center', borderWidth: 1.5, borderColor: DS.success + '40' },
+  activeTxt:    { fontSize: 13, fontWeight: '800', color: DS.success },
   removeBtn:    { padding: 4 },
   removeTxt:    { fontSize: 13, color: DS.textMuted, fontWeight: '700' },
 });
@@ -642,153 +612,8 @@ const seg = StyleSheet.create({
 // ── Operational checklist ─────────────────────────────────────────────────────
 
 interface CheckItem { label: string; done: boolean; hint?: string }
+interface FreightSummary { perUnit: number; totalCost: number; mode: string; transitDays: number }
 
-function OperationalChecklist({ items }: { items: CheckItem[] }) {
-  const done  = items.filter(i => i.done).length;
-  const total = items.length;
-  const pct   = Math.round((done / total) * 100);
-  return (
-    <AppCard style={cl.card}>
-      <View style={cl.header}>
-        <View style={{ flex: 1, gap: 2 }}>
-          <Text style={cl.title}>Sourcing Checklist</Text>
-          <Text style={cl.sub}>{done}/{total} complete · {pct}% ready to continue</Text>
-        </View>
-        <View style={[cl.badge, { backgroundColor: pct === 100 ? DS.success + '18' : DS.warning + '18' }]}>
-          <Text style={[cl.badgeTxt, { color: pct === 100 ? DS.success : DS.warning }]}>{pct}%</Text>
-        </View>
-      </View>
-      <View style={cl.track}><View style={[cl.fill, { width: `${pct}%` as any, backgroundColor: pct === 100 ? DS.success : DS.warning }]} /></View>
-      <View style={cl.rows}>
-        {items.map((item, i) => (
-          <View key={i} style={cl.row}>
-            <View style={[cl.check, item.done && cl.checkDone]}>
-              <Text style={[cl.checkTxt, item.done && cl.checkTxtDone]}>{item.done ? '✓' : ''}</Text>
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[cl.itemLabel, item.done && cl.itemDone]}>{item.label}</Text>
-              {!item.done && item.hint && <Text style={cl.itemHint}>{item.hint}</Text>}
-            </View>
-          </View>
-        ))}
-      </View>
-    </AppCard>
-  );
-}
-
-const cl = StyleSheet.create({
-  card:        { gap: 14 },
-  header:      { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  title:       { fontSize: 14, fontWeight: '800', color: DS.textPrimary, letterSpacing: -0.3 },
-  sub:         { fontSize: 11, color: DS.textMuted },
-  badge:       { borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4 },
-  badgeTxt:    { fontSize: 13, fontWeight: '900', letterSpacing: -0.3 },
-  track:       { height: 4, backgroundColor: DS.border, borderRadius: 2, overflow: 'hidden' },
-  fill:        { height: 4, borderRadius: 2 },
-  rows:        { gap: 10 },
-  row:         { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-  check:       { width: 20, height: 20, borderRadius: 10, borderWidth: 1.5, borderColor: DS.border, alignItems: 'center', justifyContent: 'center', backgroundColor: DS.bgSubtle, flexShrink: 0, marginTop: 1 },
-  checkDone:   { backgroundColor: DS.success, borderColor: DS.success },
-  checkTxt:    { fontSize: 11, fontWeight: '900', color: DS.textMuted },
-  checkTxtDone:{ color: '#fff' },
-  itemLabel:   { fontSize: 13, fontWeight: '600', color: DS.textPrimary },
-  itemDone:    { color: DS.textMuted, textDecorationLine: 'line-through' },
-  itemHint:    { fontSize: 11, color: DS.textMuted, marginTop: 2, lineHeight: 15 },
-});
-
-// ── Pipeline summary card ─────────────────────────────────────────────────────
-
-interface FreightSummary {
-  perUnit:    number;
-  totalCost:  number;
-  mode:       string;
-  transitDays:number;
-}
-
-function PipelineSummaryCard({
-  pipeline, freightSummary, onGoToFreight, onGoToCosts,
-}: {
-  pipeline: ReturnType<typeof usePipeline>;
-  freightSummary: FreightSummary | null;
-  onGoToFreight: () => void;
-  onGoToCosts: () => void;
-}) {
-  const sup       = pipeline.selectedSupplier;
-  const product   = pipeline.activeProduct?.title ?? pipeline.activeNiche?.keyword;
-  const unitCost  = sup?.unitCost ?? 0;
-  const moq       = sup?.moq ?? 0;
-  const fPerUnit  = freightSummary?.perUnit ?? 0;
-  const landed    = unitCost + fPerUnit;
-  const investment= moq > 0 && landed > 0 ? moq * landed : null;
-
-  const DataRow = ({ label, value, missing }: { label: string; value: string; missing?: boolean }) => (
-    <View style={ps.dataRow}>
-      <Text style={ps.dataLabel}>{label}</Text>
-      <Text style={[ps.dataValue, missing && { color: DS.textMuted, fontStyle: 'italic' }]}>{value}</Text>
-    </View>
-  );
-
-  return (
-    <AppCard style={ps.card}>
-      <View style={ps.header}>
-        <Text style={ps.title}>Sourcing Summary</Text>
-        <Text style={ps.sub}>Your product's sourcing cost picture</Text>
-      </View>
-
-      <View style={ps.rows}>
-        <DataRow label="Product"    value={product ?? '—'}                                  missing={!product} />
-        <DataRow label="Supplier"   value={sup ? sup.name.slice(0, 28) : '—'}               missing={!sup} />
-        <DataRow label="Unit Cost"  value={sup ? `$${sup.unitCost.toFixed(2)}` : '—'}       missing={!sup} />
-        <DataRow label="MOQ"        value={sup ? `${sup.moq.toLocaleString()} units` : '—'} missing={!sup} />
-        <DataRow label="Freight/unit" value={fPerUnit > 0 ? `$${fPerUnit.toFixed(2)}` : '—'} missing={fPerUnit === 0} />
-        {landed > 0 && (
-          <View style={[ps.dataRow, ps.landedRow]}>
-            <Text style={ps.landedLabel}>Landed Cost / Unit</Text>
-            <Text style={ps.landedValue}>${landed.toFixed(2)}</Text>
-          </View>
-        )}
-        {investment != null && (
-          <View style={[ps.dataRow, ps.investRow]}>
-            <Text style={ps.investLabel}>Total Investment (MOQ)</Text>
-            <Text style={ps.investValue}>${investment.toLocaleString()}</Text>
-          </View>
-        )}
-      </View>
-
-      <View style={{ gap: 8 }}>
-        {!freightSummary && (
-          <TouchableOpacity style={ps.ctaBtn} onPress={onGoToFreight} activeOpacity={0.85}>
-            <Text style={ps.ctaTxt}>✈  Estimate Freight Cost</Text>
-          </TouchableOpacity>
-        )}
-        <TouchableOpacity style={[ps.ctaBtn, ps.ctaBtnPrimary]} onPress={onGoToCosts} activeOpacity={0.85}>
-          <Text style={[ps.ctaTxt, ps.ctaTxtPrimary]}>→  Calculate ROI in Profit Lab</Text>
-        </TouchableOpacity>
-      </View>
-    </AppCard>
-  );
-}
-
-const ps = StyleSheet.create({
-  card:       { gap: 14 },
-  header:     { gap: 2 },
-  title:      { fontSize: 14, fontWeight: '800', color: DS.textPrimary, letterSpacing: -0.3 },
-  sub:        { fontSize: 11, color: DS.textMuted },
-  rows:       { gap: 8 },
-  dataRow:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  dataLabel:  { fontSize: 13, color: DS.textSecondary, fontWeight: '500' },
-  dataValue:  { fontSize: 13, fontWeight: '700', color: DS.textPrimary, maxWidth: '60%', textAlign: 'right' },
-  landedRow:  { paddingTop: 8, borderTopWidth: 1, borderTopColor: DS.border },
-  landedLabel:{ fontSize: 13, fontWeight: '700', color: DS.textPrimary },
-  landedValue:{ fontSize: 18, fontWeight: '900', color: DS.warning, letterSpacing: -0.5 },
-  investRow:  { paddingTop: 4 },
-  investLabel:{ fontSize: 11, color: DS.textMuted },
-  investValue:{ fontSize: 14, fontWeight: '800', color: DS.textPrimary },
-  ctaBtn:     { borderRadius: DS.radiusButton, paddingVertical: 12, alignItems: 'center', borderWidth: 1.5, borderColor: DS.accent + '44', backgroundColor: DS.accentLight },
-  ctaBtnPrimary:{ backgroundColor: DS.accent, borderColor: DS.accent },
-  ctaTxt:     { fontSize: 13, fontWeight: '800', color: DS.accent },
-  ctaTxtPrimary:{ color: '#fff' },
-});
 
 // ── Sourcing Strategy Section ─────────────────────────────────────────────────
 
@@ -883,16 +708,6 @@ function RegionRow({ region }: { region: SourcingStrategyResult['recommendedRegi
   );
 }
 
-async function addTaskToLaunchPlan(taskText: string, taskId: string): Promise<void> {
-  try {
-    const raw    = await AsyncStorage.getItem(STORAGE_KEYS.sourcingTasks);
-    const tasks: { id: string; text: string }[] = raw ? JSON.parse(raw) : [];
-    if (!tasks.find(t => t.id === taskId)) {
-      tasks.push({ id: taskId, text: taskText });
-      await AsyncStorage.setItem(STORAGE_KEYS.sourcingTasks, JSON.stringify(tasks));
-    }
-  } catch {}
-}
 
 function SourcingStrategySection({
   strategy,
@@ -902,14 +717,7 @@ function SourcingStrategySection({
   onSearchPress?: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const [taskAdded, setTaskAdded] = useState<string | null>(null);
   const diffColor = DIFFICULTY_COLOR[strategy.sourcingDifficulty] ?? DS.textMuted;
-
-  async function handleAddToLaunchPlan(taskText: string, taskId: string) {
-    await addTaskToLaunchPlan(taskText, taskId);
-    setTaskAdded(taskId);
-    setTimeout(() => setTaskAdded(null), 2500);
-  }
 
   return (
     <View style={ss.wrapper}>
@@ -938,22 +746,6 @@ function SourcingStrategySection({
               {i === 0 && rec.platform.liveIntegration && onSearchPress && (
                 <TouchableOpacity style={ss.ctaBtn} onPress={onSearchPress} activeOpacity={0.85}>
                   <Text style={ss.ctaBtnTxt}>Search {rec.platform.name} Suppliers Now →</Text>
-                </TouchableOpacity>
-              )}
-              {i === 0 && !rec.platform.liveIntegration && (
-                <TouchableOpacity
-                  style={[ss.ctaBtn, ss.ctaBtnSecondary]}
-                  onPress={() => handleAddToLaunchPlan(
-                    `Research ${rec.platform.name} suppliers — ${rec.why.split('.')[0]}`,
-                    `src_platform_${rec.platform.id}`,
-                  )}
-                  activeOpacity={0.85}
-                >
-                  <Text style={ss.ctaBtnSecondaryTxt}>
-                    {taskAdded === `src_platform_${rec.platform.id}`
-                      ? '✓ Added to Launch Plan'
-                      : `Add "${rec.platform.name} research" to Launch Plan`}
-                  </Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -1064,7 +856,7 @@ export default function SourcingLogisticsScreen() {
   const prefilled       = useRef(false);
   const isMountedRef    = useRef(true);
   const { toastMsg, toastVisible, toastType, showToast, hideToast } = useToast();
-  const { can, increment } = useSubscription();
+  const { can, increment, tier } = useSubscription();
   const [showPaywall, setShowPaywall] = useState(false);
 
   useEffect(() => {
@@ -1086,16 +878,17 @@ export default function SourcingLogisticsScreen() {
   const [showFilters, setShowFilters] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [selectedId,   setSelectedId]   = useState<string | null>(null);
-  const [compareIds,   setCompareIds]   = useState<Set<string>>(new Set());
+  const [compareIds,   setCompareIds]   = useState<Set<string>>(() => new Set());
   const [showCompare,  setShowCompare]  = useState(false);
   const [analyzeModal,    setAnalyzeModal]    = useState(false);
-  const [analyzeLoading,  setAnalyzeLoading]  = useState(false);
   const [analyzeResult,   setAnalyzeResult]   = useState<AnalyzeSupplierResult | null>(null);
   const [analyzeError,    setAnalyzeError]    = useState('');
   const [analyzeTargetId, setAnalyzeTargetId] = useState<string | null>(null);
   const [outreachEmail,     setOutreachEmail]     = useState<OutreachEmail | null>(null);
+  const [outreachOpenId,    setOutreachOpenId]    = useState<string | null>(null);
   const [outreachLoadingId, setOutreachLoadingId] = useState<string | null>(null);
   const [outreachError,     setOutreachError]     = useState('');
+  const outreachQueue = useRef<ScoredDisplay | null>(null);
 
   // ── Freight state ─────────────────────────────────────────────────────────
   const [freightProduct,  setFreightProduct]  = useState('');
@@ -1128,6 +921,9 @@ export default function SourcingLogisticsScreen() {
     AsyncStorage.getItem(STORAGE_KEYS.recentSupplierSearches)
       .then(raw => { if (raw) try { setRecentSearches(JSON.parse(raw)); } catch {} })
       .catch(() => {});
+    AsyncStorage.getItem(STORAGE_KEYS.compareIds)
+      .then(raw => { if (raw) try { setCompareIds(new Set(JSON.parse(raw))); } catch {} })
+      .catch(() => {});
   }, []);
 
   useFocusEffect(useCallback(() => {
@@ -1144,27 +940,56 @@ export default function SourcingLogisticsScreen() {
 
   async function runSupplierSearch(query: string) {
     setLoading(true); setError(''); setSuppliers([]); setSelectedId(null);
-    setCompareIds(new Set()); setSummary(null); setOutreachEmail(null);
+    setCompareIds(new Set()); AsyncStorage.removeItem(STORAGE_KEYS.compareIds).catch(() => {});
+    setSummary(null); setOutreachEmail(null);
     try {
-      const result = await api.searchSuppliersV2({
-        product: query, marketplace,
-        max_unit_price: maxPrice ? parseFloat(maxPrice) : undefined,
-        max_moq:        maxMoq   ? parseInt(maxMoq)    : undefined,
-      });
+      const queries = buildSupplierQueries(query, null, tier);
+      const priceParam = maxPrice ? parseFloat(maxPrice) : undefined;
+      const moqParam   = maxMoq   ? parseInt(maxMoq)    : undefined;
+      // Fire v2 variants + v1 plain query in parallel to maximise supplier pool
+      const v2Calls = queries.map(q =>
+        api.searchSuppliersV2({ product: q, marketplace, max_unit_price: priceParam, max_moq: moqParam })
+          .then(r => r.suppliers ?? [])
+          .catch(() => [] as Supplier[])
+      );
+      const v1Call = api.searchSuppliers(query, marketplace, priceParam)
+        .then(r => r.suppliers ?? [])
+        .catch(() => [] as Supplier[]);
+      const allResults = await Promise.all([...v2Calls, v1Call]);
       if (!isMountedRef.current) return;
-      const allRaw: Supplier[] = result.suppliers ?? [];
+      const seenKeys = new Set<string>();
+      let allRaw: Supplier[] = [];
+      for (const batch of allResults) {
+        for (const s of batch) {
+          const key = ((s.supplier || '') + '|' + (s.url || '')).toLowerCase().trim();
+          if (!key || seenKeys.has(key)) continue;
+          seenKeys.add(key);
+          allRaw.push(s);
+        }
+      }
       if (allRaw.length === 0) throw new Error('No suppliers found. Try a different product name.');
       const { results: deduped, removed } = deduplicateSuppliers(allRaw);
-      const scored = deduped
+      // If strict name-similarity dedup cut results below 3, fall back to URL-only dedup
+      let finalDeduped = deduped;
+      if (deduped.length < 3 && allRaw.length > deduped.length) {
+        const seenUrls = new Set<string>();
+        finalDeduped = allRaw.filter(s => {
+          if (!s.url) return true;
+          const key = s.url.toLowerCase().replace(/https?:\/\/(www\.)?/, '').split('?')[0];
+          if (seenUrls.has(key)) return false;
+          seenUrls.add(key);
+          return true;
+        });
+      }
+      const scored = finalDeduped
         .map((s, i) => {
           const sc = scoreSupplier(s, query); const disp = supplierToDisplay(s, i);
           return { ...disp, relevanceScore: sc.relevanceScore, opportunityScore: sc.opportunityScore, finalScore: sc.finalScore, badges: sc.badges, matchReason: sc.matchReason, _fs: sc.finalScore };
         })
         .sort((a, b) => (b._fs ?? 0) - (a._fs ?? 0)).slice(0, 15);
       const apiSuppliers: ScoredDisplay[] = scored.map(({ _fs: _, ...rest }) => rest);
-      const finalSuppliers = [...apiSuppliers, ...buildPlatformSuppliers(query)];
-      setSuppliers(finalSuppliers);
-      setSummary({ originalQuery: query, expandedKeywords: [query], totalScanned: allRaw.length, duplicatesRemoved: removed, finalCount: finalSuppliers.length, topCategory: detectSupplierType(allRaw) });
+      setSuppliers(apiSuppliers);
+      setSummary({ originalQuery: query, expandedKeywords: queries, totalScanned: allRaw.length, duplicatesRemoved: allRaw.length - finalDeduped.length, finalCount: apiSuppliers.length, topCategory: detectSupplierType(allRaw) });
     } catch (e: any) {
       if (isMountedRef.current) setError(e?.message ?? 'Search failed. Please try again.');
     } finally {
@@ -1192,27 +1017,113 @@ export default function SourcingLogisticsScreen() {
     await runSupplierSearch(q);
   }
 
-  async function handleAnalyzeSupplier(item: ScoredDisplay) {
+  function buildLocalAnalysis(item: ScoredDisplay): AnalyzeSupplierResult {
+    const score     = item.finalScore ?? 50;
+    const moqNum    = item.moqNum ?? 0;
+    const priceUSD  = item.priceUSD;
+    const hasPrice  = priceUSD != null && priceUSD > 0;
+    const platform  = (item.platform ?? '').toLowerCase();
+
+    const grade =
+      score >= 82 ? 'A' : score >= 68 ? 'B' : score >= 52 ? 'C' : 'D';
+
+    const confidence_label =
+      hasPrice && moqNum > 0 ? 'High Confidence'
+      : hasPrice || moqNum > 0 ? 'Moderate Confidence'
+      : 'Low Confidence — request a quote for full details';
+
+    const strengths: string[] = [];
+    if (item.badges?.includes('Smart Pick'))            strengths.push('Top-scored supplier for this search');
+    if (item.badges?.includes('Low MOQ'))               strengths.push(`Low minimum order (${moqNum > 0 ? moqNum : '<100'} units) — good for testing`);
+    if (item.badges?.includes('Great Price'))           strengths.push(`Competitive unit price${hasPrice ? ` ($${priceUSD!.toFixed(2)}/unit)` : ''}`);
+    if (item.badges?.includes('Verified'))              strengths.push('Verified supplier on Alibaba — reduced fraud risk');
+    if (item.badges?.includes('Private Label Friendly'))strengths.push('OEM/ODM capable — suitable for private label');
+    if (platform.includes('alibaba'))                   strengths.push('Alibaba trade assurance available — payment protection');
+    if (moqNum > 0 && moqNum <= 100)                    strengths.push('Very low MOQ — ideal for initial launch order');
+    if (item.trust != null && item.trust >= 7)          strengths.push('High trust score from platform metrics');
+    if (strengths.length === 0)                         strengths.push('Listed on a reputable B2B sourcing platform');
+
+    const risk_flags: string[] = [];
+    if (!hasPrice)                                      risk_flags.push('No unit price listed — always get a written quote before proceeding');
+    if (moqNum >= 500)                                  risk_flags.push(`High MOQ (${moqNum} units) — requires significant upfront capital`);
+    else if (moqNum >= 300)                             risk_flags.push(`Moderate-high MOQ (${moqNum} units) — negotiate down for a trial order`);
+    if (!item.url)                                      risk_flags.push('No direct link — source this supplier manually on their platform');
+    if (item.trust != null && item.trust < 4)           risk_flags.push('Low platform trust score — verify credentials before ordering');
+    if (platform.includes('dhgate'))                    risk_flags.push('DHgate suppliers vary widely — always order a sample first');
+    if (platform.includes('1688'))                      risk_flags.push('1688 is China-domestic — communication may require translation support');
+
+    const recommendation =
+      score >= 82 ? `Strong contender. Request samples and negotiate — aim for a ${moqNum > 0 ? Math.ceil(moqNum * 0.5) : 50}–${moqNum || 100} unit trial order.`
+      : score >= 68 ? `Good option. Contact for a detailed quote, confirm lead times, and order a sample before committing.`
+      : score >= 52 ? `Worth exploring, but keep looking. Get a quote and compare with your top 2–3 suppliers.`
+      : `Lower priority. Only pursue if your stronger options don't work out.`;
+
+    const priceTarget = hasPrice
+      ? `$${(priceUSD! * 0.80).toFixed(2)}/unit (20% below listed)`
+      : 'Request their best price — never accept the first quote';
+    const openingOffer = hasPrice
+      ? `$${(priceUSD! * 0.68).toFixed(2)}/unit (32% below listed)`
+      : 'Ask for their factory price sheet before making any offer';
+    const moqAsk = moqNum > 100
+      ? `Ask to start with ${Math.ceil(moqNum * 0.4)}–${Math.ceil(moqNum * 0.6)} units for a trial order`
+      : 'MOQ is already low — focus on price negotiation';
+
+    return {
+      total_score: score,
+      grade,
+      confidence_label,
+      strengths,
+      risk_flags,
+      recommendation,
+      negotiation_strategy: {
+        opening_offer: openingOffer,
+        target_price:  priceTarget,
+        moq_ask:       moqAsk,
+        leverage_points: [
+          'Mention you are evaluating multiple suppliers — creates competitive pressure',
+          'Offer to leave a positive review in exchange for a sample discount',
+          hasPrice ? `Current price is $${priceUSD!.toFixed(2)} — reference competitor pricing to justify a lower ask` : 'Request itemised pricing: unit cost, packaging, shipping separately',
+        ],
+      },
+    };
+  }
+
+  function handleAnalyzeSupplier(item: ScoredDisplay) {
     setAnalyzeResult(null); setAnalyzeError(''); setAnalyzeTargetId(item.id);
-    setAnalyzeModal(true); setAnalyzeLoading(true);
-    try {
-      const res = await api.scoreSupplier({ supplier_name: item.name, price_per_unit: item.priceUSD ?? 0, moq: item.moqNum, product_name: product.trim() || undefined });
-      if (!isMountedRef.current) return;
-      setAnalyzeResult({ total_score: res.total_score, grade: res.grade, confidence_label: res.confidence_label, strengths: res.strengths, risk_flags: res.risk_flags, recommendation: res.recommendation, negotiation_strategy: res.negotiation_strategy });
-      setSuppliers(prev => prev.map(s => s.id === item.id ? { ...s, grade: res.grade, trust: res.total_score / 10, finalScore: res.total_score } : s));
-    } catch (err: any) {
-      if (isMountedRef.current) setAnalyzeError(err?.message ?? 'Analysis failed.');
-    } finally { if (isMountedRef.current) setAnalyzeLoading(false); }
+    const result = buildLocalAnalysis(item);
+    setAnalyzeResult(result);
+    setSuppliers(prev => prev.map(s => s.id === item.id ? { ...s, grade: result.grade, trust: result.total_score / 10, finalScore: result.total_score } : s));
+    setAnalyzeModal(true);
   }
 
   async function handleGenerateOutreach(item: ScoredDisplay) {
-    setOutreachLoadingId(item.id); setOutreachError(''); setOutreachEmail(null);
+    if (outreachOpenId === item.id) {
+      setOutreachOpenId(null); setOutreachEmail(null); setOutreachError(''); return;
+    }
+    if (!isOnline) {
+      outreachQueue.current = item;
+      showToast('No internet — outreach will generate automatically when you reconnect.', 'info');
+      return;
+    }
+    setOutreachLoadingId(item.id); setOutreachError(''); setOutreachEmail(null); setOutreachOpenId(null);
     try {
       const result = await api.getSupplierEmail(product.trim() || item.name, 'Your Brand');
       if (!isMountedRef.current) return;
       setOutreachEmail({ ...result, supplierUrl: item.url, supplierName: item.name });
+      setOutreachOpenId(item.id);
     } catch (err: any) { if (isMountedRef.current) setOutreachError(err?.message ?? 'Failed to generate email.'); }
     finally { if (isMountedRef.current) setOutreachLoadingId(null); }
+  }
+
+  useEffect(() => {
+    if (!isOnline || !outreachQueue.current) return;
+    const queued = outreachQueue.current;
+    outreachQueue.current = null;
+    handleGenerateOutreach(queued);
+  }, [isOnline]);
+
+  function handleDismissEmail() {
+    setOutreachEmail(null); setOutreachOpenId(null); setOutreachError('');
   }
 
   function handleSelectSupplier(item: ScoredDisplay) {
@@ -1249,7 +1160,12 @@ export default function SourcingLogisticsScreen() {
   }
 
   function toggleCompare(id: string) {
-    setCompareIds(prev => { const next = new Set(prev); if (next.has(id)) { next.delete(id); } else if (next.size < 3) { next.add(id); } return next; });
+    setCompareIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) { next.delete(id); } else if (next.size < 3) { next.add(id); }
+      AsyncStorage.setItem(STORAGE_KEYS.compareIds, JSON.stringify([...next])).catch(() => {});
+      return next;
+    });
   }
 
   // ── Freight handler ───────────────────────────────────────────────────────
@@ -1350,9 +1266,9 @@ export default function SourcingLogisticsScreen() {
       hint:  'Switch to the Freight tab to estimate shipping cost',
     },
     {
-      label: 'Recon insights available',
+      label: 'Teardown complete',
       done:  !!pipeline.reconInsights,
-      hint:  'Run Review Recon in the Research tab first',
+      hint:  'Run Teardown in the Research tab first',
     },
     {
       label: 'Cost model saved',
@@ -1360,6 +1276,89 @@ export default function SourcingLogisticsScreen() {
       hint:  'Tap "Calculate ROI" below to build your profit model',
     },
   ];
+
+  // ── Explore More Sources (always visible, fixed URLs) ─────────────────────
+
+  function renderExploreSources() {
+    const q   = (product || '').toLowerCase();
+    const slug = (product || '').trim().replace(/\s+/g, '-').toLowerCase();
+    const qEnc = encodeURIComponent((product || '').trim());
+
+    const isFashion     = /shoe|boot|sandal|sneaker|cloth|apparel|dress|shirt|pant|trouser|bag|handbag|jewelry|jewel|watch|accessory|hat|cap|jacket|coat|glove|scarf|belt|wallet/.test(q);
+    const isElectronics = /electronic|phone|tablet|laptop|speaker|headphone|earbud|cable|charger|battery|gadget|tech|camera|drone|light|led|keyboard|mouse/.test(q);
+    const isIndustrial  = /machine|machinery|equipment|tool|hardware|metal|steel|pump|motor|valve|pipe|industrial|factory|component|part|mold/.test(q);
+
+    const platforms = [
+      {
+        name: 'Alibaba',
+        emoji: '🏭',
+        hint: 'Largest B2B marketplace — factory-direct, all categories',
+        priority: 0,
+        url: `https://www.alibaba.com/trade/search?SearchText=${qEnc}&tab=supplier`,
+      },
+      {
+        name: 'AliExpress',
+        emoji: '🛒',
+        hint: isFashion ? 'Strong for fashion & accessories' : isElectronics ? 'Large electronics selection' : 'Low MOQ, international shipping',
+        priority: 1,
+        url: `https://www.aliexpress.com/wholesale?SearchText=${qEnc}`,
+      },
+      {
+        name: 'DHgate',
+        emoji: '🛍',
+        hint: isFashion ? 'Best for fashion & accessories' : isElectronics ? 'Good for electronics & gadgets' : 'Low MOQ, fast shipping',
+        priority: 2,
+        url: `https://www.dhgate.com/w/search/${slug}.html`,
+      },
+      {
+        name: 'Made-in-China',
+        emoji: '🏗',
+        hint: isIndustrial ? 'Specialises in machinery & parts' : 'Good for hardware & manufacturing',
+        priority: isIndustrial ? 1 : 3,
+        url: `https://www.made-in-china.com/products-search/hot-china-products/${slug}.html`,
+      },
+      {
+        name: 'Global Sources',
+        emoji: '🌐',
+        hint: isElectronics ? 'Top-rated for electronics' : isIndustrial ? 'Good for industrial parts' : 'Verified trade suppliers',
+        priority: isElectronics ? 1 : isIndustrial ? 1 : 4,
+        url: `https://www.globalsources.com/manufacturers/${slug}.html`,
+      },
+      {
+        name: 'IndiaMart',
+        emoji: '🇮🇳',
+        hint: 'India-based manufacturers — great for textiles, engineering & pharma',
+        priority: isFashion ? 2 : isIndustrial ? 2 : 5,
+        url: `https://dir.indiamart.com/search.mp?ss=${qEnc}`,
+      },
+    ].sort((a, b) => a.priority - b.priority);
+
+    return (
+      <AppCard style={{ gap: 10 }}>
+        <Text style={sc.moreSourcesEye}>EXPLORE MORE SOURCES</Text>
+        <Text style={sc.moreSourcesSub}>
+          {product ? `Manual search on B2B platforms — ranked for "${product}".` : 'Search a product above, then tap any platform to browse suppliers.'}
+        </Text>
+        <View style={sc.moreSourcesGrid}>
+          {platforms.map((p, i) => (
+            <TouchableOpacity
+              key={p.name}
+              style={[sc.moreSourcesBtn, i === 0 && sc.moreSourcesBtnTop]}
+              onPress={() => openURL(p.url)}
+              activeOpacity={0.8}
+            >
+              <Text style={sc.moreSourcesEmoji}>{p.emoji}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={sc.moreSourcesName}>{p.name}</Text>
+                <Text style={sc.moreSourcesHint}>{p.hint}</Text>
+              </View>
+              <Text style={sc.moreSourcesLangTxt}>EN →</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </AppCard>
+    );
+  }
 
   // ── Section renderers ─────────────────────────────────────────────────────
 
@@ -1413,16 +1412,8 @@ export default function SourcingLogisticsScreen() {
 
         <RecentSearches items={recentSearches} accentColor={DS.accent} onSelect={selectRecentSearch} onClear={() => { setRecentSearches([]); AsyncStorage.removeItem(STORAGE_KEYS.recentSupplierSearches).catch(() => {}); }} />
 
-        {pipeline.reconInsights && <ReconSpecsCard insights={pipeline.reconInsights} />}
-
-        <SourcingStrategySection
-          strategy={sourcingStrategy}
-          onSearchPress={() => {
-            if (pipeline.activeProduct?.title && !product) {
-              setProduct(pipeline.activeProduct.title);
-            }
-          }}
-        />
+        {/* Always-visible platform list — shown before search results load */}
+        {!loading && suppliers.length === 0 && renderExploreSources()}
 
         {loading && <View style={sc.loadingWrap}><ActivityIndicator color={DS.accent} size="large" /><Text style={sc.loadingTxt}>Finding suppliers…</Text></View>}
 
@@ -1439,10 +1430,19 @@ export default function SourcingLogisticsScreen() {
           <>
             {summary && <SmartSummaryCard summary={summary} />}
             <View style={sc.resultsHeader}>
-              <Text style={sc.resultsCount}>{suppliers.length} suppliers · ranked by score</Text>
+              <Text style={sc.resultsCount}>{suppliers.length} supplier{suppliers.length !== 1 ? 's' : ''} · ranked by score</Text>
               <Text style={sc.resultsSub}>Analyze · Compare · Email · Lock In</Text>
             </View>
-            {!pipeline.selectedSupplier && (
+            {suppliers.length < 3 && (
+              <View style={sc.thinResultsBanner}>
+                <Text style={sc.thinResultsIcon}>🔍</Text>
+                <View style={{ flex: 1, gap: 3 }}>
+                  <Text style={sc.thinResultsTitle}>Only {suppliers.length} result{suppliers.length !== 1 ? 's' : ''} found</Text>
+                  <Text style={sc.thinResultsTxt}>Try a more specific term (e.g. "silicone spatula" instead of "spatula"), or use the platforms below to search manually.</Text>
+                </View>
+              </View>
+            )}
+            {suppliers.length >= 3 && !pipeline.selectedSupplier && (
               <View style={sc.coachBanner}>
                 <Text style={sc.coachIcon}>💡</Text>
                 <Text style={sc.coachTxt}>
@@ -1451,8 +1451,11 @@ export default function SourcingLogisticsScreen() {
               </View>
             )}
             {suppliers.map(sup => (
-              <SupplierCard key={sup.id} item={sup} grade={sup.grade} inCompare={compareIds.has(sup.id)} analyzeLoading={analyzeLoading && analyzeTargetId === sup.id} outreachLoading={outreachLoadingId === sup.id} onView={() => openURL(resolveSupplierUrl(sup.platform, sup.url, product))} onAnalyze={() => handleAnalyzeSupplier(sup)} onToggleCompare={() => toggleCompare(sup.id)} onOutreach={() => handleGenerateOutreach(sup)} onSelect={() => handleSelectSupplier(sup)} isSelected={selectedId === sup.id} />
+              <SupplierCard key={sup.id} item={sup} grade={sup.grade} inCompare={compareIds.has(sup.id)} analyzeLoading={false} outreachLoading={outreachLoadingId === sup.id} isEmailOpen={outreachOpenId === sup.id} onView={() => openURL(resolveSupplierUrl(sup.platform, sup.url, product))} onAnalyze={() => handleAnalyzeSupplier(sup)} onToggleCompare={() => toggleCompare(sup.id)} onOutreach={() => handleGenerateOutreach(sup)} onSelect={() => handleSelectSupplier(sup)} isSelected={selectedId === sup.id} sellingPrice={pipeline.activeProduct?.price ?? undefined} />
             ))}
+
+            {/* ── Explore More Sources ────────────────────────────── */}
+            {renderExploreSources()}
           </>
         )}
 
@@ -1464,7 +1467,7 @@ export default function SourcingLogisticsScreen() {
             </TouchableOpacity>
           </AppCard>
         )}
-        {outreachEmail && <OutreachEmailCard email={outreachEmail} />}
+        {outreachEmail && <OutreachEmailCard email={outreachEmail} onDismiss={handleDismissEmail} />}
 
         {!!pipeline.selectedSupplier && (
           <View style={sc.handoffCard}>
@@ -1508,23 +1511,6 @@ export default function SourcingLogisticsScreen() {
               </TouchableOpacity>
             </View>
           </View>
-        )}
-
-        {/* Saved quotes comparison */}
-        {pipeline.supplierQuotes.length > 0 && (
-          <SupplierQuotesCard
-            quotes={pipeline.supplierQuotes}
-            sellingPrice={pipeline.activeProduct?.price ?? null}
-            confirmedFreightPerUnit={
-              pipeline.costModel?.freight != null && pipeline.costModel.freight > 0
-                ? pipeline.costModel.freight
-                : null
-            }
-            onSelect={handleSelectQuote}
-            onRemove={name => pipeline.removeSupplierQuote(name)}
-            onUpdate={(name, updates) => pipeline.updateSupplierQuote(name, updates)}
-            selectedName={pipeline.activeSupplierId ?? pipeline.selectedSupplier?.name}
-          />
         )}
 
         {!loading && suppliers.length === 0 && !error && (
@@ -1573,6 +1559,7 @@ export default function SourcingLogisticsScreen() {
         )}
 
         <AppCard padding={16} style={{ gap: 14 }}>
+          <Text style={fr.formTitle}>Shipment Configuration</Text>
           <Text style={fr.sectionTitle}>📦 PRODUCT DETAILS</Text>
           <InputField label="Product name" value={freightProduct} onChangeText={setFreightProduct} placeholder="e.g. portable blender" containerStyle={{ flex: undefined }} />
           <View style={fr.row}>
@@ -1599,30 +1586,40 @@ export default function SourcingLogisticsScreen() {
 
         {freightResult && (
           <View style={{ gap: 12 }}>
-            <View style={fr.summaryCard}>
-              <Text style={fr.summaryLabel}>SHIPMENT SUMMARY</Text>
-              <Text style={fr.summaryTitle}>{freightResult.product}</Text>
-              <Text style={fr.summarySub}>{freightResult.units.toLocaleString()} units · {freightResult.total_weight_kg} kg · {freightResult.total_cbm} CBM</Text>
+            {/* Freight Quotes header + total load bar */}
+            <View style={{ gap: 8 }}>
+              <Text style={fr.quotesHeader}>Freight Quotes</Text>
+              <View style={fr.loadBar}>
+                <Text style={fr.loadBarItem}>📦 {freightResult.units.toLocaleString()} units</Text>
+                <View style={fr.loadBarDot} />
+                <Text style={fr.loadBarItem}>{freightResult.total_weight_kg} kg total</Text>
+                <View style={fr.loadBarDot} />
+                <Text style={fr.loadBarItem}>{freightResult.total_cbm} CBM</Text>
+              </View>
             </View>
 
+            {/* Recommended mode — large amber card */}
             {modes.map(m => {
               if (!m) return null;
               const isRec = m.mode.toLowerCase().includes(freightResult.recommended.replace('_', ' '));
+              if (!isRec) return null;
               return (
-                <AppCard key={m.mode} padding={16} style={[fr.modeCard, isRec && fr.modeCardRec]}>
-                  {isRec && <View style={fr.recBadge}><Text style={fr.recBadgeTxt}>★ RECOMMENDED</Text></View>}
+                <AppCard key={m.mode} padding={16} style={[fr.modeCard, fr.modeCardRec]}>
                   <View style={fr.modeHeader}>
-                    <Text style={[fr.modeName, isRec && fr.modeNameRec]}>{m.mode}</Text>
+                    <View style={{ gap: 3 }}>
+                      <View style={fr.recBadge}><Text style={fr.recBadgeTxt}>★ RECOMMENDED</Text></View>
+                      <Text style={fr.modeName}>{m.mode}</Text>
+                    </View>
                     <Text style={fr.modeTransit}>{m.transit_days} days</Text>
                   </View>
                   <View style={fr.modePriceRow}>
                     <View style={fr.modePriceBlock}>
-                      <Text style={fr.modePriceLabel}>TOTAL COST</Text>
-                      <Text style={[fr.modePrice, isRec && { color: DS.warning }]}>${m.total_cost.toLocaleString()}</Text>
+                      <Text style={fr.modePriceLabel}>PER UNIT</Text>
+                      <Text style={[fr.modePrice, { color: DS.warning }]}>${m.cost_per_unit.toFixed(2)}</Text>
                     </View>
                     <View style={fr.modePriceBlock}>
-                      <Text style={fr.modePriceLabel}>PER UNIT</Text>
-                      <Text style={[fr.modePrice, isRec && { color: DS.warning }]}>${m.cost_per_unit.toFixed(2)}</Text>
+                      <Text style={fr.modePriceLabel}>TOTAL</Text>
+                      <Text style={[fr.modePrice, { color: DS.warning }]}>${m.total_cost.toLocaleString()}</Text>
                     </View>
                     {pipeline.selectedSupplier && (
                       <View style={fr.modePriceBlock}>
@@ -1636,56 +1633,70 @@ export default function SourcingLogisticsScreen() {
               );
             })}
 
+            {/* Non-recommended modes — compact rows */}
+            <AppCard padding={12} style={{ gap: 8 }}>
+              {modes.map(m => {
+                if (!m) return null;
+                const isRec = m.mode.toLowerCase().includes(freightResult.recommended.replace('_', ' '));
+                if (isRec) return null;
+                return (
+                  <View key={m.mode} style={fr.compactModeRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={fr.compactModeName}>{m.mode}</Text>
+                      <Text style={fr.compactModeTransit}>{m.transit_days} days</Text>
+                    </View>
+                    <View style={{ alignItems: 'flex-end', gap: 1 }}>
+                      <Text style={fr.compactModePrice}>${m.cost_per_unit.toFixed(2)}/unit</Text>
+                      <Text style={fr.compactModeTotal}>${m.total_cost.toLocaleString()} total</Text>
+                    </View>
+                  </View>
+                );
+              })}
+            </AppCard>
+
             <AppCard padding={14} style={{ gap: 6 }}>
               <Text style={fr.sectionTitle}>ADDITIONAL COSTS</Text>
               <View style={fr.extraRow}><Text style={fr.extraLabel}>FBA Inbound Handling</Text><Text style={fr.extraValue}>${freightResult.fba_inbound_est.toFixed(2)}</Text></View>
               <View style={fr.extraRow}><Text style={fr.extraLabel}>China 3PL Prep / Labeling</Text><Text style={fr.extraValue}>${freightResult.prep_cost.toFixed(2)}</Text></View>
             </AppCard>
 
-            {/* Landed cost summary */}
-            {freightSummary && pipeline.selectedSupplier && (
-              <AppCard style={fr.landedCard}>
-                <Text style={fr.landedEye}>SOURCING COMPLETE — COST CONFIRMED</Text>
-                <View style={fr.landedRow}>
-                  <View style={fr.landedBlock}>
-                    <Text style={fr.landedLbl}>Unit Cost</Text>
-                    <Text style={fr.landedVal}>${pipeline.selectedSupplier.unitCost.toFixed(2)}</Text>
-                  </View>
-                  <Text style={fr.landedPlus}>+</Text>
-                  <View style={fr.landedBlock}>
-                    <Text style={fr.landedLbl}>Freight/Unit</Text>
-                    <Text style={fr.landedVal}>${freightSummary.perUnit.toFixed(2)}</Text>
-                  </View>
-                  <Text style={fr.landedPlus}>=</Text>
-                  <View style={[fr.landedBlock, fr.landedBlockHighlight]}>
-                    <Text style={fr.landedLbl}>Landed Cost</Text>
-                    <Text style={[fr.landedVal, fr.landedValHighlight]}>
-                      ${(pipeline.selectedSupplier.unitCost + freightSummary.perUnit).toFixed(2)}
-                    </Text>
-                  </View>
-                </View>
-                {pipeline.activeProduct?.price && pipeline.activeProduct.price > 0 && (() => {
-                  const price    = pipeline.activeProduct!.price;
-                  const fPerUnit = freightSummary.perUnit;
-                  const unitCost = pipeline.selectedSupplier.unitCost;
-                  const wKg      = parseFloat(freightWeightKg) || 0.5;
-                  const margin   = confirmedMarginPct(price, unitCost, fPerUnit, wKg);
-                  const roi      = confirmedROIPct(price, unitCost, fPerUnit, wKg);
-                  return (
-                    <View style={fr.landedEstRow}>
-                      <Text style={fr.landedEstLbl}>Margin Est.</Text>
-                      <Text style={[fr.landedEstVal, { color: marginColor(margin) }]}>
-                        ~{margin.toFixed(0)}%
-                      </Text>
-                      <Text style={[fr.landedEstLbl, { marginLeft: 16 }]}>ROI Est.</Text>
-                      <Text style={[fr.landedEstVal, { color: roiColor(roi) }]}>
-                        ~{roi.toFixed(0)}%
+            {/* Sourcing Complete — dark navy card */}
+            {freightSummary && pipeline.selectedSupplier && (() => {
+              const price    = pipeline.activeProduct?.price ?? 0;
+              const fPerUnit = freightSummary.perUnit;
+              const unitCost = pipeline.selectedSupplier.unitCost;
+              const wKg      = parseFloat(freightWeightKg) || 0.5;
+              const landed   = unitCost + fPerUnit;
+              const margin   = price > 0 ? confirmedMarginPct(price, unitCost, fPerUnit, wKg) : null;
+              const roi      = price > 0 ? confirmedROIPct(price, unitCost, fPerUnit, wKg) : null;
+              return (
+                <View style={fr.navyCard}>
+                  <Text style={fr.navyLabel}>SOURCING COMPLETE</Text>
+                  <View style={fr.navyGrid}>
+                    <View style={fr.navyCell}>
+                      <Text style={fr.navyCellLbl}>Total Landed</Text>
+                      <Text style={fr.navyCellVal}>${landed.toFixed(2)}</Text>
+                    </View>
+                    <View style={fr.navyCell}>
+                      <Text style={fr.navyCellLbl}>Target Sale</Text>
+                      <Text style={fr.navyCellVal}>{price > 0 ? `$${price.toFixed(2)}` : '—'}</Text>
+                    </View>
+                    <View style={fr.navyCell}>
+                      <Text style={fr.navyCellLbl}>Est. Margin</Text>
+                      <Text style={[fr.navyCellVal, margin != null && { color: marginColor(margin) + 'CC' }]}>
+                        {margin != null ? `${margin.toFixed(0)}%` : '—'}
                       </Text>
                     </View>
-                  );
-                })()}
-              </AppCard>
-            )}
+                    <View style={fr.navyCell}>
+                      <Text style={fr.navyCellLbl}>Est. ROI</Text>
+                      <Text style={[fr.navyCellVal, roi != null && { color: roiColor(roi) + 'CC' }]}>
+                        {roi != null ? `${roi.toFixed(0)}%` : '—'}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              );
+            })()}
 
             {/* Save Freight to Pipeline */}
             {freightSummary && (
@@ -1777,55 +1788,141 @@ export default function SourcingLogisticsScreen() {
       ? estimateStartupCapital(sup.unitCost, sup.moq, freightSummary?.perUnit ?? sup.unitCost * 0.35, price)
       : null;
 
+    const completedChecks = checklistItems.filter(i => i.done).length;
+    const totalChecks     = checklistItems.length;
+    const readinessPct    = totalChecks > 0 ? Math.round((completedChecks / totalChecks) * 100) : 0;
+
     return (
       <View style={{ gap: DS.sectionGap }}>
-        <PipelineSummaryCard
-          pipeline={pipeline}
-          freightSummary={freightSummary}
-          onGoToFreight={() => setTab('freight')}
-          onGoToCosts={() => { pipeline.trackPipelineEvent('sourcing_handoff_profit', {}); navigation.navigate('Profit'); }}
-        />
 
-        {/* Startup capital breakdown */}
+        {/* 1 — Supplier Shortlist: saved quotes with ROI comparison */}
+        {pipeline.supplierQuotes.length > 0 && (
+          <SupplierQuotesCard
+            quotes={pipeline.supplierQuotes}
+            sellingPrice={pipeline.activeProduct?.price ?? null}
+            confirmedFreightPerUnit={
+              pipeline.costModel?.freight != null && pipeline.costModel.freight > 0
+                ? pipeline.costModel.freight
+                : null
+            }
+            onSelect={handleSelectQuote}
+            onRemove={name => pipeline.removeSupplierQuote(name)}
+            onUpdate={(name, updates) => pipeline.updateSupplierQuote(name, updates)}
+            selectedName={pipeline.activeSupplierId ?? pipeline.selectedSupplier?.name}
+          />
+        )}
+
+        {/* 3 — Cost Breakdown: startup capital split */}
         {capital && (
           <AppCard style={{ gap: 12 }}>
-            <Text style={{ fontSize: 13, fontWeight: '800', color: DS.textPrimary, letterSpacing: -0.2 }}>
-              💼 Estimated Startup Capital
-            </Text>
-            <Text style={{ fontSize: 11, color: DS.textMuted }}>
-              Rough total cash required to launch this product — verify with Profit Lab.
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <View style={{ gap: 2 }}>
+                <Text style={ov.sectionHead}>Startup Capital</Text>
+                <Text style={ov.sectionSub}>Estimated total to launch at MOQ</Text>
+              </View>
+              <Text style={ov.capitalTotal}>~${capital.total.toLocaleString()}</Text>
+            </View>
             {[
-              { label: 'Inventory (unit cost × MOQ)',    value: capital.inventoryCost },
-              { label: 'Estimated freight',              value: capital.freightCost },
-              { label: 'Amazon fee buffer (½ first batch)', value: capital.amazonFeeBuffer },
-              { label: 'PPC launch budget (~5% of rev)', value: capital.ppcBuffer },
-              { label: 'Contingency (25% buffer)',       value: capital.contingency },
+              { label: 'Inventory',   value: capital.inventoryCost,   pct: capital.inventoryCost   / capital.total },
+              { label: 'Freight',     value: capital.freightCost,     pct: capital.freightCost     / capital.total },
+              { label: 'Amazon Fees', value: capital.amazonFeeBuffer, pct: capital.amazonFeeBuffer / capital.total },
+              { label: 'PPC Budget',  value: capital.ppcBuffer,       pct: capital.ppcBuffer       / capital.total },
+              { label: 'Contingency', value: capital.contingency,     pct: capital.contingency     / capital.total },
             ].map(r => (
-              <View key={r.label} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 5, borderBottomWidth: 1, borderBottomColor: DS.border }}>
-                <Text style={{ fontSize: 12, color: DS.textSecondary, flex: 1 }}>{r.label}</Text>
-                <Text style={{ fontSize: 12, fontWeight: '700', color: DS.textPrimary }}>${r.value.toLocaleString()}</Text>
+              <View key={r.label} style={{ gap: 4 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Text style={{ fontSize: 12, color: DS.textSecondary }}>{r.label}</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: DS.textPrimary }}>${r.value.toLocaleString()}</Text>
+                </View>
+                <View style={ov.barTrack}>
+                  <View style={[ov.barFill, { width: `${Math.round(r.pct * 100)}%` as any }]} />
+                </View>
               </View>
             ))}
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingTop: 4 }}>
-              <Text style={{ fontSize: 14, fontWeight: '800', color: DS.textPrimary }}>Estimated Total</Text>
-              <Text style={{ fontSize: 18, fontWeight: '900', color: DS.accent, letterSpacing: -0.5 }}>
-                ~${capital.total.toLocaleString()}
-              </Text>
-            </View>
           </AppCard>
         )}
 
+        {/* 4 — Supply Chain Intelligence: risk scoring */}
         {intelProfile && (
           <SupplyChainIntelligenceCard
             profile={intelProfile}
-            onNavigate={tab => navigation.navigate('Main', { screen: tab } as any)}
+            onNavigate={t => navigation.navigate('Main', { screen: t } as any)}
           />
         )}
+
+        {/* 5 — Decision Simulator: what-if scenarios */}
         {intelProfile && (
           <DecisionSimulationPanel sim={decisionSim} baseProfile={intelProfile} />
         )}
-        <OperationalChecklist items={checklistItems} />
+
+        {/* 6 — Sourcing Plan: collapsed reference guide */}
+        <SourcingStrategySection
+          strategy={sourcingStrategy}
+          onSearchPress={() => {
+            setTab('suppliers');
+            if (pipeline.activeProduct?.title && !product) setProduct(pipeline.activeProduct.title);
+          }}
+        />
+
+        {/* 6 — Product Specs: collapsed supplier question checklist */}
+        {pipeline.reconInsights && <ReconSpecsCard insights={pipeline.reconInsights} />}
+
+        {/* 7 — Sourcing readiness checklist */}
+        <AppCard style={{ gap: 12 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <View style={{ gap: 2 }}>
+              <Text style={ov.sectionHead}>Sourcing Readiness</Text>
+              <Text style={ov.sectionSub}>{completedChecks}/{totalChecks} steps complete</Text>
+            </View>
+            <View style={[ov.readinessRing, { borderColor: readinessPct >= 80 ? DS.success : readinessPct >= 50 ? DS.warning : DS.danger }]}>
+              <Text style={ov.readinessPct}>{readinessPct}%</Text>
+            </View>
+          </View>
+          <View style={ov.checkTrack}>
+            <View style={[ov.checkFill, { width: `${readinessPct}%` as any, backgroundColor: readinessPct >= 80 ? DS.success : readinessPct >= 50 ? DS.warning : DS.danger }]} />
+          </View>
+          {checklistItems.map((item, i) => {
+            const navTarget = i === 0 || i === 1 ? 'suppliers'
+                            : i === 2 ? 'freight'
+                            : null;
+            return (
+              <TouchableOpacity
+                key={item.label}
+                style={ov.checkRow}
+                onPress={!item.done && navTarget ? () => setTab(navTarget as any) : undefined}
+                activeOpacity={!item.done && navTarget ? 0.7 : 1}
+                disabled={item.done || !navTarget}
+              >
+                <View style={[ov.checkDot, item.done && ov.checkDotDone]}>
+                  {item.done && <Text style={ov.checkMark}>✓</Text>}
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[ov.checkTxt, item.done && ov.checkTxtDone]}>{item.label}</Text>
+                  {!item.done && item.hint && <Text style={ov.checkHint}>{item.hint}</Text>}
+                </View>
+                {!item.done && navTarget && <Text style={ov.checkNav}>→</Text>}
+              </TouchableOpacity>
+            );
+          })}
+        </AppCard>
+
+        {/* 8 — Next step CTA */}
+        <AppCard style={{ gap: 10 }}>
+          <Text style={ov.sectionHead}>Ready for the next step?</Text>
+          {!freightSummary && (
+            <TouchableOpacity style={ov.ctaSecondary} onPress={() => setTab('freight')} activeOpacity={0.85}>
+              <Text style={ov.ctaSecondaryTxt}>✈  Estimate Freight Cost</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity
+            style={ov.ctaPrimary}
+            onPress={() => { pipeline.trackPipelineEvent('sourcing_handoff_profit', {}); navigation.navigate('Profit'); }}
+            activeOpacity={0.85}
+          >
+            <Text style={ov.ctaPrimaryTxt}>Calculate ROI in Profit Lab →</Text>
+          </TouchableOpacity>
+        </AppCard>
+
       </View>
     );
   }
@@ -1835,7 +1932,7 @@ export default function SourcingLogisticsScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: DS.bgCanvas }}>
       <Toast message={toastMsg} visible={toastVisible} onHide={hideToast} type={toastType} />
-      <AnalyzeSupplierModal visible={analyzeModal} loading={analyzeLoading} result={analyzeResult} error={analyzeError} onClose={() => setAnalyzeModal(false)} />
+      <AnalyzeSupplierModal visible={analyzeModal} loading={false} result={analyzeResult} error={analyzeError} onClose={() => setAnalyzeModal(false)} />
 
       <CompareSuppliersModal visible={showCompare} items={compareItems} onClose={() => setShowCompare(false)} />
       <PaywallModal visible={showPaywall} onClose={() => setShowPaywall(false)} featureContext="Supplier sourcing" />
@@ -1843,13 +1940,7 @@ export default function SourcingLogisticsScreen() {
       <SafeAreaView edges={['top']} style={{ backgroundColor: DS.bgCanvas }}>
         <AppHeader helpKey="sourcing" />
         <OfflineBanner visible={!isOnline} />
-        <PipelineProgressBar />
       </SafeAreaView>
-
-      <View style={{ paddingHorizontal: DS.pagePadding, paddingTop: DS.sectionGap, paddingBottom: 12, gap: 4 }}>
-        <Text style={{ fontSize: 9, fontWeight: '800', color: DS.warning, letterSpacing: 2.5, textTransform: 'uppercase' }}>SOURCING & LOGISTICS</Text>
-        <Text style={{ fontSize: 22, fontWeight: '900', color: DS.textPrimary, letterSpacing: -0.6 }}>Can I manufacture this profitably?</Text>
-      </View>
 
       <View style={{ paddingHorizontal: DS.pagePadding, paddingBottom: 14 }}>
         <SourcingSegment value={tab} onChange={setTab} />
@@ -1874,7 +1965,7 @@ export default function SourcingLogisticsScreen() {
             <View style={cfb.pillPending}>
               <Text style={cfb.pillIcon}>⊞</Text>
               <Text style={cfb.pillTextPending}>1 selected — add 1 more to compare</Text>
-              <TouchableOpacity onPress={() => setCompareIds(new Set())} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <TouchableOpacity onPress={() => { setCompareIds(new Set()); AsyncStorage.removeItem(STORAGE_KEYS.compareIds).catch(() => {}); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                 <Text style={cfb.clearPending}>✕</Text>
               </TouchableOpacity>
             </View>
@@ -1883,7 +1974,7 @@ export default function SourcingLogisticsScreen() {
               <Text style={cfb.pillIcon}>⊞</Text>
               <Text style={cfb.pillText}>Compare {compareIds.size} Suppliers</Text>
               <Text style={cfb.pillArrow}>→</Text>
-              <TouchableOpacity style={cfb.clearBtn} onPress={() => setCompareIds(new Set())} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <TouchableOpacity style={cfb.clearBtn} onPress={() => { setCompareIds(new Set()); AsyncStorage.removeItem(STORAGE_KEYS.compareIds).catch(() => {}); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                 <Text style={cfb.clearText}>✕</Text>
               </TouchableOpacity>
             </TouchableOpacity>
@@ -1897,7 +1988,7 @@ export default function SourcingLogisticsScreen() {
 // ── Styles ────────────────────────────────────────────────────────────────────
 
 const es = StyleSheet.create({
-  banner:        { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: DS.accentLight ?? '#EFF6FF', borderRadius: DS.radiusCard, padding: DS.cardPadding, borderWidth: 1, borderColor: DS.accent + '40' },
+  banner:        { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: DS.accentLight, borderRadius: DS.radiusCard, padding: DS.cardPadding, borderWidth: 1, borderColor: DS.accent + '40' },
   bannerIcon:    { fontSize: 24 },
   bannerTitle:   { fontSize: 14, fontWeight: '700', color: DS.accent },
   bannerSub:     { fontSize: 12, color: DS.textSecondary, lineHeight: 17 },
@@ -1918,10 +2009,14 @@ const sc = StyleSheet.create({
   resultsHeader:     { gap: 3 },
   resultsCount:      { fontSize: 14, fontWeight: '800', color: DS.textPrimary },
   resultsSub:        { fontSize: 11, color: DS.textMuted },
-  coachBanner:       { flexDirection: 'row', alignItems: 'flex-start', gap: 8, backgroundColor: DS.indigoLight, borderRadius: 10, borderWidth: 1, borderColor: DS.indigo + '30', paddingHorizontal: 12, paddingVertical: 9 },
-  coachIcon:         { fontSize: 13, marginTop: 1 },
-  coachTxt:          { flex: 1, fontSize: 11, color: DS.textSecondary, lineHeight: 15 },
-  retryBtn:          { paddingHorizontal: 20, paddingVertical: 9, borderRadius: DS.radiusButton, backgroundColor: DS.accent },
+  coachBanner:          { flexDirection: 'row', alignItems: 'flex-start', gap: 8, backgroundColor: DS.accentLight, borderRadius: 10, borderWidth: 1, borderColor: DS.accent + '30', paddingHorizontal: 12, paddingVertical: 9 },
+  coachIcon:            { fontSize: 13, marginTop: 1 },
+  coachTxt:             { flex: 1, fontSize: 11, color: DS.textSecondary, lineHeight: 15 },
+  thinResultsBanner:    { flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: DS.warning + '12', borderRadius: 12, borderWidth: 1, borderColor: DS.warning + '40', paddingHorizontal: 14, paddingVertical: 12 },
+  thinResultsIcon:      { fontSize: 16, marginTop: 1 },
+  thinResultsTitle:     { fontSize: 13, fontWeight: '800', color: DS.textPrimary },
+  thinResultsTxt:       { fontSize: 11, color: DS.textSecondary, lineHeight: 15 },
+  retryBtn:          { paddingHorizontal: 20, paddingVertical: 8, borderRadius: 8, backgroundColor: DS.dangerText },
   retryBtnTxt:       { fontSize: 13, fontWeight: '700', color: '#fff' },
   emptyWrap:         { alignItems: 'center', paddingVertical: 48, gap: 10 },
   emptyIcon:         { fontSize: 40, color: DS.textMuted },
@@ -1939,11 +2034,41 @@ const sc = StyleSheet.create({
   handoffBtn:            { backgroundColor: DS.accent, borderRadius: DS.radiusButton, paddingVertical: 13, alignItems: 'center' },
   handoffBtnPrimary:     { backgroundColor: DS.success, borderRadius: DS.radiusButton, paddingVertical: 14, alignItems: 'center', shadowColor: DS.success, shadowOpacity: 0.3, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 4 },
   handoffBtnPrimaryTxt:  { fontSize: 14, fontWeight: '900', color: '#fff', letterSpacing: -0.2 },
-  handoffBtnSecondary:    { borderRadius: DS.radiusButton, paddingVertical: 12, alignItems: 'center', borderWidth: 1.5, borderColor: DS.border, backgroundColor: DS.bgCard },
-  handoffBtnSecondaryTxt: { fontSize: 13, fontWeight: '700', color: DS.textSecondary },
+  handoffBtnSecondary:    { borderRadius: DS.radiusButton, paddingVertical: 12, alignItems: 'center', borderWidth: 1.5, borderColor: DS.accent + '44', backgroundColor: DS.accentLight },
+  handoffBtnSecondaryTxt: { fontSize: 13, fontWeight: '700', color: DS.accent },
+  // Explore more sources strip
+  moreSourcesEye:    { fontSize: 9, fontWeight: '800', color: DS.textMuted, letterSpacing: 2 },
+  moreSourcesSub:    { fontSize: 11, color: DS.textMuted, lineHeight: 16 },
+  moreSourcesGrid:   { gap: 6 },
+  moreSourcesBtn:    { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 10, backgroundColor: DS.bgSubtle, borderRadius: DS.radiusChip, borderWidth: 1, borderColor: DS.border, paddingHorizontal: 12, paddingVertical: 10 },
+  moreSourcesBtnTop: { backgroundColor: DS.accentLight, borderColor: DS.accent + '44' },
+  moreSourcesEmoji:  { fontSize: 18 },
+  moreSourcesName:   { fontSize: 13, fontWeight: '700', color: DS.textPrimary },
+  moreSourcesHint:   { fontSize: 10, color: DS.textMuted, marginTop: 1 },
+  moreSourcesArrow:  { fontSize: 13, color: DS.textMuted },
+  moreSourcesLangBadge:    { borderRadius: 4, paddingHorizontal: 5, paddingVertical: 2, backgroundColor: DS.successBg, borderWidth: 1, borderColor: DS.success + '40' },
+  moreSourcesLangBadgeCN:  { backgroundColor: DS.warningBg, borderColor: DS.warning + '40' },
+  moreSourcesLangTxt:      { fontSize: 9, fontWeight: '800', color: DS.successText, letterSpacing: 0.5 },
+  moreSourcesLangTxtCN:    { color: DS.warningText },
 });
 
 const fr = StyleSheet.create({
+  formTitle:           { fontSize: 18, fontWeight: '800', color: DS.textPrimary, letterSpacing: -0.4 },
+  quotesHeader:        { fontSize: 18, fontWeight: '800', color: DS.textPrimary, letterSpacing: -0.4 },
+  loadBar:             { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: DS.bgSubtle, borderRadius: 10, padding: 10 },
+  loadBarItem:         { fontSize: 12, color: DS.textSecondary, fontWeight: '600' },
+  loadBarDot:          { width: 3, height: 3, borderRadius: 2, backgroundColor: DS.border },
+  compactModeRow:      { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: DS.border },
+  compactModeName:     { fontSize: 13, fontWeight: '700', color: DS.textPrimary },
+  compactModeTransit:  { fontSize: 11, color: DS.textMuted },
+  compactModePrice:    { fontSize: 13, fontWeight: '800', color: DS.textPrimary },
+  compactModeTotal:    { fontSize: 11, color: DS.textMuted },
+  navyCard:            { backgroundColor: DS.textPrimary, borderRadius: DS.radiusCard, padding: 18, gap: 12 },
+  navyLabel:           { fontSize: 9, fontWeight: '900', color: 'rgba(255,255,255,0.5)', letterSpacing: 2 },
+  navyGrid:            { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  navyCell:            { width: '46%', gap: 3 },
+  navyCellLbl:         { fontSize: 10, fontWeight: '600', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase' as const, letterSpacing: 0.5 },
+  navyCellVal:         { fontSize: 22, fontWeight: '900', color: '#fff', letterSpacing: -0.6 },
   supplierContext:     { backgroundColor: DS.success + '10', borderRadius: DS.radiusCard, borderWidth: 1, borderColor: DS.success + '30', padding: 14, gap: 3 },
   supplierContextLabel:{ fontSize: 9, fontWeight: '800', color: DS.success, letterSpacing: 2 },
   supplierContextName: { fontSize: 14, fontWeight: '800', color: DS.textPrimary },
@@ -1992,15 +2117,39 @@ const fr = StyleSheet.create({
   landedEstVal:        { fontSize: 14, fontWeight: '800' },
 });
 
+const ov = StyleSheet.create({
+  sectionHead:   { fontSize: 15, fontWeight: '800', color: DS.textPrimary, letterSpacing: -0.3 },
+  sectionSub:    { fontSize: 12, color: DS.textMuted },
+  readinessRing: { width: 52, height: 52, borderRadius: 26, borderWidth: 3, alignItems: 'center', justifyContent: 'center' },
+  readinessPct:  { fontSize: 14, fontWeight: '900', color: DS.textPrimary, letterSpacing: -0.4 },
+  checkTrack:    { height: 3, backgroundColor: DS.bgSubtle, borderRadius: 2, overflow: 'hidden' as const },
+  checkFill:     { height: 3, borderRadius: 2 },
+  checkRow:      { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  checkDot:      { width: 20, height: 20, borderRadius: 10, borderWidth: 1.5, borderColor: DS.border, backgroundColor: DS.bgSubtle, alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 },
+  checkDotDone:  { backgroundColor: DS.success, borderColor: DS.success },
+  checkMark:     { fontSize: 10, fontWeight: '900', color: '#fff' },
+  checkTxt:      { fontSize: 13, fontWeight: '600', color: DS.textSecondary },
+  checkTxtDone:  { color: DS.textMuted, textDecorationLine: 'line-through' as const, fontWeight: '500' as const },
+  checkHint:     { fontSize: 11, color: DS.textMuted, marginTop: 2, lineHeight: 15 },
+  barTrack:      { height: 4, backgroundColor: DS.bgSubtle, borderRadius: 2, overflow: 'hidden' as const },
+  barFill:       { height: 4, backgroundColor: DS.accent, borderRadius: 2 },
+  capitalTotal:  { fontSize: 20, fontWeight: '900', color: DS.accent, letterSpacing: -0.8 },
+  ctaPrimary:    { backgroundColor: DS.accent, borderRadius: DS.radiusButton, paddingVertical: 14, alignItems: 'center' as const },
+  ctaPrimaryTxt: { fontSize: 14, fontWeight: '800', color: '#fff', letterSpacing: -0.3 },
+  ctaSecondary:  { borderRadius: DS.radiusButton, paddingVertical: 13, alignItems: 'center' as const, borderWidth: 1.5, borderColor: DS.accent + '44', backgroundColor: DS.accentLight },
+  ctaSecondaryTxt: { fontSize: 13, fontWeight: '700', color: DS.accent },
+  checkNav:        { fontSize: 14, fontWeight: '700', color: DS.accent },
+});
+
 const cfb = StyleSheet.create({
-  wrap:           { position: 'absolute', bottom: 16, left: 16, right: 16, alignItems: 'center' },
-  pill:           { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: DS.accent, borderRadius: 28, paddingVertical: 13, paddingLeft: 18, paddingRight: 12, shadowColor: DS.textPrimary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 12, elevation: 10 },
-  pillPending:    { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: DS.bgCard, borderRadius: 28, paddingVertical: 12, paddingLeft: 16, paddingRight: 14, borderWidth: 1.5, borderColor: DS.border, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 6 },
-  pillIcon:       { fontSize: 15 },
-  pillText:       { flex: 1, fontSize: 14, fontWeight: '800', color: '#fff', letterSpacing: -0.3 },
-  pillTextPending:{ flex: 1, fontSize: 13, fontWeight: '600', color: DS.textSecondary },
-  pillArrow:      { fontSize: 16, fontWeight: '800', color: '#fff' },
-  clearBtn:       { width: 26, height: 26, borderRadius: 13, backgroundColor: 'rgba(255,255,255,0.25)', alignItems: 'center', justifyContent: 'center' },
-  clearText:      { fontSize: 12, color: '#fff', fontWeight: '700' },
-  clearPending:   { fontSize: 14, color: DS.textMuted, fontWeight: '700' },
+  wrap:         { position: 'absolute', bottom: 16, left: 16, right: 16, alignItems: 'center' },
+  pill:         { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: DS.accent, borderRadius: 28, paddingVertical: 13, paddingLeft: 18, paddingRight: 12, shadowColor: DS.textPrimary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 12, elevation: 10 },
+  pillPending:  { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: DS.bgCard, borderRadius: 28, paddingVertical: 12, paddingLeft: 16, paddingRight: 14, borderWidth: 1.5, borderColor: DS.border, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 6 },
+  pillIcon:     { fontSize: 15 },
+  pillText:     { flex: 1, fontSize: 14, fontWeight: '800', color: '#fff', letterSpacing: -0.3 },
+  pillTextPending: { flex: 1, fontSize: 13, fontWeight: '600', color: DS.textSecondary },
+  pillArrow:    { fontSize: 16, fontWeight: '800', color: '#fff' },
+  clearBtn:     { width: 26, height: 26, borderRadius: 13, backgroundColor: 'rgba(255,255,255,0.25)', alignItems: 'center', justifyContent: 'center' },
+  clearText:    { fontSize: 12, fontWeight: '700', color: '#fff' },
+  clearPending: { fontSize: 13, fontWeight: '600', color: DS.textMuted, paddingHorizontal: 4 },
 });
