@@ -238,6 +238,11 @@ function StageDiscovery({ session, onComplete }: {
                 </Text>
               </View>
               <Text style={stg.resultMeta}>~${estRevenue.toLocaleString()}/mo est.</Text>
+              {p.source && p.source !== 'dataforseo' && (
+                <View style={[stg.resultBadge, { backgroundColor: DS.warningBg }]}>
+                  <Text style={{ fontSize: 10, fontWeight: '700', color: DS.warning }}>Price is an estimate</Text>
+                </View>
+              )}
             </View>
           </TouchableOpacity>
         );
@@ -390,7 +395,7 @@ function StageSupplier({ session, onComplete }: {
     if (!q) return;
     setLoading(true); setError(''); setResults([]);
     try {
-      const res = await api.searchSuppliers(q);
+      const res = await api.searchSuppliersV2({ product: q });
       setResults(res.suppliers ?? []);
     } catch (e: any) {
       setError(e?.message ?? 'Supplier search failed');

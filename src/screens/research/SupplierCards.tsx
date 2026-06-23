@@ -62,6 +62,7 @@ export function SupplierCard({
   const { fmt } = useCurrency();
   const hasLink    = !!item.url;
   const isGold     = item.badge === 'Gold Supplier';
+  const isReal     = item.source === 'alibaba_api';
   const unitCost   = item.priceUSD;
   const landed     = unitCost != null && unitCost > 0 ? roughLandedCost(unitCost) : null;
   const roi        = unitCost != null && unitCost > 0 && sellingPrice != null && sellingPrice > 0
@@ -77,11 +78,20 @@ export function SupplierCard({
         <View style={{ flex: 1, gap: 3 }}>
           <Text style={sc.name} numberOfLines={2}>{item.name}</Text>
           <View style={sc.trustRow}>
-            <Text style={[sc.trustIcon, isGold && { color: DS.warningText }]}>{isGold ? '★' : '✓'}</Text>
-            <Text style={sc.trustTxt}>{isGold ? 'Gold Supplier' : 'Verified'}</Text>
+            <Text style={[sc.trustIcon, isGold && { color: DS.warningText }, !isReal && { color: DS.warning }]}>
+              {!isReal ? '~' : isGold ? '★' : '✓'}
+            </Text>
+            <Text style={[sc.trustTxt, !isReal && { color: DS.warning }]}>
+              {!isReal ? 'Estimated' : isGold ? 'Gold Supplier' : 'Verified'}
+            </Text>
             {item.country ? <Text style={sc.trustDot}>·</Text> : null}
             {item.country ? <Text style={sc.trustTxt}>{item.country}</Text> : null}
           </View>
+          {!isReal && (
+            <Text style={{ fontSize: 10, color: DS.warning, marginTop: 2 }}>
+              Live Alibaba data isn't connected yet — pricing and details are placeholders.
+            </Text>
+          )}
         </View>
         {grade && (
           <View style={[sc.gradeBadge, { backgroundColor: (GRADE_COLOR[grade] ?? DS.textMuted) + '18' }]}>

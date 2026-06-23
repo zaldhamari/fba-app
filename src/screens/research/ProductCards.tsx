@@ -13,6 +13,7 @@ import { ppcColor, confidenceColor } from '../../lib/financialEngine';
 import type { PPCPressure, SalesConfidence } from '../../lib/financialEngine';
 import { buildOpportunitySignals } from './productHelpers';
 import type { SignalType } from './productHelpers';
+import { EstimateLabel } from '../../components/EstimateLabel';
 
 // ── Compare helpers ───────────────────────────────────────────────────────────
 
@@ -124,6 +125,15 @@ export function ProductMarketCard({
           </View>
         </View>
       </View>
+
+      {/* Price isn't from a real listing yet (no Amazon data API configured) — disclose it
+          rather than showing a category-average guess as if it were the actual price. */}
+      {item.source && item.source !== 'dataforseo' && item.price != null && (
+        <View style={pmc.rowBetween}>
+          <Text style={pmc.intelDisclaimer}>Price is a category estimate, not a live listing</Text>
+          <EstimateLabel type="estimated" />
+        </View>
+      )}
 
       {/* ── Stats row ─── */}
       <View style={pmc.stats}>
@@ -293,6 +303,7 @@ export function ProductMarketCard({
 
 const pmc = StyleSheet.create({
   card:             { gap: 12 },
+  rowBetween:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   cardSelected:     { borderWidth: 2, borderColor: DS.accent },
   // Header
   header:           { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },

@@ -34,6 +34,9 @@ export interface ProductDisplay {
   finalScore?:        number;
   badges?:            string[];
   matchReason?:       string;
+  /** 'dataforseo' = real listing data. 'keyword_estimate'/'stub'/undefined = price is a
+   *  category-average guess, not from this specific listing. */
+  source?:            string;
 }
 
 export interface SupplierDisplay {
@@ -57,6 +60,8 @@ export interface SupplierDisplay {
   trust: number;
   country: string;
   url?: string;
+  /** 'alibaba_api' = real supplier data. 'stub'/undefined = fabricated placeholder. */
+  source?: string;
 }
 
 export interface KeywordMetric { label: string; value: string; icon: string; color: string; bg: string; }

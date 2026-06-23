@@ -33,6 +33,7 @@ import { IntelligenceSummaryBanner } from '../components/IntelligenceSummaryBann
 import { FBAGlossaryModal } from '../components/FBAGlossaryModal';
 import type { TabParamList } from '../navigation/tabTypes';
 import type { WinnerEntry } from '../types/builder';
+import { EstimateLabel } from '../components/EstimateLabel';
 
 type Nav = BottomTabNavigationProp<TabParamList>;
 
@@ -188,7 +189,7 @@ function AnalyzeProductModal({ visible, onClose }: { visible: boolean; onClose: 
           </View>
           <View style={ap.idleHint}>
             <Text style={ap.idleHintIcon}>🔍</Text>
-            <Text style={ap.idleHintText}>Enter any product keyword and Copilot will pull live Amazon data, run an AI verdict, and surface review gaps you can exploit.</Text>
+            <Text style={ap.idleHintText}>Enter any product keyword and Copilot will pull real Amazon listing data when available, run an AI verdict, and surface review gaps you can exploit.</Text>
           </View>
         </View>
       )}
@@ -219,8 +220,14 @@ function AnalyzeProductModal({ visible, onClose }: { visible: boolean; onClose: 
 
           {/* Product snapshot */}
           <View style={ap.productCard}>
-            <Text style={ap.productEyebrow}>TOP RESULT</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text style={ap.productEyebrow}>TOP RESULT</Text>
+              {result.product.source && result.product.source !== 'dataforseo' && <EstimateLabel type="estimated" />}
+            </View>
             <Text style={ap.productTitle} numberOfLines={3}>{result.product.title}</Text>
+            {result.product.source && result.product.source !== 'dataforseo' && (
+              <Text style={ap.productEstNote}>Price is a category estimate, not a live listing — the verdict below inherits that uncertainty.</Text>
+            )}
             <View style={ap.statsRow}>
               <View style={ap.statBox}>
                 <Text style={ap.statVal}>${result.product.price?.toFixed(2) ?? '—'}</Text>
@@ -338,6 +345,7 @@ const ap = StyleSheet.create({
   productCard:      { backgroundColor: DS.bgCard, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: DS.border, gap: 10 },
   productEyebrow:   { fontSize: 10, fontWeight: '700', color: DS.textMuted, letterSpacing: 0.8 },
   productTitle:     { fontSize: 15, fontWeight: '700', color: DS.textPrimary, lineHeight: 22 },
+  productEstNote:   { fontSize: 11, color: DS.warningText, lineHeight: 15, marginTop: 2 },
   statsRow:         { flexDirection: 'row', alignItems: 'center' },
   statBox:          { flex: 1, alignItems: 'center', gap: 2 },
   statDivider:      { width: 1, height: 28, backgroundColor: DS.border },
@@ -588,8 +596,14 @@ function FindOpportunitiesModal({ visible, onClose }: { visible: boolean; onClos
                 <View style={fo.resultCard}>
                   <View style={fo.resultCardHeader}>
                     <Text style={fo.resultCardTitle}>{srQuery}</Text>
-                    <VerdictBadge verdict={srResult.verdict.label} />
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <EstimateLabel type={srResult.data_source && srResult.data_source !== 'stub' ? 'confirmed' : 'estimated'} />
+                      <VerdictBadge verdict={srResult.verdict.label} />
+                    </View>
                   </View>
+                  {(!srResult.data_source || srResult.data_source === 'stub') && (
+                    <Text style={fo.nicheReason}>Live Amazon data isn't connected yet — the numbers below are placeholders, not real market data.</Text>
+                  )}
                   <View style={fo.scoreRow}>
                     <Text style={fo.scoreLabel}>Score</Text>
                     <View style={fo.scoreBarTrack}>
@@ -1807,9 +1821,11 @@ const lp = StyleSheet.create({
 
 // ─── Home Screen (dashboard, pipeline, launch plan) ──────────────────────────
 
-// ─── Trending products feed (live) ────────────────────────────────────────────
-// No backend "trending" endpoint exists, so we surface real products from a live
-// Amazon search on a rotating evergreen category. Cached once per session.
+// ─── Trending products feed ───────────────────────────────────────────────────
+// No backend "trending" endpoint exists, so we surface results from an Amazon
+// search on a rotating evergreen category — real listing data when DataForSEO
+// credentials are configured server-side, otherwise a labeled price estimate
+// (see the "(est)" suffix below). Cached once per session.
 
 const TRENDING_KEYWORDS = [
   'kitchen gadgets', 'home organization', 'pet accessories', 'fitness gear',
@@ -1847,7 +1863,7 @@ function TrendingProducts({ onPick }: { onPick: () => void }) {
       {loading ? (
         <View style={tp.loadingRow}>
           <ActivityIndicator color={DS.accent} />
-          <Text style={tp.loadingTxt}>Pulling live products…</Text>
+          <Text style={tp.loadingTxt}>Finding trending products…</Text>
         </View>
       ) : (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={tp.row}>
@@ -1871,7 +1887,7 @@ function TrendingProducts({ onPick }: { onPick: () => void }) {
                 </View>
                 <Text style={tp.name} numberOfLines={2}>{p.title}</Text>
                 <View style={tp.stats}>
-                  <Text style={tp.stat}>${p.price}</Text>
+                  <Text style={tp.stat}>${p.price}{p.source && p.source !== 'dataforseo' ? ' (est)' : ''}</Text>
                   {reviews > 0 && (
                     <>
                       <Text style={tp.statDot}>·</Text>

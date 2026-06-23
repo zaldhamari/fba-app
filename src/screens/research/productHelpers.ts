@@ -56,6 +56,7 @@ export function productToDisplay(p: Product): ProductDisplay {
     ppcPressure,
     revenueEstLow:   salesEst?.revenueEstLow,
     revenueEstHigh:  salesEst?.revenueEstHigh,
+    source:          p.source,
   };
 }
 
@@ -84,6 +85,7 @@ export function supplierToDisplay(s: Supplier, idx: number): SupplierDisplay {
     trust:         Math.round(trust * 10) / 10,
     country:       '🇨🇳',
     url:           s.url || undefined,
+    source:        s.source,
   };
 }
 

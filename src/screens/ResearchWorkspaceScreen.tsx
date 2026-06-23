@@ -33,6 +33,8 @@ import { useCurrency } from '../context/CurrencyContext';
 import { useActiveProduct } from '../context/ActiveProductContext';
 import { usePipeline, PipelineReconInsights } from '../context/PipelineContext';
 import { confidenceColor } from '../lib/financialEngine';
+import { DataSourceBanner, type DataSourceType } from '../components/DataSourceBanner';
+import { determineOverallDataSource } from '../lib/dataSourceUtils';
 import {
   expandProductKeywords,
   deduplicateProducts,
@@ -1100,6 +1102,12 @@ export default function ResearchWorkspaceScreen() {
 
       <AppHeader helpKey={mode === 'market' ? 'research' : 'smart_search'} />
       <OfflineBanner visible={!isOnline} />
+      {mode === 'market' && products.length > 0 && (
+        <DataSourceBanner
+          source={determineOverallDataSource(products.map(p => p.source)) as DataSourceType}
+          context="products"
+        />
+      )}
 
       <ScrollView
         style={s.scroll}

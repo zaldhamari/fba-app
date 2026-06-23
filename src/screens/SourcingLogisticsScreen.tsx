@@ -40,6 +40,8 @@ import { Toast } from '../components/Toast';
 import { useToast } from '../hooks/useToast';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import { OfflineBanner } from '../components/OfflineBanner';
+import { DataSourceBanner, type DataSourceType } from '../components/DataSourceBanner';
+import { determineOverallDataSource } from '../lib/dataSourceUtils';
 import { SupplyChainIntelligenceCard } from '../components/SupplyChainIntelligenceCard';
 import { DecisionSimulationPanel } from '../components/DecisionSimulationPanel';
 import { useDecisionSimulation } from '../hooks/useDecisionSimulation';
@@ -290,8 +292,8 @@ function SupplierQuotesCard({
       <View style={[sqc.freightBadge, hasFrt ? sqc.freightConfirmed : sqc.freightRough]}>
         <Text style={[sqc.freightTxt, { color: hasFrt ? DS.success : DS.warning }]}>
           {hasFrt
-            ? `✓ Confirmed freight: $${confirmedFreightPerUnit!.toFixed(2)}/unit from cost model`
-            : '~ Freight estimated (unit cost × 1.35) — run Freight Estimator for confirmed figures'}
+            ? `✓ Saved freight estimate: $${confirmedFreightPerUnit!.toFixed(2)}/unit from Freight Estimator`
+            : '~ Rough freight guess (unit cost × 1.35) — run Freight Estimator for a more detailed estimate'}
         </Text>
       </View>
 
@@ -500,8 +502,8 @@ function SupplierQuotesCard({
 
       <Text style={sqc.disclaimer}>
         {hasFrt
-          ? 'ROI uses confirmed freight from cost model. FBA fees estimated by price tier — verify exact fees in Seller Central for oversize items.'
-          : '~ROI and ~Landed use estimated freight (unit cost × 1.35). Confirm in Freight Estimator → Profit Lab for accurate figures. FBA fees estimated by price tier.'}
+          ? 'ROI uses your saved Freight Estimator figure — a model estimate, not a live carrier quote. FBA fees estimated by price tier — verify exact fees in Seller Central for oversize items.'
+          : '~ROI and ~Landed use a rough freight guess (unit cost × 1.35). Run Freight Estimator → Profit Lab for a more detailed model estimate. FBA fees estimated by price tier.'}
       </Text>
     </AppCard>
   );
@@ -946,16 +948,16 @@ export default function SourcingLogisticsScreen() {
       const queries = buildSupplierQueries(query, null, tier);
       const priceParam = maxPrice ? parseFloat(maxPrice) : undefined;
       const moqParam   = maxMoq   ? parseInt(maxMoq)    : undefined;
-      // Fire v2 variants + v1 plain query in parallel to maximise supplier pool
+      // v2 variants only — v1 (api.searchSuppliers) was dropped: it never called a real
+      // supplier API, it generated platform deep-links with prices from a hardcoded
+      // category dictionary regardless of credentials. Mixing that into this list made
+      // fabricated and real (or honestly-stubbed) results indistinguishable.
       const v2Calls = queries.map(q =>
         api.searchSuppliersV2({ product: q, marketplace, max_unit_price: priceParam, max_moq: moqParam })
           .then(r => r.suppliers ?? [])
           .catch(() => [] as Supplier[])
       );
-      const v1Call = api.searchSuppliers(query, marketplace, priceParam)
-        .then(r => r.suppliers ?? [])
-        .catch(() => [] as Supplier[]);
-      const allResults = await Promise.all([...v2Calls, v1Call]);
+      const allResults = await Promise.all(v2Calls);
       if (!isMountedRef.current) return;
       const seenKeys = new Set<string>();
       let allRaw: Supplier[] = [];
@@ -1940,6 +1942,12 @@ export default function SourcingLogisticsScreen() {
       <SafeAreaView edges={['top']} style={{ backgroundColor: DS.bgCanvas }}>
         <AppHeader helpKey="sourcing" />
         <OfflineBanner visible={!isOnline} />
+        {tab === 'suppliers' && suppliers.length > 0 && (
+          <DataSourceBanner
+            source={determineOverallDataSource(suppliers.map(s => s.source)) as DataSourceType}
+            context="suppliers"
+          />
+        )}
       </SafeAreaView>
 
       <View style={{ paddingHorizontal: DS.pagePadding, paddingBottom: 14 }}>

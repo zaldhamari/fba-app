@@ -21,6 +21,8 @@ import { ProductQuickIntel } from '../components/ProductQuickIntel';
 import { FeatureExplainer } from '../components/FeatureExplainer';
 import { useSubscription } from '../hooks/useSubscription';
 import PaywallModal from '../components/PaywallModal';
+import { EstimateLabel } from '../components/EstimateLabel';
+import { DataSourceBanner, type DataSourceType } from '../components/DataSourceBanner';
 
 const WATCHLIST_KEY = 'siftly_niche_watchlist_v1';
 
@@ -61,6 +63,7 @@ type NicheReport = {
     can_afford: boolean;
     verdict: string;
   };
+  data_source?: string;
 };
 
 type SavedNiche = {
@@ -329,7 +332,10 @@ export default function NicheResearchScreen({ embedded = false, focusTrigger = 0
             <View style={[s.verdictCard, { borderColor: vc + '40', backgroundColor: vc + '08' }]}>
               <View style={s.verdictTop}>
                 <View style={{ gap: 4 }}>
-                  <Text style={s.verdictKeyword}>{report.keyword}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text style={s.verdictKeyword}>{report.keyword}</Text>
+                    <EstimateLabel type={report.data_source && report.data_source !== 'stub' && report.data_source !== 'keyword_estimate' ? 'confirmed' : 'estimated'} />
+                  </View>
                   <Text style={[s.verdictLabel, { color: vc }]}>{report.verdict.label}</Text>
                 </View>
                 <ScoreDot score={report.verdict.score} />
@@ -508,6 +514,13 @@ export default function NicheResearchScreen({ embedded = false, focusTrigger = 0
       <PaywallModal visible={showPaywall} onClose={() => setShowPaywall(false)} featureContext="Niche research" />
       <AppHeader helpKey="niche" />
       <OfflineBanner visible={!isOnline} />
+      {report && (
+        <DataSourceBanner
+          source={(report.data_source === 'stub' ? 'stub' : (report.data_source === 'keyword_estimate' ? 'keyword_estimate' : 'confirmed')) as DataSourceType}
+          context="niche"
+          onActionPress={() => navigation.navigate('SellerProfile' as any)}
+        />
+      )}
       <ScrollView style={s.scroll} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         {nicheBody}
       </ScrollView>
