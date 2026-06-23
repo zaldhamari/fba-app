@@ -121,7 +121,7 @@ export function AdvancedLabelGenerator({
         <AppCard padding={0} style={styles.previewCard}>
           <View style={styles.header}>
             <Text style={styles.headerLabel}>Label Preview</Text>
-            {label && <StatusBadge status="success" label="Ready" />}
+            {label && <StatusBadge variant="success" label="Ready" />}
           </View>
 
           <View style={styles.canvas}>
@@ -146,7 +146,7 @@ export function AdvancedLabelGenerator({
 
         {/* Label Design Features */}
         <View style={styles.featuresSection}>
-          <SectionHeader title="Professional Design Features" size="sm" />
+          <SectionHeader title="Professional Design Features" />
           <View style={styles.featuresList}>
             {[
               {
@@ -193,7 +193,7 @@ export function AdvancedLabelGenerator({
 
         {/* Label Specifications */}
         <View style={styles.specsSection}>
-          <SectionHeader title="Label Specifications" size="sm" />
+          <SectionHeader title="Label Specifications" />
           <View style={styles.specsList}>
             <View style={styles.specItem}>
               <Text style={styles.specKey}>Package Type:</Text>
@@ -228,7 +228,7 @@ export function AdvancedLabelGenerator({
 
         {/* Design Tips */}
         <View style={styles.tipsSection}>
-          <SectionHeader title="Label Design Tips" size="sm" />
+          <SectionHeader title="Label Design Tips" />
           {[
             'Place your logo prominently in the top-left or center',
             'Use a visual hierarchy: product name → tagline → benefits',

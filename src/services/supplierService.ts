@@ -255,7 +255,7 @@ export async function createComparison(supplierId1: string, supplierId2: string,
         pricePerUnit: profile1 ? parseFloat(profile1.price) : 5,
         moq: profile1 ? parseFloat(profile1.moq) : 100,
         leadTimeDays: 21,
-        qualityGrade: profile1?.verified ? 'good' : 'unknown',
+        qualityGrade: profile1?.verified ? 'A' : 'unknown',
         certifications: [],
         trustScore: profile1?.verified ? 75 : 50,
         yearsInBusiness: 5,
@@ -264,7 +264,7 @@ export async function createComparison(supplierId1: string, supplierId2: string,
         pricePerUnit: profile2 ? parseFloat(profile2.price) : 6,
         moq: profile2 ? parseFloat(profile2.moq) : 150,
         leadTimeDays: 28,
-        qualityGrade: profile2?.verified ? 'good' : 'unknown',
+        qualityGrade: profile2?.verified ? 'A' : 'unknown',
         certifications: [],
         trustScore: profile2?.verified ? 75 : 50,
         yearsInBusiness: 3,
@@ -305,13 +305,20 @@ export async function scoreSuppliers(supplierIds: string[]): Promise<SupplierSco
     scorecards.push({
       supplierId,
       supplierName: profile.name,
-      compositeScore: Math.round(compositeScore),
-      priceScore,
-      qualityScore,
-      reliabilityScore,
-      leadTimeScore,
-      grade: compositeScore >= 85 ? 'A' : compositeScore >= 75 ? 'B' : compositeScore >= 60 ? 'C' : 'D',
-      recommendation: compositeScore >= 75 ? 'recommend' : compositeScore >= 60 ? 'consider' : 'avoid',
+      metrics: {
+        priceScore,
+        moqScore: 70,
+        leadTimeScore,
+        qualityScore,
+        trustScore: profile.verified ? 80 : 55,
+        reliabilityScore,
+      },
+      weightedScore: Math.round(compositeScore),
+      recommendation:
+        compositeScore >= 85 ? 'top_choice' :
+        compositeScore >= 75 ? 'good_alternative' :
+        compositeScore >= 60 ? 'backup_option' : 'not_recommended',
+      reasoning: `Composite score ${Math.round(compositeScore)}/100 based on price, quality, reliability, and lead time.`,
     });
   }
 

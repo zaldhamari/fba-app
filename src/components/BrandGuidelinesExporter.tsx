@@ -93,25 +93,25 @@ export function BrandGuidelinesExporter({ kit, onExported }: BrandGuidelinesExpo
           <View style={styles.statusList}>
             <View style={styles.statusItem}>
               <StatusBadge
-                status={kit.story ? 'success' : 'pending'}
+                variant={kit.story ? 'success' : 'neutral'}
                 label={kit.story ? '✓ Story' : 'Story'}
               />
             </View>
             <View style={styles.statusItem}>
               <StatusBadge
-                status={kit.colors ? 'success' : 'pending'}
+                variant={kit.colors ? 'success' : 'neutral'}
                 label={kit.colors ? '✓ Colors' : 'Colors'}
               />
             </View>
             <View style={styles.statusItem}>
               <StatusBadge
-                status={kit.typography ? 'success' : 'pending'}
+                variant={kit.typography ? 'success' : 'neutral'}
                 label={kit.typography ? '✓ Typography' : 'Typography'}
               />
             </View>
             <View style={styles.statusItem}>
               <StatusBadge
-                status={kit.guidelines ? 'success' : 'pending'}
+                variant={kit.guidelines ? 'success' : 'neutral'}
                 label={kit.guidelines ? '✓ Guidelines' : 'Guidelines'}
               />
             </View>

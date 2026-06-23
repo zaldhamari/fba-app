@@ -31,6 +31,7 @@ import FeasibilityHeart from '../components/FeasibilityHeart';
 import { track } from '../lib/analytics';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import { OfflineBanner } from '../components/OfflineBanner';
+import { CompleteBrandKitBuilder } from '../components/CompleteBrandKitBuilder';
 
 // ── SVG helpers ───────────────────────────────────────────────────────────────
 
@@ -2202,6 +2203,8 @@ export default function BrandStudioScreen() {
   const { activeProduct } = useActiveProduct();
   const pipeline = usePipeline();
 
+  const [studioMode, setStudioMode] = useState<'quick' | 'kit'>('quick');
+
   const [inputs, setInputs] = useState<BrandInputs>({
     brandName:      '',
     tagline:        '',
@@ -2513,6 +2516,31 @@ export default function BrandStudioScreen() {
       )}
       <OfflineBanner visible={!isOnline} />
 
+      {/* Mode toggle */}
+      <View style={bs.modeToggleRow}>
+        <TouchableOpacity
+          style={[bs.modeBtn, studioMode === 'quick' && bs.modeBtnActive]}
+          onPress={() => setStudioMode('quick')}
+          activeOpacity={0.8}
+        >
+          <Text style={[bs.modeBtnTxt, studioMode === 'quick' && bs.modeBtnTxtActive]}>
+            ⚡ Quick Generate
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[bs.modeBtn, studioMode === 'kit' && bs.modeBtnActive]}
+          onPress={() => setStudioMode('kit')}
+          activeOpacity={0.8}
+        >
+          <Text style={[bs.modeBtnTxt, studioMode === 'kit' && bs.modeBtnTxtActive]}>
+            🎨 Full Brand Kit
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {studioMode === 'kit' ? (
+        <CompleteBrandKitBuilder />
+      ) : (
       <ScrollView
         style={s.scroll}
         contentContainerStyle={s.content}
@@ -2832,6 +2860,7 @@ export default function BrandStudioScreen() {
           </>
         )}
       </ScrollView>
+      )}
     </SafeAreaView>
   );
 }
@@ -2877,4 +2906,31 @@ const bs = StyleSheet.create({
     borderBottomColor: DS.border,
   },
   backTxt: { fontSize: 13, fontWeight: '700', color: DS.accent },
+  modeToggleRow: {
+    flexDirection:    'row',
+    marginHorizontal: DS.pagePadding,
+    marginVertical:   DS.cardGap,
+    gap:              DS.cardGap,
+  },
+  modeBtn: {
+    flex:            1,
+    paddingVertical: 10,
+    borderRadius:    DS.radiusButton,
+    backgroundColor: DS.bgElevated,
+    alignItems:      'center',
+    borderWidth:     1.5,
+    borderColor:     DS.border,
+  },
+  modeBtnActive: {
+    backgroundColor: DS.accent,
+    borderColor:     DS.accent,
+  },
+  modeBtnTxt: {
+    fontSize:   13,
+    fontWeight: '700',
+    color:      DS.textSecondary,
+  },
+  modeBtnTxtActive: {
+    color: '#FFFFFF',
+  },
 });

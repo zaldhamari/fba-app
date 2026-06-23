@@ -55,13 +55,14 @@ export function ColorSystemBuilder({ onPaletteGenerated }: ColorSystemBuilderPro
                 { backgroundColor: primaryColor },
               ]}
             />
-            <InputField
-              label="Hex Code"
-              value={primaryColor}
-              onChangeText={setPrimaryColor}
-              placeholder="#2563EB"
-              style={{ flex: 1 }}
-            />
+            <View style={{ flex: 1 }}>
+              <InputField
+                label="Hex Code"
+                value={primaryColor}
+                onChangeText={setPrimaryColor}
+                placeholder="#2563EB"
+              />
+            </View>
           </View>
         </View>
 
@@ -96,7 +97,7 @@ export function ColorSystemBuilder({ onPaletteGenerated }: ColorSystemBuilderPro
         {palette && (
           <>
             <View style={styles.section}>
-              <SectionHeader title="Generated Palette" size="sm" />
+              <SectionHeader title="Generated Palette" />
 
               {/* Primary Shades */}
               <View style={styles.shadeGroup}>
@@ -185,7 +186,7 @@ export function ColorSystemBuilder({ onPaletteGenerated }: ColorSystemBuilderPro
                         Ratio: {check.ratio.toFixed(2)}:1
                       </Text>
                       <StatusBadge
-                        status={
+                        variant={
                           check.wcagLevel === 'AAA'
                             ? 'success'
                             : check.wcagLevel === 'AA'

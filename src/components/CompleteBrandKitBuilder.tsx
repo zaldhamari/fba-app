@@ -24,8 +24,17 @@ import { StatusBadge } from './ds/StatusBadge';
 import { BrandStoryCard } from './BrandStoryCard';
 import { ColorSystemBuilder } from './ColorSystemBuilder';
 import { BrandGuidelinesExporter } from './BrandGuidelinesExporter';
+import { AdvancedLogoGenerator } from './AdvancedLogoGenerator';
+import { AdvancedLabelGenerator } from './AdvancedLabelGenerator';
+import { TypographySystemBuilder } from './TypographySystemBuilder';
+import {
+  DesignExportManager,
+  ComplianceDashboard,
+  AmazonListingPreview,
+  BrandRolloutPlan,
+} from './Phase3Phase4Bundle';
 import { useBrandingSystem } from '../hooks/useBrandingSystem';
-import type { CompleteBrandKit, BrandStory, ColorPalette } from '../types/branding';
+import type { CompleteBrandKit, BrandStory, ColorPalette, TypographyScale, LogoVariation, LabelDesign } from '../types/branding';
 
 interface Phase {
   id: number;
@@ -46,6 +55,11 @@ export function CompleteBrandKitBuilder() {
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   });
+  const [generatedLogos, setGeneratedLogos] = useState<LogoVariation[] | null>(null);
+  const [generatedLabel, setGeneratedLabel] = useState<LabelDesign | null>(null);
+  const [typography, setTypography] = useState<TypographyScale | null>(null);
+  const [packageType, setPackageType] = useState('standard');
+  const [phase4Tab, setPhase4Tab] = useState<'exports' | 'compliance' | 'amazon' | 'rollout'>('exports');
 
   const phases: Phase[] = [
     {
@@ -62,15 +76,15 @@ export function CompleteBrandKitBuilder() {
       description: 'Build typography system and generate brand guide PDF',
       icon: '🔤',
       components: ['Font Pairing', 'Type Scale', 'Guidelines PDF', 'Usage Rules'],
-      completed: !!brandKit.typography && !!brandKit.guidelines,
+      completed: !!typography,
     },
     {
       id: 3,
-      name: 'Design Exports & Mockups',
-      description: 'Export assets and create packaging mockups',
+      name: 'Logo, Label & Exports',
+      description: 'Generate logos, product labels, and export all assets',
       icon: '🎨',
-      components: ['PNG/JPG/PDF Export', 'Social Media Assets', 'Packaging Mockup', 'Shelf View'],
-      completed: !!brandKit.exports && !!brandKit.mockups,
+      components: ['5 Logo Variations', 'Product Label', 'PNG/PDF Export', 'Social Assets'],
+      completed: !!generatedLogos && !!generatedLabel,
     },
     {
       id: 4,
@@ -89,6 +103,23 @@ export function CompleteBrandKitBuilder() {
   const handlePaletteGenerated = (palette: ColorPalette) => {
     setBrandKit(prev => ({ ...prev, colors: palette }));
   };
+
+  const handleTypographyGenerated = (scale: TypographyScale) => {
+    setTypography(scale);
+    setBrandKit(prev => ({ ...prev, typography: scale }));
+  };
+
+  const handleLogosGenerated = (logos: LogoVariation[]) => {
+    setGeneratedLogos(logos);
+  };
+
+  const handleLabelGenerated = (label: LabelDesign) => {
+    setGeneratedLabel(label);
+  };
+
+  const primaryLogoSvg = generatedLogos?.find(l => l.type === 'badge')?.svg
+    ?? generatedLogos?.[0]?.svg
+    ?? '';
 
   const handleSaveKit = async () => {
     if (brandKit.brandName) {
@@ -136,7 +167,7 @@ export function CompleteBrandKitBuilder() {
                     <Text style={styles.phaseDesc}>{phase.description}</Text>
                   </View>
                   {phase.completed ? (
-                    <StatusBadge status="success" label="✓" />
+                    <StatusBadge variant="success" label="✓" />
                   ) : (
                     <View style={styles.phaseNumber}>{phase.id}</View>
                   )}
@@ -167,52 +198,88 @@ export function CompleteBrandKitBuilder() {
           )}
 
           {currentPhase === 2 && (
-            <BrandGuidelinesExporter kit={brandKit} />
+            <>
+              {brandKit.story && brandKit.colors ? (
+                <TypographySystemBuilder
+                  style={brandKit.story.personality ?? 'Premium'}
+                  onSystemGenerated={handleTypographyGenerated}
+                />
+              ) : (
+                <AppCard>
+                  <Text style={styles.placeholderText}>
+                    Complete Phase 1 (Story + Colors) first.
+                  </Text>
+                </AppCard>
+              )}
+              <View style={{ marginTop: DS.sectionGap }}>
+                <BrandGuidelinesExporter kit={brandKit} />
+              </View>
+            </>
           )}
 
           {currentPhase === 3 && (
-            <AppCard>
-              <SectionHeader title="Phase 3: Design Exports & Mockups" />
-              <Text style={styles.placeholderText}>
-                🎨 Export logos, labels, and social media assets in multiple formats
-              </Text>
-              <Text style={styles.placeholderText}>
-                📦 Generate 3D packaging mockups from multiple angles
-              </Text>
-              <Text style={styles.placeholderText}>
-                🛍️ Create shelf context and lifestyle mockups
-              </Text>
-              <PrimaryButton
-                label="Coming Soon"
-                onPress={() => {}}
-                disabled
-                style={{ marginTop: DS.sectionGap }}
-              />
-            </AppCard>
+            <>
+              {brandKit.story && brandKit.colors ? (
+                <>
+                  <AdvancedLogoGenerator
+                    story={brandKit.story}
+                    colors={brandKit.colors}
+                    typography={typography ?? undefined}
+                    onLogosGenerated={handleLogosGenerated}
+                  />
+                  {primaryLogoSvg ? (
+                    <View style={{ marginTop: DS.sectionGap }}>
+                      <AdvancedLabelGenerator
+                        story={brandKit.story}
+                        colors={brandKit.colors}
+                        typography={typography ?? brandKit.typography!}
+                        logoSvg={primaryLogoSvg}
+                        packageType={packageType}
+                        onLabelGenerated={handleLabelGenerated}
+                      />
+                    </View>
+                  ) : (
+                    <AppCard style={{ marginTop: DS.sectionGap }}>
+                      <Text style={styles.placeholderText}>
+                        Generate logos above first — label will use your badge logo.
+                      </Text>
+                    </AppCard>
+                  )}
+                  <View style={{ marginTop: DS.sectionGap }}>
+                    <DesignExportManager kit={brandKit} />
+                  </View>
+                </>
+              ) : (
+                <AppCard>
+                  <Text style={styles.placeholderText}>
+                    Complete Phase 1 (Story + Colors) first.
+                  </Text>
+                </AppCard>
+              )}
+            </>
           )}
 
           {currentPhase === 4 && (
-            <AppCard>
-              <SectionHeader title="Phase 4: Launch & Compliance" />
-              <Text style={styles.placeholderText}>
-                ✓ Check trademark availability (US, EU, etc.)
-              </Text>
-              <Text style={styles.placeholderText}>
-                ✓ Verify domain and social media handles
-              </Text>
-              <Text style={styles.placeholderText}>
-                🛒 Preview brand in Amazon listing layout
-              </Text>
-              <Text style={styles.placeholderText}>
-                🚀 Generate 30-day launch plan + content calendar
-              </Text>
-              <PrimaryButton
-                label="Coming Soon"
-                onPress={() => {}}
-                disabled
-                style={{ marginTop: DS.sectionGap }}
-              />
-            </AppCard>
+            <>
+              {/* Sub-tab bar */}
+              <View style={styles.phase4Tabs}>
+                {(['exports', 'compliance', 'amazon', 'rollout'] as const).map(tab => (
+                  <TouchableOpacity
+                    key={tab}
+                    style={[styles.phase4Tab, phase4Tab === tab && styles.phase4TabActive]}
+                    onPress={() => setPhase4Tab(tab)}
+                  >
+                    <Text style={[styles.phase4TabText, phase4Tab === tab && styles.phase4TabTextActive]}>
+                      {tab === 'exports' ? 'Exports' : tab === 'compliance' ? 'Legal' : tab === 'amazon' ? 'Amazon' : 'Launch'}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              {phase4Tab === 'exports' && <DesignExportManager kit={brandKit} />}
+              {phase4Tab === 'compliance' && <ComplianceDashboard kit={brandKit} />}
+              {phase4Tab === 'amazon' && <AmazonListingPreview kit={brandKit} />}
+              {phase4Tab === 'rollout' && <BrandRolloutPlan kit={brandKit} />}
+            </>
           )}
         </View>
 
@@ -259,7 +326,7 @@ export function CompleteBrandKitBuilder() {
             </View>
             <View style={styles.summaryItem}>
               <Text style={styles.summaryLabel}>Status:</Text>
-              <StatusBadge status="info" label={brandKit.status || 'Draft'} />
+              <StatusBadge variant="info" label={brandKit.status || 'Draft'} />
             </View>
             <View style={styles.summaryItem}>
               <Text style={styles.summaryLabel}>Phases Completed:</Text>
@@ -391,5 +458,29 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     color: DS.textPrimary,
+  },
+  phase4Tabs: {
+    flexDirection: 'row',
+    marginHorizontal: DS.pagePadding,
+    marginBottom: DS.cardGap,
+    gap: DS.cardGap,
+  },
+  phase4Tab: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: DS.radiusChip,
+    backgroundColor: DS.bgElevated,
+    alignItems: 'center',
+  },
+  phase4TabActive: {
+    backgroundColor: DS.accent,
+  },
+  phase4TabText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: DS.textSecondary,
+  },
+  phase4TabTextActive: {
+    color: '#FFFFFF',
   },
 });

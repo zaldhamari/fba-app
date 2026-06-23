@@ -22,7 +22,7 @@ import { InputField } from './ds/InputField';
 import { PrimaryButton, SecondaryButton } from './ds/Buttons';
 import { StatusBadge } from './ds/StatusBadge';
 import { useSupplierManagement } from '../hooks/useSupplierManagement';
-import { Shadows } from '../theme/shadows';
+import { shadow as Shadows } from '../theme/shadows';
 
 interface SupplierMessageFormProps {
   supplierId: string;
@@ -267,7 +267,7 @@ export function SupplierMessageForm({
           {/* Summary */}
           <View style={styles.summary}>
             <StatusBadge
-              status={direction === 'inbound' ? 'success' : 'info'}
+              variant={direction === 'inbound' ? 'success' : 'info'}
               label={`${direction === 'inbound' ? '📩' : '📤'} ${direction === 'inbound' ? 'Reply' : 'Outbound'}`}
             />
             <Text style={styles.summaryText}>
@@ -302,7 +302,7 @@ export function SupplierMessageForm({
  * Called automatically when user clicks "Generate Email"
  */
 export async function autoLogOutboundEmail(
-  logMessageFn: (supplierId: string, message: any) => Promise<void>,
+  logMessageFn: (supplierId: string, message: any) => Promise<any>,
   supplierId: string,
   email: { subject: string; body: string }
 ) {

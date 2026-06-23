@@ -27,6 +27,8 @@ export interface BrandStory {
   customerPersona: CustomerPersona;
   elevatorPitch?: string; // Auto-generated 30-second
   positioningStatement?: string; // Auto-generated
+  tagline?: string; // Short brand tagline
+  personality?: string; // Brand voice / personality descriptor
   createdAt: string;
 }
 
@@ -73,6 +75,8 @@ export interface ColorPalette {
     accents: string[];
     borders: string[];
   };
+  border?: string; // Convenience alias for a primary border color
+  textMuted?: string; // Convenience alias for muted text color
   contrast: {
     color1: string;
     color2: string;
@@ -358,6 +362,26 @@ export interface RolloutPlan {
     endDate: string;
     goals: string[];
   }[];
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// LABEL & LOGO VARIATIONS
+// ────────────────────────────────────────────────────────────────────────────
+
+export interface LabelDesign {
+  svg: string;
+  title: string;
+  description: string;
+  packageType: string;
+}
+
+export interface LogoVariation {
+  type: 'icon' | 'wordmark' | 'badge' | 'combined' | 'monochrome' | 'stacked';
+  svg: string;
+  name: string;
+  usage: string;
+  minSize: string;
+  bestFor: string;
 }
 
 // ────────────────────────────────────────────────────────────────────────────

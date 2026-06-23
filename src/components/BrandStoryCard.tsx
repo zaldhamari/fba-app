@@ -122,7 +122,7 @@ export function BrandStoryCard({ onStoryCreated }: BrandStoryCardProps) {
 
         {/* Customer Persona */}
         <View style={styles.section}>
-          <SectionHeader title="Target Customer Persona" size="sm" />
+          <SectionHeader title="Target Customer Persona" />
 
           <InputField
             label="Persona Name"
@@ -177,7 +177,7 @@ export function BrandStoryCard({ onStoryCreated }: BrandStoryCardProps) {
         {/* Preview */}
         {story && (
           <View style={styles.previewSection}>
-            <SectionHeader title="Generated Story Elements" size="sm" />
+            <SectionHeader title="Generated Story Elements" />
 
             <View style={styles.previewCard}>
               <Text style={styles.previewLabel}>30-Second Elevator Pitch:</Text>
@@ -189,7 +189,7 @@ export function BrandStoryCard({ onStoryCreated }: BrandStoryCardProps) {
               <Text style={styles.previewText}>{story.positioningStatement}</Text>
             </View>
 
-            <StatusBadge status="success" label="✓ Brand Story Ready" />
+            <StatusBadge variant="success" label="✓ Brand Story Ready" />
           </View>
         )}
 

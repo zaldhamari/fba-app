@@ -23,6 +23,7 @@ import { useSubscription } from '../hooks/useSubscription';
 import PaywallModal from '../components/PaywallModal';
 import { EstimateLabel } from '../components/EstimateLabel';
 import { DataSourceBanner, type DataSourceType } from '../components/DataSourceBanner';
+import { PipelineProgressBar } from '../components/PipelineProgressBar';
 
 const WATCHLIST_KEY = 'siftly_niche_watchlist_v1';
 
@@ -513,6 +514,7 @@ export default function NicheResearchScreen({ embedded = false, focusTrigger = 0
     <SafeAreaView style={s.container} edges={['top']}>
       <PaywallModal visible={showPaywall} onClose={() => setShowPaywall(false)} featureContext="Niche research" />
       <AppHeader helpKey="niche" />
+      <PipelineProgressBar />
       <OfflineBanner visible={!isOnline} />
       {report && (
         <DataSourceBanner

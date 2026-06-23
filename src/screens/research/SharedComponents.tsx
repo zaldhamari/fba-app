@@ -83,6 +83,7 @@ export const MODE_TABS: { id: Mode; label: string; color: string }[] = [
   { id: 'market',   label: 'Products',  color: DS.info    },
   { id: 'suppliers', label: 'Suppliers', color: DS.accent  },
   { id: 'freight',   label: 'Shipping',  color: DS.warning },
+  { id: 'vault',     label: 'Vault',     color: DS.gold    },
 ];
 
 export function ModeSegment({ value, onChange, exclude }: { value: Mode; onChange: (v: Mode) => void; exclude?: Mode[] }) {
@@ -126,6 +127,7 @@ const MODE_DESC: Record<Mode, string> = {
   lookup:    'Teardown a product: paste any product, ASIN, or Amazon URL — AI reads the reviews and surfaces every flaw you can fix to beat it.',
   suppliers: 'Find suppliers: matching factories on Alibaba, DHgate, and 1688. Pick a product in the Products tab first for better matches.',
   freight:   'Estimate shipping: costs from China to your FBA warehouse. Enter units, weight, and dimensions to compare air vs sea.',
+  vault:     'Your saved products: browse, filter, and manage every opportunity you\'ve saved. Export a report or get a launch pack.',
 };
 
 export function ModeDescStrip({ mode }: { mode: Mode }) {

@@ -550,4 +550,9 @@ export const api = {
     return data;
   },
 
+  generateBrandAsset: async (body: { prompt: string; type: string }) => {
+    const data = await postSlow<{ svg: string; url?: string }>('/brand/asset', body);
+    return data;
+  },
+
 };

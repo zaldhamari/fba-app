@@ -75,7 +75,7 @@ export function AdvancedLogoGenerator({
             <Text style={styles.headerLabel}>Logo Preview</Text>
             {selectedLogo && (
               <StatusBadge
-                status="success"
+                variant="success"
                 label={`${selectedIndex + 1} of ${logos?.length || 0}`}
               />
             )}
@@ -144,7 +144,7 @@ export function AdvancedLogoGenerator({
         {/* Logo Variations Overview */}
         {logos && (
           <View style={styles.section}>
-            <SectionHeader title="All 5 Variations" size="sm" />
+            <SectionHeader title="All 5 Variations" />
             <View style={styles.variationsGrid}>
               {logos.map((logo, idx) => (
                 <TouchableOpacity
@@ -172,7 +172,7 @@ export function AdvancedLogoGenerator({
 
         {/* Logo Information */}
         <View style={styles.infoSection}>
-          <SectionHeader title="Why 5 Variations?" size="sm" />
+          <SectionHeader title="Why 5 Variations?" />
 
           {[
             {

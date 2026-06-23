@@ -250,12 +250,12 @@ xref 0 5 0000000000 65535 f 0000000010 00000 n 0000000053 00000 n 0000000102 000
 export async function generateSocialAssets(
   logoSvg: string,
   brandName: string,
-): Promise<Record<string, string>> {
+): Promise<{ instagram_profile: string; instagram_post: string; tiktok_cover: string; facebook_cover: string; twitter_header: string; youtube_banner: string }> {
   // Social media platforms require specific dimensions
   // These would normally be generated using image processing
   // For now, return SVG-based data that can be rendered to these dimensions
 
-  const socialAssets: Record<string, string> = {
+  const socialAssets = {
     // Instagram Profile Picture: 1080x1080
     instagram_profile: createSocialAsset(logoSvg, 1080, 1080, 'Instagram Profile'),
 
@@ -293,16 +293,15 @@ function createSocialAsset(svgData: string, width: number, height: number, label
 // FAVICON GENERATION - Multiple sizes
 // ════════════════════════════════════════════════════════════════════════════
 
-export async function generateFavicons(logoSvg: string): Promise<Record<string, string>> {
+export async function generateFavicons(logoSvg: string): Promise<{ '16x16': string; '32x32': string; '64x64': string; '128x128': string; '180x180': string }> {
   const sizes = ['16x16', '32x32', '64x64', '128x128', '180x180'];
-  const favicons: Record<string, string> = {};
-
-  for (const size of sizes) {
-    const [width, height] = size.split('x').map(Number);
-    favicons[size] = createFaviconSvg(logoSvg, width, height);
-  }
-
-  return favicons;
+  return {
+    '16x16':   createFaviconSvg(logoSvg, 16, 16),
+    '32x32':   createFaviconSvg(logoSvg, 32, 32),
+    '64x64':   createFaviconSvg(logoSvg, 64, 64),
+    '128x128': createFaviconSvg(logoSvg, 128, 128),
+    '180x180': createFaviconSvg(logoSvg, 180, 180),
+  };
 }
 
 function createFaviconSvg(svgData: string, width: number, height: number): string {
@@ -321,7 +320,7 @@ export async function generateEmailTemplates(
   logoSvg: string,
   brandName: string,
   primaryColor: string,
-): Promise<Record<string, string>> {
+): Promise<{ header_600x200: string; signature_240x120: string }> {
   return {
     header_600x200: generateEmailHeader(logoSvg, brandName, primaryColor, 600, 200),
     signature_240x120: generateEmailSignature(logoSvg, brandName, primaryColor, 240, 120),

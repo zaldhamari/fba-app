@@ -158,23 +158,23 @@ export function ComplianceDashboard({ kit }: { kit: Partial<CompleteBrandKit> })
 
         {results && (
           <View style={styles.resultsSection}>
-            <SectionHeader title="Compliance Results" size="sm" />
+            <SectionHeader title="Compliance Results" />
 
             <View style={styles.resultCard}>
               <Text style={styles.resultTitle}>Trademark</Text>
-              <StatusBadge status="success" label="✓ Available" />
+              <StatusBadge variant="success" label="✓ Available" />
               <Text style={styles.resultDesc}>No conflicts found in major databases</Text>
             </View>
 
             <View style={styles.resultCard}>
               <Text style={styles.resultTitle}>Domain</Text>
-              <StatusBadge status="success" label="✓ Available" />
+              <StatusBadge variant="success" label="✓ Available" />
               <Text style={styles.resultDesc}>yourcompany.com - $12.99/year</Text>
             </View>
 
             <View style={styles.resultCard}>
               <Text style={styles.resultTitle}>Social Handles</Text>
-              <StatusBadge status="info" label="2/5 Available" />
+              <StatusBadge variant="info" label="2/5 Available" />
               <Text style={styles.resultDesc}>Instagram & Twitter available, TikTok taken</Text>
             </View>
           </View>
@@ -237,26 +237,26 @@ export function AmazonListingPreview({ kit }: { kit: Partial<CompleteBrandKit> }
         </View>
 
         <View style={styles.section}>
-          <SectionHeader title="Proportion Analysis" size="sm" />
+          <SectionHeader title="Proportion Analysis" />
 
           <View style={styles.analysisCard}>
             <View style={styles.analysisItem}>
-              <StatusBadge status="success" label="Logo Size" />
+              <StatusBadge variant="success" label="Logo Size" />
               <Text style={styles.analysisText}>✓ Optimal (150x150px recommended)</Text>
             </View>
             <View style={styles.analysisItem}>
-              <StatusBadge status="success" label="Color Contrast" />
+              <StatusBadge variant="success" label="Color Contrast" />
               <Text style={styles.analysisText}>✓ Excellent (WCAG AAA)</Text>
             </View>
             <View style={styles.analysisItem}>
-              <StatusBadge status="success" label="Text Readability" />
+              <StatusBadge variant="success" label="Text Readability" />
               <Text style={styles.analysisText}>✓ Good on mobile & desktop</Text>
             </View>
           </View>
         </View>
 
         <View style={styles.section}>
-          <SectionHeader title="Optimization Tips" size="sm" />
+          <SectionHeader title="Optimization Tips" />
           {[
             'Use high-contrast logo that works at small sizes',
             'Ensure product title is compelling and keyword-optimized',
@@ -375,7 +375,7 @@ export function BrandRolloutPlan({ kit }: { kit: Partial<CompleteBrandKit> }) {
         </View>
 
         <View style={styles.section}>
-          <SectionHeader title="Copy Templates" size="sm" />
+          <SectionHeader title="Copy Templates" />
 
           <View style={styles.templateCard}>
             <Text style={styles.templateTitle}>Instagram Bio</Text>

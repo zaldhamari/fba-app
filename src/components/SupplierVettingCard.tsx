@@ -5,7 +5,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { DS } from '../theme/ds';
 import { AppCard } from './ds/AppCard';
 import { SectionHeader } from './ds/SectionHeader';
@@ -41,7 +41,7 @@ export function SupplierVettingCard({
     init();
   }, [supplierId]);
 
-  const handleCheck = async (field: keyof typeof vetting.checklist, value: boolean) => {
+  const handleCheck = async (field: keyof NonNullable<typeof vetting>['checklist'], value: boolean) => {
     if (!vetting) return;
     const updated = await updateVetting(supplierId, {
       ...vetting,
@@ -72,19 +72,27 @@ export function SupplierVettingCard({
         {/* Risk Summary */}
         <View style={styles.riskSummary}>
           <StatusBadge
-            status={vetting.overallRisk}
+            variant={
+              vetting.overallRisk === 'low' ? 'success' :
+              vetting.overallRisk === 'medium' ? 'warning' :
+              vetting.overallRisk === 'high' ? 'danger' : 'neutral'
+            }
             label={`Risk Level: ${vetting.overallRisk}`}
             bg={riskColors[vetting.overallRisk]}
           />
           <StatusBadge
-            status={vetting.vettingStatus}
+            variant={
+              vetting.vettingStatus === 'passed' ? 'success' :
+              vetting.vettingStatus === 'failed' ? 'danger' :
+              vetting.vettingStatus === 'in_progress' ? 'info' : 'neutral'
+            }
             label={`Status: ${vetting.vettingStatus}`}
           />
         </View>
 
         {/* Checklist Items */}
         <View style={styles.checklistSection}>
-          <SectionHeader title="Compliance Checklist" size="sm" />
+          <SectionHeader title="Compliance Checklist" />
 
           <CheckItem
             label="Business Registered"
@@ -138,7 +146,7 @@ export function SupplierVettingCard({
 
         {/* Years in Business */}
         <View style={styles.section}>
-          <SectionHeader title="Years in Business" size="sm" />
+          <SectionHeader title="Years in Business" />
           <View style={styles.yearsDisplay}>
             {vetting.checklist.yearsInBusiness ? (
               <>

@@ -110,7 +110,7 @@ export function TypographySystemBuilder({
         {/* Preview */}
         {typography && (
           <View style={styles.previewSection}>
-            <SectionHeader title="Typography Scale Preview" size="sm" />
+            <SectionHeader title="Typography Scale Preview" />
 
             <View style={styles.previewCard}>
               <Text style={[styles.previewH1, { fontFamily: headlineFont }]}>
@@ -145,7 +145,7 @@ export function TypographySystemBuilder({
         {/* Type Scale Details */}
         {typography && (
           <View style={styles.scaleSection}>
-            <SectionHeader title="Complete Type Scale" size="sm" />
+            <SectionHeader title="Complete Type Scale" />
 
             {[
               { key: 'h1', name: 'H1 - Headline', desc: '48-72px · Bold (700-900)' },
@@ -166,7 +166,7 @@ export function TypographySystemBuilder({
 
         {/* Best Practices */}
         <View style={styles.tipsSection}>
-          <SectionHeader title="Typography Best Practices" size="sm" />
+          <SectionHeader title="Typography Best Practices" />
           {[
             '✓ Use headline font (serif/display) for impact; body font for readability',
             '✓ Maintain 1.5-1.6 line height for comfortable reading',
@@ -198,7 +198,7 @@ export function TypographySystemBuilder({
 
         {typography && (
           <View style={styles.successBanner}>
-            <StatusBadge status="success" label="✓ Typography System Ready" />
+            <StatusBadge variant="success" label="✓ Typography System Ready" />
             <Text style={styles.successText}>
               Your complete type scale is ready for design and development.
             </Text>

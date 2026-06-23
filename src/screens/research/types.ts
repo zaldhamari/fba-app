@@ -3,7 +3,7 @@ export type { KeepaSignals };
 
 // ── Display types ─────────────────────────────────────────────────────────────
 
-export type Mode = 'market' | 'lookup' | 'suppliers' | 'freight';
+export type Mode = 'market' | 'lookup' | 'suppliers' | 'freight' | 'vault';
 
 export interface ProductDisplay {
   id: string;

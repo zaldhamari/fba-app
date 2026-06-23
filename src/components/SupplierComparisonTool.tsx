@@ -221,7 +221,7 @@ export function SupplierComparisonTool({
 
         {/* Recommendation */}
         <View style={styles.recommendation}>
-          <StatusBadge status="info" label="🏆 Top Choice" />
+          <StatusBadge variant="info" label="🏆 Top Choice" />
           <Text style={styles.recommendationText}>
             {suppliers[0].name} is the best option based on price, quality, and reliability
           </Text>

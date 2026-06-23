@@ -158,7 +158,7 @@ export function useBrandingSystem() {
       setState(prev => ({ ...prev, loading: true, error: null }));
       try {
         // Generate multiple formats and sizes
-        const exportPackage = await generateExports(logo_svg, label_svg);
+        const exportPackage = await generateExportsImpl(logo_svg, label_svg);
         setState(prev => ({ ...prev, loading: false }));
         return exportPackage;
       } catch (err) {
@@ -431,7 +431,7 @@ async function generateTypography(style: string): Promise<TypographyScale> {
   const defaultFont = {
     name: 'Inter',
     category: 'sans-serif' as const,
-    weight: ['400', '600', '700'],
+    weight: ['400', '600', '700'] as ('100' | '300' | '400' | '500' | '600' | '700' | '800' | '900')[],
     lineHeight: 1.5,
     letterSpacing: 0,
   };

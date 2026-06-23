@@ -11,23 +11,7 @@
  */
 
 import { api } from './api';
-import type { BrandStory, ColorPalette, TypographyScale } from '../types/branding';
-
-interface LogoVariation {
-  type: 'icon' | 'wordmark' | 'badge' | 'combined' | 'monochrome';
-  svg: string;
-  name: string;
-  usage: string;
-  minSize: string;
-  bestFor: string;
-}
-
-interface LabelDesign {
-  svg: string;
-  title: string;
-  description: string;
-  packageType: string;
-}
+import type { BrandStory, ColorPalette, TypographyScale, LogoVariation, LabelDesign } from '../types/branding';
 
 // ────────────────────────────────────────────────────────────────────────────
 // ADVANCED LOGO GENERATION
@@ -81,7 +65,7 @@ export async function generateAdvancedLogos(
   // Premium typography-based logo
   const wordmarkSvg = await generateWordmark(
     brandName,
-    story.tagline,
+    story.tagline ?? '',
     primaryColor,
     typography,
     story,
@@ -118,7 +102,7 @@ export async function generateAdvancedLogos(
   const combinedSvg = await generateCombinedLockup(
     initials,
     brandName,
-    story.tagline,
+    story.tagline ?? '',
     primaryColor,
     accentColor,
     story,
@@ -438,7 +422,7 @@ async function buildAdvancedLabel(
     Output ONLY valid SVG XML code starting with <svg and ending with </svg>.
   `;
 
-  const response = await api.generateBrandAsset({ prompt, type: 'label', packageType });
+  const response = await api.generateBrandAsset({ prompt, type: `label_${packageType}` });
   return response.svg || createFallbackLabel(story, colors, packageType);
 }
 

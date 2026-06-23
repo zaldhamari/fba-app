@@ -106,6 +106,12 @@ import { OfflineBanner } from '../components/OfflineBanner';
 import { track } from '../lib/analytics';
 import { useProductIntelligence } from '../hooks/useProductIntelligence';
 import { ProductQuickIntel } from '../components/ProductQuickIntel';
+import VaultCard from '../components/VaultCard';
+import VaultFilterBar from '../components/VaultFilterBar';
+import VaultExportModal from '../components/VaultExportModal';
+import ShareCard from '../components/ShareCard';
+import LaunchPackModal from '../components/LaunchPackModal';
+import type { VaultEntry, VaultStatus } from '../types/vault';
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
@@ -145,6 +151,14 @@ export default function ResearchWorkspaceScreen() {
   const [freeAllowance,     setFreeAllowance]     = useState<{ used: number; limit: number; resets_on: string } | null>(null);
   const [allowanceLoading,  setAllowanceLoading]  = useState(false);
   const allowanceDebounce   = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ── Vault state ────────────────────────────────────────────────────────────
+  const [vaultSearch,       setVaultSearch]       = useState('');
+  const [vaultStatusFilter, setVaultStatusFilter] = useState<VaultStatus | 'all'>('all');
+  const [showVaultExport,   setShowVaultExport]   = useState(false);
+  const [shareEntry,        setShareEntry]        = useState<VaultEntry | null>(null);
+  const [showLaunchPack,    setShowLaunchPack]    = useState(false);
+  const [launchPackProduct, setLaunchPackProduct] = useState<string | undefined>(undefined);
 
   // ── Recent searches ────────────────────────────────────────────────────────
   const [recentMarket,   setRecentMarket]   = useState<string[]>([]);
@@ -1073,6 +1087,75 @@ export default function ResearchWorkspaceScreen() {
     );
   }
 
+  // ── Vault tab ──────────────────────────────────────────────────────────────
+
+  function renderVaultTab() {
+    const allEntries = vault.entries ?? [];
+    const filtered = allEntries.filter(e => {
+      const matchSearch = !vaultSearch || e.product.title.toLowerCase().includes(vaultSearch.toLowerCase());
+      const matchStatus = vaultStatusFilter === 'all' || e.status === vaultStatusFilter;
+      return matchSearch && matchStatus;
+    });
+
+    return (
+      <View style={{ gap: DS.sectionGap }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Text style={{ fontSize: 13, fontWeight: '700', color: DS.textPrimary }}>
+            {allEntries.length} saved product{allEntries.length !== 1 ? 's' : ''}
+          </Text>
+          {allEntries.length > 0 && (
+            <TouchableOpacity onPress={() => setShowVaultExport(true)} activeOpacity={0.8}>
+              <Text style={{ fontSize: 12, fontWeight: '600', color: DS.gold }}>Export Report ↗</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        <VaultFilterBar
+          search={vaultSearch}
+          onSearchChange={setVaultSearch}
+          statusFilter={vaultStatusFilter}
+          onStatusChange={setVaultStatusFilter}
+          count={filtered.length}
+        />
+
+        {filtered.length === 0 ? (
+          <AppCard>
+            <Text style={{ textAlign: 'center', color: DS.textMuted, fontSize: 13, paddingVertical: 24 }}>
+              {allEntries.length === 0 ? 'Save products from the Products tab to build your vault.' : 'No products match your filters.'}
+            </Text>
+          </AppCard>
+        ) : (
+          filtered.map(entry => (
+            <VaultCard
+              key={entry.asin}
+              entry={entry}
+              onRemove={() => vault.removeEntry(entry.asin)}
+              onStatusChange={status => vault.updateStatus(entry.asin, status)}
+              onNoteChange={note => vault.updateNote(entry.asin, note)}
+              onShare={() => setShareEntry(entry)}
+            />
+          ))
+        )}
+
+        {allEntries.length > 0 && (
+          <TouchableOpacity
+            onPress={() => { setLaunchPackProduct(filtered[0]?.product.title); setShowLaunchPack(true); }}
+            activeOpacity={0.85}
+            style={{
+              backgroundColor: DS.gold,
+              borderRadius: DS.radiusButton,
+              paddingVertical: 14,
+              alignItems: 'center',
+              marginTop: DS.sectionGap,
+            }}
+          >
+            <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 14 }}>🚀 Get Launch Pack</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    );
+  }
+
 
   // ── Main render ────────────────────────────────────────────────────────────
 
@@ -1098,6 +1181,22 @@ export default function ResearchWorkspaceScreen() {
         items={compareProductItems}
         onClose={() => setShowCompareProducts(false)}
         onSaveWinner={(item) => { handleSaveProduct(item); setShowCompareProducts(false); }}
+      />
+      <VaultExportModal
+        visible={showVaultExport}
+        entries={vault.entries ?? []}
+        onClose={() => setShowVaultExport(false)}
+      />
+      {shareEntry && (
+        <ShareCard
+          entry={shareEntry}
+          onClose={() => setShareEntry(null)}
+        />
+      )}
+      <LaunchPackModal
+        visible={showLaunchPack}
+        onClose={() => setShowLaunchPack(false)}
+        productName={launchPackProduct}
       />
 
       <AppHeader helpKey={mode === 'market' ? 'research' : 'smart_search'} />
@@ -1165,6 +1264,7 @@ export default function ResearchWorkspaceScreen() {
 
         {/* ── Mode selector ────────────────────────────────── */}
         <ModeSegment value={mode} onChange={setMode} exclude={['suppliers', 'freight']} />
+
         <ModeDescStrip mode={mode} />
 
         {/* ── Product Intelligence Preview ─────────────────────────────────── */}
@@ -1179,6 +1279,7 @@ export default function ResearchWorkspaceScreen() {
         {/* ── Mode content ─────────────────────────────────── */}
         {mode === 'market'  && renderMarketTab()}
         {mode === 'lookup'  && renderLookupTab()}
+        {mode === 'vault'   && renderVaultTab()}
       </ScrollView>
 
       {/* ── Floating compare bar ─────────────────────────────── */}

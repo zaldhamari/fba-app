@@ -210,7 +210,7 @@ export interface SupplierProfile {
   platform: string;
   price: string;
   moq: string;
-  rating?: number;
+  numericRating?: number; // Raw numeric rating from platform (e.g. 4.5 stars)
   verified: boolean;
   yearsInBusiness?: number;
   country: string;

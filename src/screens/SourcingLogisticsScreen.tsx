@@ -47,6 +47,9 @@ import { DecisionSimulationPanel } from '../components/DecisionSimulationPanel';
 import { useDecisionSimulation } from '../hooks/useDecisionSimulation';
 import { useSubscription } from '../hooks/useSubscription';
 import PaywallModal from '../components/PaywallModal';
+import { SupplierVettingCard } from '../components/SupplierVettingCard';
+import { SupplierComparisonTool } from '../components/SupplierComparisonTool';
+import { SupplierMessageModal } from '../components/SupplierMessageModal';
 
 
 // ── Supplier URL resolver ─────────────────────────────────────────────────────
@@ -884,6 +887,8 @@ export default function SourcingLogisticsScreen() {
   const [showCompare,  setShowCompare]  = useState(false);
   const [analyzeModal,    setAnalyzeModal]    = useState(false);
   const [analyzeResult,   setAnalyzeResult]   = useState<AnalyzeSupplierResult | null>(null);
+  const [supplierToolTab, setSupplierToolTab] = useState<'vet' | 'compare' | 'message'>('vet');
+  const [showMessageModal, setShowMessageModal] = useState(false);
   const [analyzeError,    setAnalyzeError]    = useState('');
   const [analyzeTargetId, setAnalyzeTargetId] = useState<string | null>(null);
   const [outreachEmail,     setOutreachEmail]     = useState<OutreachEmail | null>(null);
@@ -1522,6 +1527,51 @@ export default function SourcingLogisticsScreen() {
             <Text style={sc.emptySub}>Search verified manufacturers above. We'll rank by score, let you compare, and save to your pipeline.</Text>
           </View>
         )}
+
+        {/* ── Advanced Supplier Tools ── */}
+        {!!pipeline.selectedSupplier && (
+          <View style={sc.supplierToolsCard}>
+            <Text style={sc.supplierToolsTitle}>Supplier Tools</Text>
+            <View style={sc.supplierToolTabs}>
+              {(['vet', 'compare', 'message'] as const).map(t => (
+                <TouchableOpacity
+                  key={t}
+                  style={[sc.supplierToolTab, supplierToolTab === t && sc.supplierToolTabActive]}
+                  onPress={() => { if (t === 'message') setShowMessageModal(true); else setSupplierToolTab(t); }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[sc.supplierToolTabTxt, supplierToolTab === t && sc.supplierToolTabTxtActive]}>
+                    {t === 'vet' ? '✓ Vet' : t === 'compare' ? '⊞ Compare' : '✉ Message'}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            {supplierToolTab === 'vet' && (
+              <SupplierVettingCard
+                supplierId={pipeline.selectedSupplier.name}
+                supplierName={pipeline.selectedSupplier.name}
+                productName={pipeline.activeProduct?.title ?? product}
+              />
+            )}
+            {supplierToolTab === 'compare' && suppliers.length >= 2 && (
+              <SupplierComparisonTool
+                productName={pipeline.activeProduct?.title ?? product}
+                supplierIds={suppliers.slice(0, 5).map(s => s.id)}
+                onSelectWinner={(id) => {
+                  const winner = suppliers.find(s => s.id === id);
+                  if (winner) handleSelectSupplier(winner);
+                }}
+              />
+            )}
+            {supplierToolTab === 'compare' && suppliers.length < 2 && (
+              <View style={{ padding: 16 }}>
+                <Text style={{ color: DS.textMuted, fontSize: 13, textAlign: 'center' }}>
+                  Search for suppliers above to compare them.
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
       </View>
     );
   }
@@ -1938,6 +1988,14 @@ export default function SourcingLogisticsScreen() {
 
       <CompareSuppliersModal visible={showCompare} items={compareItems} onClose={() => setShowCompare(false)} />
       <PaywallModal visible={showPaywall} onClose={() => setShowPaywall(false)} featureContext="Supplier sourcing" />
+      {!!pipeline.selectedSupplier && (
+        <SupplierMessageModal
+          visible={showMessageModal}
+          supplierId={pipeline.selectedSupplier.name}
+          supplierName={pipeline.selectedSupplier.name}
+          onClose={() => setShowMessageModal(false)}
+        />
+      )}
 
       <SafeAreaView edges={['top']} style={{ backgroundColor: DS.bgCanvas }}>
         <AppHeader helpKey="sourcing" />
@@ -2058,6 +2116,13 @@ const sc = StyleSheet.create({
   moreSourcesLangBadgeCN:  { backgroundColor: DS.warningBg, borderColor: DS.warning + '40' },
   moreSourcesLangTxt:      { fontSize: 9, fontWeight: '800', color: DS.successText, letterSpacing: 0.5 },
   moreSourcesLangTxtCN:    { color: DS.warningText },
+  supplierToolsCard:       { backgroundColor: DS.bgCard, borderRadius: DS.radiusCard, borderWidth: 1, borderColor: DS.border, marginTop: DS.sectionGap, overflow: 'hidden' },
+  supplierToolsTitle:      { fontSize: 13, fontWeight: '700', color: DS.textPrimary, paddingHorizontal: DS.cardPadding, paddingTop: DS.cardPadding, marginBottom: 12 },
+  supplierToolTabs:        { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: DS.border },
+  supplierToolTab:         { flex: 1, paddingVertical: 10, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },
+  supplierToolTabActive:   { borderBottomColor: DS.accent },
+  supplierToolTabTxt:      { fontSize: 12, fontWeight: '600', color: DS.textSecondary },
+  supplierToolTabTxtActive:{ color: DS.accent },
 });
 
 const fr = StyleSheet.create({
