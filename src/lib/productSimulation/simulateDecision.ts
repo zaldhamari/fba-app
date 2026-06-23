@@ -80,10 +80,15 @@ function applyOverrides(
   const simSellPrice   = overrides.sellingPriceOverride ?? base.product?.price ?? 0;
 
   if (simSellPrice > 0 && (simUnitCost > 0 || simFreight > 0)) {
-    const marginPct = (simSellPrice - simUnitCost - simFreight) / simSellPrice;
+    // Net margin = gross margin minus Amazon fees (referral 15% + FBA ~15% = 30%).
+    // Thresholds are percentages (55 / 35) matching costModel.marginPct in
+    // useProductIntelligence — using gross margin here made every scenario
+    // ~30 points too optimistic compared to the base profile.
+    const grossFraction = (simSellPrice - simUnitCost - simFreight) / simSellPrice;
+    const netMarginPct  = (grossFraction - 0.30) * 100; // 0.30 = REFERRAL_RATE + FBA_FEE_RATE
     sim.estimatedMarginRisk =
-      marginPct > 0.55 ? 'Low' :
-      marginPct > 0.35 ? 'Medium' : 'High';
+      netMarginPct > 55 ? 'Low' :
+      netMarginPct > 35 ? 'Medium' : 'High';
   }
 
   // ── Seller profile overrides ──────────────────────────────────────────────

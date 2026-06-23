@@ -6,7 +6,7 @@
  * Preserves the Siftly DS, card style, and all existing FBA logic.
  */
 
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import {
   ScrollView, StyleSheet, View, Text, Modal,
   TouchableOpacity, TextInput, Linking, Alert,
@@ -27,6 +27,7 @@ import { useCurrency } from '../context/CurrencyContext';
 import { usePipeline } from '../context/PipelineContext';
 import type { CurrencyCode, MarketplaceId } from '../context/CurrencyContext';
 import { useActiveProduct } from '../context/ActiveProductContext';
+import { api } from '../services/api';
 import { HelpButton } from '../components/HelpModal';
 import { AppHeader } from '../components/AppHeader';
 import type { FeatureKey } from '../lib/featureHelp';
@@ -347,26 +348,28 @@ interface FBAInputs {
   sellingPrice: string; productCost: string; freight: string;
   fbaFees: string; referralFee: string; duties: string;
   packaging: string; unitsOrdered: string;
+  // Physical attributes — feed the real /calculate/fba rate schedule instead
+  // of making the user guess a flat FBA-fee dollar amount. Pre-filled via AI
+  // estimate when no measured data exists; always user-editable.
+  weightLbs: string; length: string; width: string; height: string; category: string;
 }
 const FBA_DEFAULTS: FBAInputs = {
   sellingPrice: '', productCost: '', freight: '',
   fbaFees: '', referralFee: '', duties: '',
   packaging: '', unitsOrdered: '',
+  weightLbs: '', length: '', width: '', height: '', category: 'all',
 };
+
+const FBA_CATEGORIES = [
+  'all', 'electronics', 'home', 'kitchen', 'sports',
+  'toys', 'beauty', 'clothing', 'tools', 'books',
+];
 
 interface FBASaved {
   inputs: FBAInputs; netProfit: number; margin: number; roi: number; savedAt: string;
   currency: CurrencyCode; marketplaceId: MarketplaceId; amazonMarketplace: string;
   productName?: string; hsCode?: string; asin?: string; confidenceScore?: number;
 }
-
-const US_FEE_TIERS = [
-  { tier: 'Small standard (≤ 1 lb)',   range: '$3.22 – $4.18' },
-  { tier: 'Large standard (1–2 lbs)', range: '$5.25 – $6.33' },
-  { tier: 'Large standard (2–3 lbs)', range: '$6.33 – $7.17' },
-  { tier: 'Large standard (3+ lbs)', range: '$7.17 + $0.16/lb extra' },
-  { tier: 'Oversize (small)',          range: '$9.73+' },
-];
 
 // Thin adapter — FBAWorkspace stores raw user input as strings; the actual
 // profit/margin/ROI formula lives in financialEngine.computeUnitEconomics so
@@ -582,6 +585,88 @@ function FBAWorkspace({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pipeline.selectedSupplier, pipeline.activeProduct, autofillDone]);
 
+  // ── Auto-populate weight/dimensions/category, then auto-calc real FBA fees ──
+  // Goal: never make the user guess a flat "FBA fees" dollar figure. Pull
+  // weight/dims from an AI estimate (no real Amazon/Alibaba product-detail API
+  // is wired in that returns this), then call the real 2026 fee schedule.
+  // Every value here stays user-editable — auto-fill only sets a field that's
+  // still blank or still matches the last auto-filled value.
+  const [physicalSource, setPhysicalSource] = useState<'estimated' | 'fallback' | 'user-entered' | null>(null);
+  const [physicalLoading, setPhysicalLoading] = useState(false);
+  const [feesAutoFilled, setFeesAutoFilled] = useState(false);
+  const [feesOverridden, setFeesOverridden] = useState(false);
+  const lastPhysicalTitle = useRef('');
+
+  useEffect(() => {
+    const title = productName.trim();
+    if (!title) return;
+    if (inputs.weightLbs !== '' && physicalSource !== 'estimated' && physicalSource !== 'fallback') return;
+    // Debounce so we fire one AI call per pause-in-typing, not one per keystroke
+    // (estimatePhysical is a real Claude call and consumes the backend's spend budget).
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      if (title === lastPhysicalTitle.current) return;
+      lastPhysicalTitle.current = title;
+      setPhysicalLoading(true);
+      api.estimatePhysical({ title, price: n(inputs.sellingPrice) || undefined })
+        .then(res => {
+          if (cancelled) return;
+          setInputs(prev => ({
+            ...prev,
+            weightLbs: res.weight_lbs.toFixed(2),
+            length:    res.length.toFixed(1),
+            width:     res.width.toFixed(1),
+            height:    res.height.toFixed(1),
+            category:  res.category || prev.category,
+          }));
+          setPhysicalSource(res.source === 'ai_estimate' ? 'estimated' : 'fallback');
+        })
+        .catch(() => {})
+        .finally(() => { if (!cancelled) setPhysicalLoading(false); });
+    }, 700);
+    return () => { cancelled = true; clearTimeout(timer); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productName]);
+
+  useEffect(() => {
+    const sell = n(inputs.sellingPrice);
+    const cost = n(inputs.productCost);
+    const wt   = n(inputs.weightLbs);
+    const l = n(inputs.length), w = n(inputs.width), h = n(inputs.height);
+    if (sell <= 0 || wt <= 0 || l <= 0 || w <= 0 || h <= 0) return;
+    if (feesOverridden) return; // user took manual control — stop auto-recalculating over them
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      api.calculateFBA({
+        product_name: productName.trim() || 'Product',
+        selling_price: sell,
+        supplier_cost: cost,
+        weight_lbs: wt,
+        dimensions: { length: l, width: w, height: h },
+        category: inputs.category || 'all',
+        quantity: Math.max(1, Math.round(n(inputs.unitsOrdered)) || 1),
+      }).then(res => {
+        if (cancelled) return;
+        setInputs(prev => ({
+          ...prev,
+          fbaFees: res.fees.fulfillment_fee.toFixed(2),
+          referralFee: res.fees.referral_fee.toFixed(2),
+        }));
+        setFeesAutoFilled(true);
+      }).catch(() => {});
+    }, 400);
+    return () => { cancelled = true; clearTimeout(timer); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inputs.sellingPrice, inputs.productCost, inputs.weightLbs, inputs.length, inputs.width, inputs.height, inputs.category, inputs.unitsOrdered]);
+
+  function setPhysical(k: 'weightLbs' | 'length' | 'width' | 'height', v: string) {
+    setInputs(p => ({ ...p, [k]: v }));
+    setPhysicalSource('user-entered');
+  }
+  function setCategory(v: string) {
+    setInputs(p => ({ ...p, category: v }));
+  }
+
   const c  = useMemo(() => computeFBA(committed), [committed]);
   const sc = useMemo(() => {
     const cfg = SCENARIO_CFG[scenario];
@@ -648,7 +733,10 @@ function FBAWorkspace({
     return warnings;
   }, [inputs]);
 
-  function set(k: keyof FBAInputs, v: string) { setInputs(p => ({ ...p, [k]: v })); }
+  function set(k: keyof FBAInputs, v: string) {
+    setInputs(p => ({ ...p, [k]: v }));
+    if (k === 'fbaFees' || k === 'referralFee') setFeesOverridden(true);
+  }
 
   function handleLoad() {
     if (!latestEntry) return;
@@ -677,31 +765,72 @@ function FBAWorkspace({
           <Field label={`Selling price (${symbol})`} value={inputs.sellingPrice} onChange={v => set('sellingPrice', v)} placeholder="24.99" />
           <Field label={`Supplier cost (${symbol})`} value={inputs.productCost} onChange={v => set('productCost', v)} placeholder="5.20" />
         </Pair>
+
+        {/* Package weight & dimensions — drives the real FBA fee calc below */}
+        <View style={ws.rowBetween}>
+          <Text style={ws.chipLabel}>PACKAGE WEIGHT & SIZE</Text>
+          {physicalSource && (
+            <EstimateLabel type={physicalSource === 'user-entered' ? 'user-entered' : physicalSource === 'estimated' ? 'estimated' : 'directional'} />
+          )}
+          {physicalLoading && <Text style={ws.hint}>estimating…</Text>}
+        </View>
+        <Pair>
+          <Field label="Weight (lbs)" value={inputs.weightLbs} onChange={v => setPhysical('weightLbs', v)} placeholder="1.20" />
+          <Field label="Length (in)" value={inputs.length} onChange={v => setPhysical('length', v)} placeholder="10.0" />
+        </Pair>
+        <Pair>
+          <Field label="Width (in)" value={inputs.width} onChange={v => setPhysical('width', v)} placeholder="8.0" />
+          <Field label="Height (in)" value={inputs.height} onChange={v => setPhysical('height', v)} placeholder="4.0" />
+        </Pair>
+        <Text style={ws.chipLabel}>CATEGORY</Text>
+        <View style={ws.chips}>
+          {FBA_CATEGORIES.map(cat => (
+            <TouchableOpacity key={cat} style={[ws.chip, inputs.category === cat && ws.chipActive]} onPress={() => setCategory(cat)}>
+              <Text style={[ws.chipTxt, inputs.category === cat && ws.chipTxtActive]}>{cat}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        {!physicalSource && !inputs.weightLbs && (
+          <Text style={ws.hint}>Enter a product name above to auto-estimate weight & size — or fill these in yourself.</Text>
+        )}
+        {physicalSource === 'estimated' && (
+          <Text style={ws.hint}>AI-estimated from the product name — not measured. Edit any field to correct it.</Text>
+        )}
+
         <Pair>
           <Field label={`Freight / unit (${symbol})`} value={inputs.freight} onChange={v => set('freight', v)} placeholder="2.10" />
           <Field label={`FBA fees (${symbol})`} value={inputs.fbaFees} onChange={v => set('fbaFees', v)} placeholder="4.50" />
         </Pair>
         {/* FBA Fee Helper */}
         <TouchableOpacity style={ws.helperLink} onPress={() => setShowFeeHelper(v => !v)} activeOpacity={0.7}>
-          <Text style={ws.helperLinkTxt}>{showFeeHelper ? '▲' : '▼'} Need FBA fee estimates?</Text>
+          <Text style={ws.helperLinkTxt}>{showFeeHelper ? '▲' : '▼'} How are FBA fees calculated?</Text>
         </TouchableOpacity>
         {showFeeHelper && (
           <View style={ws.helperBox}>
             <Text style={ws.helperTitle}>
               {marketplace === 'US'
-                ? 'US FBA Fee Ranges (2025 approx.)'
+                ? 'Auto-calculated from weight & size above'
                 : `Check ${profile.amazonMarketplace} Seller Central for fee schedules`}
             </Text>
-            {marketplace === 'US' && US_FEE_TIERS.map(t => (
-              <View key={t.tier} style={ws.helperRow}>
-                <Text style={ws.helperLabel}>{t.tier}</Text>
-                <Text style={ws.helperValue}>{t.range}</Text>
-              </View>
-            ))}
-            <Text style={ws.disclaimer}>Estimates only. Verify actual fees in Seller Central — fees change periodically and vary by category.</Text>
+            {marketplace === 'US' ? (
+              <Text style={ws.disclaimer}>
+                FBA fees and referral fee are calculated automatically using Amazon's current
+                price-banded fee schedule (incl. the fuel & logistics surcharge) once weight and
+                dimensions are filled in above. You can still type over either field manually —
+                doing so stops the auto-calculation for this session.
+              </Text>
+            ) : (
+              <Text style={ws.disclaimer}>Estimates only. Verify actual fees in Seller Central — fees change periodically and vary by category.</Text>
+            )}
           </View>
         )}
-        {n(inputs.sellingPrice) > 0 && (
+        {feesAutoFilled && !feesOverridden && n(inputs.fbaFees) > 0 && (
+          <View style={ws.rowBetween}>
+            <Text style={ws.hint}>FBA fees & referral fee auto-calculated from weight/size/category</Text>
+            <EstimateLabel type="estimated" />
+          </View>
+        )}
+        {n(inputs.sellingPrice) > 0 && !feesAutoFilled && (
           <Text style={ws.hint}>
             Referral fee hint: 15% of {symbol}{n(inputs.sellingPrice).toFixed(2)} = {symbol}{(n(inputs.sellingPrice) * 0.15).toFixed(2)} (most categories)
           </Text>
@@ -1002,8 +1131,10 @@ function BreakevenWorkspace() {
   const profitPU = p - c - f;
   const beUnits = profitPU > 0 ? Math.ceil(s / profitPU) : 0;
   const beFixed = profitPU > 0 ? Math.ceil(fx / profitPU) : 0;
-  const months  = sl > 0 && profitPU > 0
-    ? safe(s / (sl * profitPU - fx)).toFixed(1) : null;
+  const monthlyNetProfit = sl * profitPU - fx;
+  const months  = sl > 0 && profitPU > 0 && monthlyNetProfit > 0
+    ? safe(s / monthlyNetProfit).toFixed(1) : null;
+  const breakEvenBlocked = sl > 0 && profitPU > 0 && monthlyNetProfit <= 0;
 
   return (
     <View style={ws.wrap}>
@@ -1041,7 +1172,7 @@ function BreakevenWorkspace() {
           {[
             ['Units to recover startup',        beUnits > 0 ? `${beUnits} units` : 'N/A'],
             ['Units/mo to cover fixed costs',   beFixed > 0 ? `${beFixed} units` : 'N/A'],
-            ['Months to break even',            months ? `${months} months` : 'Enter monthly sales'],
+            ['Months to break even',            breakEvenBlocked ? 'Fixed costs exceed monthly profit' : months ? `${months} months` : 'Enter monthly sales'],
             ['Revenue at break-even',           beUnits > 0 ? `${symbol}${(beUnits * p).toFixed(0)}` : 'N/A'],
           ].map(([l, v]) => <Row key={l} label={l} value={v} />)}
         </AppCard>
@@ -2059,6 +2190,7 @@ const ws = StyleSheet.create({
   cardTitle:  { fontSize: 15, fontWeight: '800', color: DS.textPrimary, letterSpacing: -0.3 },
   hint:       { fontSize: 12, color: DS.textMuted, lineHeight: 17 },
   disclaimer: { fontSize: 11, color: DS.textMuted, lineHeight: 16, fontStyle: 'italic' },
+  rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
 
   warnBox:    { backgroundColor: DS.warningBg, borderRadius: 12, borderWidth: 1, borderColor: DS.warning + '50', padding: 12, gap: 8 },
   warnRow:    { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
