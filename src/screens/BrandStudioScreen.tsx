@@ -2341,7 +2341,7 @@ export default function BrandStudioScreen() {
     const dir = BRAND_DIRECTIONS.find(d => d.id === selectedDirection);
     try {
       const result = await api.createBrand({
-        product_type:    inputs.brandName || 'product',
+        product_type:    (pipeline.activeProduct?.title ?? pipeline.activeNiche?.keyword ?? inputs.brandName) || 'product',
         style:           inputs.style.toLowerCase(),
         brand_name:      inputs.brandName,
         brand_direction: selectedDirection ?? undefined,
@@ -2394,8 +2394,8 @@ export default function BrandStudioScreen() {
     try {
       const result = await api.createLabel({
         brand_name:      inputs.brandName || 'Brand',
-        product_name:    inputs.brandName || 'Product',
-        weight:          '0.5kg',
+        product_name:    labelFields?.['productName'] || inputs.brandName || 'Product',
+        weight:          labelFields?.['netWeight'] || '0.5kg',
         style:           inputs.style.toLowerCase(),
         brand_direction: selectedDirection ?? undefined,
         color_palette:   inputs.colorPalette,
@@ -2426,8 +2426,8 @@ export default function BrandStudioScreen() {
     try {
       const result = await api.createLabel({
         brand_name:      inputs.brandName || 'Brand',
-        product_name:    inputs.brandName || 'Product',
-        weight:          '0.5kg',
+        product_name:    labelFields?.['productName'] || inputs.brandName || 'Product',
+        weight:          labelFields?.['netWeight'] || '0.5kg',
         style:           inputs.style.toLowerCase(),
         brand_direction: selectedDirection ?? undefined,
         color_palette:   inputs.colorPalette,
@@ -2436,7 +2436,11 @@ export default function BrandStudioScreen() {
         tagline:         inputs.tagline || undefined,
       });
       await increment('brands');
-      setLabelResult(result);
+      // Preserve existing label_svg if already generated — only update insert
+      setLabelResult(prev => ({
+        label_svg:  prev?.label_svg  || result.label_svg,
+        insert_svg: result.insert_svg,
+      }));
       if (result.insert_svg) {
         const entry: BrandHistoryEntry = { brandName: inputs.brandName, style: inputs.style, assetType: 'insert', svg: result.insert_svg, createdAt: new Date().toISOString() };
         await saveToHistory(entry);
@@ -2625,7 +2629,7 @@ export default function BrandStudioScreen() {
           />
           {brandResult && !labelResult && (
             <TouchableOpacity
-              onPress={() => { advanceBrandStep(4); setBrandStep(4); }}
+              onPress={() => { advanceBrandStep(2); setBrandStep(5); }}
               activeOpacity={0.8}
               style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12, borderRadius: DS.radiusCard, backgroundColor: DS.bgSubtle, borderWidth: 1, borderColor: DS.border }}
             >
