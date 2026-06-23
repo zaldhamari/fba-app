@@ -121,6 +121,9 @@ export interface Product {
   opportunity: 'Good' | 'Moderate' | 'Saturated';
   url: string;
   error?: string;
+  /** 'dataforseo' = real listing data. 'stub' = fabricated placeholder (no DataForSEO
+   *  credentials configured server-side). Undefined = legacy keyword-derived estimate. */
+  source?: string;
 }
 
 export interface TrendData {
@@ -140,6 +143,11 @@ export interface Supplier {
   image: string;
   url: string;
   error?: string;
+  /** 'alibaba_api' = real supplier data. 'stub' = fabricated placeholder (no Alibaba
+   *  Open Platform credentials configured server-side). */
+  source?: string;
+  verified?: boolean;
+  trade_assurance?: boolean;
 }
 
 export interface FBAResult {
@@ -211,6 +219,20 @@ export const api = {
     category: string;
     quantity?: number;
   }) => post<FBAResult>('/calculate/fba', body),
+
+  /** Pre-fills weight/dimensions/category when no real measured data exists.
+   *  `source` in the response is 'ai_estimate' or 'fallback_estimate' — never
+   *  'confirmed'. Always shown with an EstimateLabel and left user-editable. */
+  estimatePhysical: (body: { title: string; price?: number; category?: string }) =>
+    post<{
+      weight_lbs: number;
+      length: number;
+      width: number;
+      height: number;
+      category: string;
+      confidence: 'high' | 'medium' | 'low';
+      source: 'ai_estimate' | 'fallback_estimate';
+    }>('/ai/estimate-physical', body),
 
   createBrand: async (body: {
     product_type:    string;
@@ -468,6 +490,7 @@ export const api = {
         review_count: number;
         asin: string;
         url: string;
+        source?: string;
       }[];
       can_you_afford_it: {
         budget: number;
@@ -476,6 +499,10 @@ export const api = {
         can_afford: boolean;
         verdict: string;
       };
+      /** 'dataforseo' = the whole report is built from real Amazon listing data.
+       *  'stub' = no DataForSEO credentials configured server-side — every number
+       *  below (market snapshot, products to model) is fabricated placeholder data. */
+      data_source?: string;
     }>('/research/niche', body);
     validateSearchNiche(data);
     return data;
