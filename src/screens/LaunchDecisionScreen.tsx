@@ -984,7 +984,7 @@ export default function LaunchDecisionScreen() {
             label="Niche"
             value={activeNiche ? `${activeNiche.keyword} (${activeNiche.verdictLabel})` : '—'}
             missing={!activeNiche}
-            onPress={!activeNiche ? () => navigateToTab('Niche') : undefined}
+            onPress={!activeNiche ? () => navigateToTab('Home') : undefined}
             navLabel="Research a Niche"
           />
           <DataRow

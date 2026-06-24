@@ -233,7 +233,7 @@ export function SupplierComparisonTool({
             label={`Choose ${suppliers[0].name}`}
             onPress={() => onSelectWinner?.(suppliers[0].id)}
           />
-          <SecondaryButton label="Compare More" onPress={() => {}} />
+          <SecondaryButton label="Add Another Supplier" onPress={() => onSelectWinner?.('')} />
         </View>
       </AppCard>
     </ScrollView>
