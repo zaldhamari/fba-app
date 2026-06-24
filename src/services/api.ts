@@ -15,6 +15,7 @@ const API_KEY  = process.env.EXPO_PUBLIC_API_KEY ?? '';
 
 const REQUEST_TIMEOUT_MS       = 15_000;
 const SLOW_ENDPOINT_TIMEOUT_MS = 25_000;
+const NICHE_TIMEOUT_MS         = 35_000;
 
 // ── Keepa signal types ────────────────────────────────────────────────────────
 
@@ -124,6 +125,8 @@ export interface Product {
   /** 'dataforseo' = real listing data. 'stub' = fabricated placeholder (no DataForSEO
    *  credentials configured server-side). Undefined = legacy keyword-derived estimate. */
   source?: string;
+  /** Real monthly Amazon search volume from DataForSEO Labs (present on keyword_estimate results). */
+  search_volume?: number;
 }
 
 export interface TrendData {
@@ -509,7 +512,7 @@ export const api = {
        *  'stub' = no DataForSEO credentials configured server-side — every number
        *  below (market snapshot, products to model) is fabricated placeholder data. */
       data_source?: string;
-    }>('/research/niche', body);
+    }>('/research/niche', body, NICHE_TIMEOUT_MS);
     validateSearchNiche(data);
     return data;
   },
