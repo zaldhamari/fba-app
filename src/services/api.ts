@@ -262,15 +262,21 @@ export const api = {
     }>('/research/keywords', { product }),
 
   createLabel: async (body: {
-    brand_name:       string;
-    product_name:     string;
-    weight:           string;
-    style?:           string;
-    brand_direction?: string;
-    color_palette?:   string;
-    font_style?:      string;
-    packaging_type?:  string;
-    tagline?:         string;
+    brand_name:        string;
+    product_name:      string;
+    weight:            string;
+    style?:            string;
+    brand_direction?:  string;
+    color_palette?:    string;
+    font_style?:       string;
+    packaging_type?:   string;
+    tagline?:          string;
+    ingredients?:      string;
+    warnings?:         string;
+    directions?:       string;
+    support_url?:      string;
+    qr_text?:          string;
+    manufacturer?:     string;
   }) => {
     const data = await postSlow<{ label_svg: string; insert_svg: string }>('/brand/label', body);
     validateCreateLabel(data);

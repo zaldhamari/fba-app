@@ -936,7 +936,7 @@ const lg = StyleSheet.create({
 // ── Packaging Insert tab ──────────────────────────────────────────────────────
 
 function PackagingInsertTab({
-  brandName, loading, result, onGenerate, genError, exportLoading, exportError, onExport, accentColor,
+  brandName, loading, result, onGenerate, genError, exportLoading, exportError, onExport, accentColor, labelFields,
 }: {
   brandName:     string;
   loading:       boolean;
@@ -947,6 +947,7 @@ function PackagingInsertTab({
   exportError:   string;
   onExport:      () => void;
   accentColor:   string;
+  labelFields?:  Record<string, string>;
 }) {
   const displayName = brandName.trim() || 'Your Brand';
   const hasSvg      = !!result?.insert_svg && isValidSvg(result.insert_svg);
@@ -985,10 +986,10 @@ function PackagingInsertTab({
                 </View>
                 <View style={pi.qrInfo}>
                   <Text style={pi.qrLabel}>Scan to leave a review</Text>
-                  <Text style={pi.qrUrl}>[Your review link]</Text>
+                  <Text style={pi.qrUrl}>{labelFields?.['qrText'] || 'amazon.com/review/[ASIN]'}</Text>
                   <View style={pi.supportRow}>
                     <Text style={pi.supportLabel}>Support: </Text>
-                    <Text style={pi.supportEmail}>[Your support email]</Text>
+                    <Text style={pi.supportEmail}>{labelFields?.['supportUrl'] || 'support@yourbrand.com'}</Text>
                   </View>
                 </View>
               </View>
@@ -2402,6 +2403,12 @@ export default function BrandStudioScreen() {
         font_style:      inputs.fontStyle,
         packaging_type:  packagingType,
         tagline:         inputs.tagline || undefined,
+        ingredients:     labelFields?.['ingredients'] || undefined,
+        warnings:        labelFields?.['warnings'] || undefined,
+        directions:      labelFields?.['directions'] || undefined,
+        support_url:     labelFields?.['supportUrl'] || undefined,
+        qr_text:         labelFields?.['qrText'] || undefined,
+        manufacturer:    labelFields?.['manufacturerText'] || undefined,
       });
       await increment('brands');
       setLabelResult(result);
@@ -2434,6 +2441,12 @@ export default function BrandStudioScreen() {
         font_style:      inputs.fontStyle,
         packaging_type:  packagingType,
         tagline:         inputs.tagline || undefined,
+        ingredients:     labelFields?.['ingredients'] || undefined,
+        warnings:        labelFields?.['warnings'] || undefined,
+        directions:      labelFields?.['directions'] || undefined,
+        support_url:     labelFields?.['supportUrl'] || undefined,
+        qr_text:         labelFields?.['qrText'] || undefined,
+        manufacturer:    labelFields?.['manufacturerText'] || undefined,
       });
       await increment('brands');
       // Preserve existing label_svg if already generated — only update insert
@@ -2742,7 +2755,7 @@ export default function BrandStudioScreen() {
             brandName={inputs.brandName} loading={insertLoading} result={labelResult}
             onGenerate={handleGenerateInsert} genError={labelError}
             exportLoading={exportLoading} exportError={exportError} onExport={handleExportInsert}
-            accentColor={DS.accent}
+            accentColor={DS.accent} labelFields={labelFields}
           />
           <StepContinueBtn label="Continue to Listing Preparation →" onPress={() => advanceBrandStep(5)} />
         </BrandStepSection>
