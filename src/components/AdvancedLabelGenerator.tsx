@@ -251,25 +251,16 @@ export function AdvancedLabelGenerator({
             disabled={loading}
           />
           {label && (
-            <>
-              <SecondaryButton
-                label="Export as SVG"
-                onPress={() => {
-                  // TODO: Export SVG
-                  Alert.alert('Exported', 'Label SVG ready to download');
-                }}
-              />
-              <SecondaryButton
-                label="Share Label SVG"
-                onPress={async () => {
-                  try {
-                    await Share.share({ message: label.svg, title: 'Product Label — SVG' });
-                  } catch {
-                    Alert.alert('Share failed', 'Could not open share sheet on this device.');
-                  }
-                }}
-              />
-            </>
+            <SecondaryButton
+              label="Share Label SVG"
+              onPress={async () => {
+                try {
+                  await Share.share({ message: label.svg, title: 'Product Label — SVG' });
+                } catch {
+                  Alert.alert('Share failed', 'Could not open share sheet on this device.');
+                }
+              }}
+            />
           )}
         </View>
 
