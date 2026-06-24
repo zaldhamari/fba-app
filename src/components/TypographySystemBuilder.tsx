@@ -5,7 +5,7 @@
  */
 
 import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, Text, TouchableOpacity, Alert } from 'react-native';
+import { View, StyleSheet, ScrollView, Text, TouchableOpacity, Alert, Share } from 'react-native';
 import { DS } from '../theme/ds';
 import { AppCard } from './ds/AppCard';
 import { SectionHeader } from './ds/SectionHeader';
@@ -190,8 +190,21 @@ export function TypographySystemBuilder({
           />
           {typography && (
             <SecondaryButton
-              label="Export as Guide"
-              onPress={() => Alert.alert('Coming Soon', 'Typography guide PDF')}
+              label="Share Typography Guide"
+              onPress={async () => {
+                const lines = [
+                  `Typography System`,
+                  `Heading: ${typography.h1?.font?.name ?? 'n/a'} (${typography.h1?.size}px)`,
+                  `Subheading: ${typography.h2?.font?.name ?? 'n/a'} (${typography.h2?.size}px)`,
+                  `Body: ${typography.body?.font?.name ?? 'n/a'} (${typography.body?.size}px)`,
+                  `Caption: ${typography.caption?.font?.name ?? 'n/a'} (${typography.caption?.size}px)`,
+                ].join('\n');
+                try {
+                  await Share.share({ message: lines, title: 'Typography System' });
+                } catch {
+                  Alert.alert('Share failed', 'Could not open share sheet on this device.');
+                }
+              }}
             />
           )}
         </View>

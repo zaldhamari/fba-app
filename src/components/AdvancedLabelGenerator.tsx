@@ -9,7 +9,7 @@
  */
 
 import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, Text, TouchableOpacity, Alert } from 'react-native';
+import { View, StyleSheet, ScrollView, Text, TouchableOpacity, Alert, Share } from 'react-native';
 import { SvgXml } from 'react-native-svg';
 import { DS } from '../theme/ds';
 import { AppCard } from './ds/AppCard';
@@ -260,10 +260,13 @@ export function AdvancedLabelGenerator({
                 }}
               />
               <SecondaryButton
-                label="Export as PDF (Print)"
-                onPress={() => {
-                  // TODO: Export PDF
-                  Alert.alert('Coming Soon', 'PDF export with print specifications');
+                label="Share Label SVG"
+                onPress={async () => {
+                  try {
+                    await Share.share({ message: label.svg, title: 'Product Label — SVG' });
+                  } catch {
+                    Alert.alert('Share failed', 'Could not open share sheet on this device.');
+                  }
                 }}
               />
             </>

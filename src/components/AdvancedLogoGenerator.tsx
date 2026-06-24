@@ -9,7 +9,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, Text, TouchableOpacity, Alert } from 'react-native';
+import { View, StyleSheet, ScrollView, Text, TouchableOpacity, Alert, Share } from 'react-native';
 import { SvgXml } from 'react-native-svg';
 import { DS } from '../theme/ds';
 import { AppCard } from './ds/AppCard';
@@ -220,10 +220,13 @@ export function AdvancedLogoGenerator({
           />
           {selectedLogo && (
             <SecondaryButton
-              label="Export All SVGs"
-              onPress={() => {
-                // TODO: Implement multi-export
-                Alert.alert('Coming Soon', 'Export all logos as ZIP');
+              label="Share Logo SVG"
+              onPress={async () => {
+                try {
+                  await Share.share({ message: selectedLogo.svg, title: `${selectedLogo.name} — SVG` });
+                } catch {
+                  Alert.alert('Share failed', 'Could not open share sheet on this device.');
+                }
               }}
             />
           )}
