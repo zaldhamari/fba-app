@@ -57,6 +57,13 @@ export function productToDisplay(p: Product): ProductDisplay {
     revenueEstLow:   salesEst?.revenueEstLow,
     revenueEstHigh:  salesEst?.revenueEstHigh,
     source:          p.source,
+    searchVolume:    p.search_volume,
+    rank:            p.rank ?? null,
+    brand:           p.brand ?? null,
+    isBestSeller:    p.is_best_seller ?? false,
+    isAmazonChoice:  p.is_amazon_choice ?? false,
+    boughtPastMonth: p.bought_past_month ?? null,
+    productCategory: p.category ?? null,
   };
 }
 

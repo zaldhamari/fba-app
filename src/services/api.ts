@@ -127,6 +127,12 @@ export interface Product {
   source?: string;
   /** Real monthly Amazon search volume from DataForSEO Labs (present on keyword_estimate results). */
   search_volume?: number;
+  rank?:              number | null;
+  brand?:             string | null;
+  is_best_seller?:    boolean;
+  is_amazon_choice?:  boolean;
+  bought_past_month?: number | null;
+  category?:          string | null;
 }
 
 export interface TrendData {

@@ -37,6 +37,14 @@ export interface ProductDisplay {
   /** 'dataforseo' = real listing data. 'keyword_estimate'/'stub'/undefined = price is a
    *  category-average guess, not from this specific listing. */
   source?:            string;
+  /** Real monthly Amazon search volume from DataForSEO Labs (keyword_estimate results only). */
+  searchVolume?:      number;
+  rank?:              number | null;
+  brand?:             string | null;
+  isBestSeller?:      boolean;
+  isAmazonChoice?:    boolean;
+  boughtPastMonth?:   number | null;
+  productCategory?:   string | null;
 }
 
 export interface SupplierDisplay {

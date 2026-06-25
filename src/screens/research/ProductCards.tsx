@@ -126,6 +126,37 @@ export function ProductMarketCard({
         </View>
       </View>
 
+      {/* ── Amazon signals row (real data only) ─── */}
+      {item.source === 'dataforseo' && (item.brand || item.isBestSeller || item.isAmazonChoice || item.boughtPastMonth != null || item.rank != null) && (
+        <View style={pmc.signalsRow}>
+          {item.brand && (
+            <View style={pmc.signalChip}>
+              <Text style={pmc.signalTxt}>{item.brand}</Text>
+            </View>
+          )}
+          {item.isBestSeller && (
+            <View style={[pmc.signalChip, { backgroundColor: DS.warning + '22', borderColor: DS.warning + '44' }]}>
+              <Text style={[pmc.signalTxt, { color: DS.warningText }]}>Best Seller</Text>
+            </View>
+          )}
+          {item.isAmazonChoice && (
+            <View style={[pmc.signalChip, { backgroundColor: DS.accent + '18', borderColor: DS.accent + '33' }]}>
+              <Text style={[pmc.signalTxt, { color: DS.accent }]}>Amazon's Choice</Text>
+            </View>
+          )}
+          {item.rank != null && (
+            <View style={pmc.signalChip}>
+              <Text style={pmc.signalTxt}>#{item.rank}</Text>
+            </View>
+          )}
+          {item.boughtPastMonth != null && (
+            <View style={[pmc.signalChip, { backgroundColor: DS.success + '14', borderColor: DS.success + '30' }]}>
+              <Text style={[pmc.signalTxt, { color: DS.successText }]}>{item.boughtPastMonth.toLocaleString()}+ bought last month</Text>
+            </View>
+          )}
+        </View>
+      )}
+
       {/* Price isn't from a real listing yet (no Amazon data API configured) — disclose it
           rather than showing a category-average guess as if it were the actual price. */}
       {item.source && item.source !== 'dataforseo' && item.price != null && (
@@ -153,9 +184,15 @@ export function ProductMarketCard({
         <View style={pmc.div} />
         <View style={pmc.stat}>
           <Text style={pmc.statVal}>
-            {item.reviewCount != null ? item.reviewCount.toLocaleString() : '—'}
+            {item.reviewCount != null
+              ? item.reviewCount.toLocaleString()
+              : item.searchVolume != null
+              ? item.searchVolume.toLocaleString()
+              : '—'}
           </Text>
-          <Text style={pmc.statLbl}>Reviews</Text>
+          <Text style={pmc.statLbl}>
+            {item.reviewCount != null ? 'Reviews' : item.searchVolume != null ? 'Searches/mo' : 'Reviews'}
+          </Text>
         </View>
         <View style={pmc.div} />
         <View style={pmc.stat}>
@@ -325,6 +362,9 @@ const pmc = StyleSheet.create({
   statSub:          { fontSize: 9, color: DS.textMuted, marginTop: 1 },
   // Intelligence strip
   intelStrip:       { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  signalsRow:       { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 },
+  signalChip:       { backgroundColor: DS.bgSubtle, borderRadius: DS.radiusChip, borderWidth: 1, borderColor: DS.border, paddingHorizontal: 8, paddingVertical: 3 },
+  signalTxt:        { fontSize: 10, fontWeight: '600', color: DS.textSecondary },
   intelChip:        { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: DS.bgSubtle, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
   intelIcon:        { fontSize: 11 },
   intelTxt:         { fontSize: 10, fontWeight: '600', color: DS.textSecondary },
