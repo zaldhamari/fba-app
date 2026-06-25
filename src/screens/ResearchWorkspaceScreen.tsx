@@ -174,13 +174,16 @@ export default function ResearchWorkspaceScreen() {
       if (m)  { const p = safeParseJSON<string[]>(m);         if (p) setRecentMarket(p); }
       if (l)  { const p = safeParseJSON<string[]>(l);         if (p) setRecentLookup(p); }
       if (kw) { const p = safeParseJSON<unknown[]>(kw);        if (p) setSavedKWs(p as any); }
-      // Restore last review recon result so it survives tab changes
+      // Restore last review recon — only if < 2 hours old so it doesn't feel stale
       if (rev) {
         const parsed = safeParseJSON<{ name: string; cat: string; result: any; savedAt: string }>(rev);
-        if (parsed) {
-          setRevResult(parsed.result);
-          setRevProductName(parsed.name);
-          setRevCategory(parsed.cat);
+        if (parsed?.savedAt) {
+          const ageMs = Date.now() - new Date(parsed.savedAt).getTime();
+          if (ageMs < 2 * 60 * 60 * 1000) {
+            setRevResult(parsed.result);
+            setRevProductName(parsed.name);
+            setRevCategory(parsed.cat);
+          }
         }
       }
     }).catch(() => {});
@@ -884,6 +887,24 @@ export default function ResearchWorkspaceScreen() {
 
         {revResult && (
           <>
+            {/* Product label + clear */}
+            <View style={ri.productBar}>
+              <View style={ri.productBarInner}>
+                <Text style={ri.productBarLabel}>TEARDOWN FOR</Text>
+                <Text style={ri.productBarName} numberOfLines={1}>{revProductName}</Text>
+              </View>
+              <TouchableOpacity
+                style={ri.clearBtn}
+                onPress={() => { setRevResult(null); setDiffResult(null); setRevProductName(''); setRevCategory(''); }}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel="Clear teardown"
+              >
+                <Text style={ri.clearBtnTxt}>Clear ✕</Text>
+              </TouchableOpacity>
+            </View>
+
             {/* Header */}
             <AppCard style={[ri.resultHeader, { borderColor: sentColor + '40' }]}>
               <View style={ri.sentRow}>
@@ -1362,6 +1383,13 @@ const ri = StyleSheet.create({
   listRow:    { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
   dot:        { width: 7, height: 7, borderRadius: 4, marginTop: 6, flexShrink: 0 },
   listTxt:    { fontSize: 13, color: DS.textSecondary, lineHeight: 20, flex: 1 },
+
+  productBar:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: DS.bgElevated, borderRadius: DS.radiusChip, paddingHorizontal: 12, paddingVertical: 8, gap: 8 },
+  productBarInner:   { flex: 1, gap: 1 },
+  productBarLabel:   { fontSize: 8, fontWeight: '800', color: DS.textMuted, letterSpacing: 1.5, textTransform: 'uppercase' },
+  productBarName:    { fontSize: 13, fontWeight: '700', color: DS.textPrimary, letterSpacing: -0.2 },
+  clearBtn:          { backgroundColor: DS.border, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5 },
+  clearBtnTxt:       { fontSize: 11, fontWeight: '700', color: DS.textSecondary },
 
   saveInsightsCard:      { gap: 12, borderWidth: 1.5, borderColor: DS.accent + '50', backgroundColor: DS.accentLight },
   saveInsightsHeader:    { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },

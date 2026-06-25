@@ -24,6 +24,9 @@ import PaywallModal from '../components/PaywallModal';
 import { EstimateLabel } from '../components/EstimateLabel';
 import { DataSourceBanner, type DataSourceType } from '../components/DataSourceBanner';
 import { PipelineProgressBar } from '../components/PipelineProgressBar';
+import { ProductMarketCard } from './research/ProductCards';
+import { productToDisplay } from './research/productHelpers';
+import type { Product } from '../services/api';
 
 const WATCHLIST_KEY = 'siftly_niche_watchlist_v1';
 
@@ -56,6 +59,13 @@ type NicheReport = {
     review_count: number;
     asin: string;
     url: string;
+    image?: string;
+    brand?: string | null;
+    is_best_seller?: boolean;
+    is_amazon_choice?: boolean;
+    bought_past_month?: number | null;
+    category?: string | null;
+    rank?: number | null;
   }[];
   can_you_afford_it: {
     budget: number;
@@ -64,6 +74,21 @@ type NicheReport = {
     can_afford: boolean;
     verdict: string;
   };
+  top_products?: {
+    title: string;
+    price: number;
+    rating: number;
+    review_count: number;
+    asin: string;
+    url: string;
+    image?: string;
+    brand?: string | null;
+    is_best_seller?: boolean;
+    is_amazon_choice?: boolean;
+    bought_past_month?: number | null;
+    category?: string | null;
+    rank?: number | null;
+  }[];
   data_source?: string;
 };
 
@@ -329,6 +354,11 @@ export default function NicheResearchScreen({ embedded = false, focusTrigger = 0
         {/* Report */}
         {report && !loading && (
           <>
+            {/* Clear / new search */}
+            <TouchableOpacity style={s.clearRow} onPress={() => { setReport(null); setError(''); }} activeOpacity={0.7}>
+              <Text style={s.clearTxt}>← New Search</Text>
+            </TouchableOpacity>
+
             {/* Verdict */}
             <View style={[s.verdictCard, { borderColor: vc + '40', backgroundColor: vc + '08' }]}>
               <View style={s.verdictTop}>
@@ -441,27 +471,68 @@ export default function NicheResearchScreen({ embedded = false, focusTrigger = 0
               </View>
             )}
 
-            {/* Products to model */}
+            {/* What's selling — always show top_products */}
+            {(report.top_products?.length ?? 0) > 0 && (
+              <View style={{ gap: 0 }}>
+                <View style={[s.card, { marginBottom: 0, borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }]}>
+                  <Text style={s.cardTitle}>What's Selling in This Niche</Text>
+                  <Text style={s.cardSub}>Top {report.top_products!.length} products from Amazon right now</Text>
+                </View>
+                {report.top_products!.map((p, i) => {
+                  const comp: Product['competition'] = (p.review_count ?? 0) < 100 ? 'Low' : (p.review_count ?? 0) < 300 ? 'Medium' : 'High';
+                  const display = productToDisplay({
+                    asin:             p.asin,
+                    title:            p.title,
+                    price:            p.price,
+                    rating:           p.rating,
+                    review_count:     p.review_count,
+                    image:            p.image ?? '',
+                    url:              p.url,
+                    competition:      comp,
+                    opportunity:      comp === 'Low' ? 'Good' : comp === 'High' ? 'Saturated' : 'Moderate',
+                    source:           'dataforseo',
+                    brand:            p.brand ?? null,
+                    is_best_seller:   p.is_best_seller ?? false,
+                    is_amazon_choice: p.is_amazon_choice ?? false,
+                    bought_past_month: p.bought_past_month ?? null,
+                    category:         p.category ?? null,
+                    rank:             p.rank ?? null,
+                  });
+                  return <ProductMarketCard key={p.asin || i} item={display} />;
+                })}
+              </View>
+            )}
+
+            {/* Products to model — filtered low-comp subset */}
             {report.products_to_model?.length > 0 && (
-              <View style={s.card}>
-                <Text style={s.cardTitle}>Products to Model</Text>
-                <Text style={s.cardSub}>Low-competition listings in your price range</Text>
-                <FeatureExplainer text="Existing products to study and beat — not copy. Benchmark their price, reviews, and buyer complaints to design a better version." />
-                {report.products_to_model.map((p, i) => (
-                  <View key={i} style={s.modelProduct}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={s.modelTitle} numberOfLines={2}>{p.title}</Text>
-                      <View style={s.modelMeta}>
-                        <Text style={s.modelMetaTxt}>${p.price}</Text>
-                        <Text style={s.modelMetaTxt}>{p.rating}★</Text>
-                        <Text style={s.modelMetaTxt}>{p.review_count?.toLocaleString()} reviews</Text>
-                      </View>
-                    </View>
-                    <View style={s.modelRank}>
-                      <Text style={s.modelRankTxt}>#{i + 1}</Text>
-                    </View>
-                  </View>
-                ))}
+              <View style={{ gap: 0 }}>
+                <View style={[s.card, { marginBottom: 0, borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }]}>
+                  <Text style={s.cardTitle}>Products to Model</Text>
+                  <Text style={s.cardSub}>Low-competition listings in your price range</Text>
+                  <FeatureExplainer text="Existing products to study and beat — not copy. Benchmark their price, reviews, and buyer complaints to design a better version." />
+                </View>
+                {report.products_to_model.map((p, i) => {
+                  const comp: Product['competition'] = (p.review_count ?? 0) < 100 ? 'Low' : (p.review_count ?? 0) < 300 ? 'Medium' : 'High';
+                  const display = productToDisplay({
+                    asin:             p.asin,
+                    title:            p.title,
+                    price:            p.price,
+                    rating:           p.rating,
+                    review_count:     p.review_count,
+                    image:            p.image ?? '',
+                    url:              p.url,
+                    competition:      comp,
+                    opportunity:      comp === 'Low' ? 'Good' : comp === 'High' ? 'Saturated' : 'Moderate',
+                    source:           'dataforseo',
+                    brand:            p.brand ?? null,
+                    is_best_seller:   p.is_best_seller ?? false,
+                    is_amazon_choice: p.is_amazon_choice ?? false,
+                    bought_past_month: p.bought_past_month ?? null,
+                    category:         p.category ?? null,
+                    rank:             p.rank ?? null,
+                  });
+                  return <ProductMarketCard key={p.asin || i} item={display} />;
+                })}
               </View>
             )}
           </>
@@ -694,19 +765,8 @@ const s = StyleSheet.create({
   affordVerdict:    { borderRadius: DS.radiusButton, padding: 12, alignItems: 'center' },
   affordVerdictTxt: { fontSize: 13, fontWeight: '800' },
 
-  modelProduct: {
-    flexDirection:   'row',
-    alignItems:      'center',
-    gap:             12,
-    paddingVertical: 10,
-    borderTopWidth:  1,
-    borderTopColor:  DS.border,
-  },
-  modelTitle:   { fontSize: 13, color: DS.textPrimary, fontWeight: '600', lineHeight: 18 },
-  modelMeta:    { flexDirection: 'row', gap: 10, marginTop: 4 },
-  modelMetaTxt: { fontSize: 11, color: DS.textMuted },
-  modelRank:    { width: 28, height: 28, borderRadius: 14, backgroundColor: DS.bgElevated, alignItems: 'center', justifyContent: 'center' },
-  modelRankTxt: { fontSize: 10, fontWeight: '800', color: DS.textSecondary },
+  clearRow: { alignSelf: 'flex-start', paddingVertical: 4 },
+  clearTxt: { fontSize: 13, fontWeight: '700', color: DS.accent },
 
   watchlistSection: { gap: DS.cardGap },
   sectionHeader:    { flexDirection: 'row', alignItems: 'center', gap: 8 },

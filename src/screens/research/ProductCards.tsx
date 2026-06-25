@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, Modal, ScrollView, StyleSheet, TouchableOpacity,
 } from 'react-native';
@@ -406,16 +406,25 @@ export function CompareProductsModal({
   onClose:       () => void;
   onSaveWinner?: (item: ProductDisplay) => void;
 }) {
-  const { fmt } = useCurrency();
-  const scores  = items.length > 0 ? items.map(scoreProductForCompare) : [];
-  const autoIdx = scores.length > 0 ? scores.indexOf(Math.max(...scores)) : 0;
+  const { fmt }   = useCurrency();
+  const scrollRef = useRef<ScrollView>(null);
+  const scores    = items.length > 0 ? items.map(scoreProductForCompare) : [];
+  const autoIdx   = scores.length > 0 ? scores.indexOf(Math.max(...scores)) : 0;
   const [selectedIdx, setSelectedIdx] = useState(autoIdx);
 
-  // Keep selectedIdx in bounds if items change while modal is open
-  const safeIdx = Math.min(selectedIdx, Math.max(0, items.length - 1));
+  // Reset to AI pick each time modal opens
+  useEffect(() => {
+    if (visible) { setSelectedIdx(autoIdx); scrollRef.current?.scrollTo({ y: 0, animated: false }); }
+  }, [visible]);
+
+  // Scroll to top when selection changes so verdict is visible
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ y: 0, animated: true });
+  }, [selectedIdx]);
 
   if (items.length === 0) return null;
 
+  const safeIdx = Math.min(selectedIdx, Math.max(0, items.length - 1));
   const winner  = items[safeIdx];
   const second  = [...scores].sort((a, b) => b - a)[1] ?? 0;
   const rawConf = scores[safeIdx] > 0 ? ((scores[safeIdx] - second) / scores[safeIdx]) * 100 : 50;
@@ -424,6 +433,8 @@ export function CompareProductsModal({
   const vLabel  = winner.badge === 'Promising' ? 'PROCEED' : winner.badge === 'Saturated' ? 'SKIP' : 'EXPLORE';
   const vColor  = winner.badge === 'Promising' ? DS.successText : winner.badge === 'Saturated' ? DS.dangerText : DS.warningText;
   const vBg     = winner.badge === 'Promising' ? DS.successBg   : winner.badge === 'Saturated' ? DS.dangerBg  : DS.warningBg;
+  const compColor = winner.competition === 'Low' ? DS.successText : winner.competition === 'High' ? DS.dangerText : DS.warningText;
+  const compBg    = winner.competition === 'Low' ? DS.successBg   : winner.competition === 'High' ? DS.dangerBg  : DS.warningBg;
 
   const priceHL   = numHL(items.map(p => p.price), false);
   const ratingHL  = numHL(items.map(p => p.rating), true);
@@ -457,28 +468,57 @@ export function CompareProductsModal({
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <SafeAreaView style={am.sheet}>
         <View style={am.toolbar}>
-          <Text style={am.title}>Product Comparison</Text>
+          <Text style={am.title}>Compare Products</Text>
           <TouchableOpacity style={am.closeBtn} onPress={onClose} activeOpacity={0.7}>
             <Text style={am.closeTxt}>Done</Text>
           </TouchableOpacity>
         </View>
 
-        <ScrollView contentContainerStyle={prm.scroll} showsVerticalScrollIndicator={false}>
+        <ScrollView ref={scrollRef} contentContainerStyle={prm.scroll} showsVerticalScrollIndicator={false}>
 
-          {/* ── Hero ─────────────────────────────────────────────── */}
-          <View style={prm.hero}>
-            <View style={prm.heroBall1} />
-            <View style={prm.heroBall2} />
-            <Text style={prm.heroEye}>AI COMPARISON ENGINE</Text>
-            <Text style={prm.heroH}>Product Comparison</Text>
-            <Text style={prm.heroSub}>Side-by-side analysis of your selected opportunities</Text>
-            <View style={prm.heroChip}>
-              <Text style={prm.heroChipTxt}>{items.length} Products Selected</Text>
+          {/* ── Product selector — NOT in a ScrollView so taps always register ── */}
+          <AppCard padding={14} radius={18}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+              <Text style={prm.secEye}>SELECT A PRODUCT</Text>
+              <Text style={prm.tapHint}>Tap to update verdict</Text>
             </View>
-          </View>
+            <View style={prm.colRow}>
+              {items.map((p, i) => {
+                const isSel  = i === safeIdx;
+                const isAuto = i === autoIdx;
+                const bLabel = p.badge === 'Promising' ? 'PROCEED' : p.badge === 'Saturated' ? 'SKIP' : 'EXPLORE';
+                const bColor = p.badge === 'Promising' ? DS.successText : p.badge === 'Saturated' ? DS.dangerText : DS.warningText;
+                const bBg    = p.badge === 'Promising' ? DS.successBg   : p.badge === 'Saturated' ? DS.dangerBg  : DS.warningBg;
+                return (
+                  <TouchableOpacity
+                    key={p.id ?? i}
+                    style={[prm.colCard, { flex: 1 }, isSel && prm.colCardWin]}
+                    onPress={() => setSelectedIdx(i)}
+                    activeOpacity={0.72}
+                  >
+                    {p.image ? (
+                      <Image source={{ uri: p.image }} style={prm.colImg} contentFit="contain" transition={150} />
+                    ) : (
+                      <View style={prm.colImgFallback}><Text style={prm.colImgIcon}>◎</Text></View>
+                    )}
+                    <Text style={prm.colTitle} numberOfLines={2}>{p.name}</Text>
+                    <View style={prm.colFooter}>
+                      <View style={[prm.colBadge, { backgroundColor: bBg }]}>
+                        <Text style={[prm.colBadgeTxt, { color: bColor }]}>{bLabel}</Text>
+                      </View>
+                      {isSel  && <Text style={prm.winTag}>SELECTED</Text>}
+                      {!isSel && isAuto && <Text style={prm.aiTag}>AI PICK</Text>}
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </AppCard>
 
-          {/* ── AI Recommendation ─────────────────────────────────── */}
+          {/* ── Full Verdict card ─────────────────────────────────── */}
           <View style={prm.recCard}>
+
+            {/* Header */}
             <View style={prm.recTopRow}>
               <View style={prm.crownWrap}>
                 <Text style={prm.crownIcon}>{safeIdx === autoIdx ? '🏆' : '✦'}</Text>
@@ -492,71 +532,131 @@ export function CompareProductsModal({
               </View>
             </View>
 
+            {/* Product image */}
+            {winner.image ? (
+              <Image source={{ uri: winner.image }} style={prm.winnerImg} contentFit="contain" transition={150} />
+            ) : null}
+
+            {/* Stats grid */}
+            <View style={prm.winnerStats}>
+              {([
+                { label: 'Price',   val: winner.price != null ? fmt(winner.price) : '—',                                   hl: priceHL[safeIdx]   },
+                { label: 'Rating',  val: winner.rating != null ? `${winner.rating.toFixed(1)} ★` : '—',                    hl: ratingHL[safeIdx]  },
+                { label: 'Reviews', val: winner.reviewCount != null ? winner.reviewCount.toLocaleString() : '—',            hl: reviewHL[safeIdx]  },
+                { label: 'Revenue', val: winner.revenueUSD != null ? `${fmt(winner.revenueUSD, 0)}/mo` : '—',               hl: revenueHL[safeIdx] },
+              ] as { label: string; val: string; hl: HL }[]).map(({ label, val, hl }) => (
+                <View key={label} style={[prm.wStat, { backgroundColor: hlBg(hl) }]}>
+                  <Text style={[prm.wStatVal, { color: hlTxt(hl) }]}>{val}</Text>
+                  <Text style={prm.wStatLbl}>{label}</Text>
+                </View>
+              ))}
+            </View>
+
+            {/* Badges */}
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+              <View style={[prm.detailBadge, { backgroundColor: compBg }]}>
+                <Text style={[prm.detailBadgeTxt, { color: compColor }]}>{winner.competition} Competition</Text>
+              </View>
+              <View style={[prm.detailBadge, { backgroundColor: vBg }]}>
+                <Text style={[prm.detailBadgeTxt, { color: vColor }]}>{winner.badge ?? 'Moderate'} Opportunity</Text>
+              </View>
+              {winner.isBestSeller && (
+                <View style={[prm.detailBadge, { backgroundColor: DS.warning + '22' }]}>
+                  <Text style={[prm.detailBadgeTxt, { color: DS.warningText }]}>Best Seller</Text>
+                </View>
+              )}
+              {winner.isAmazonChoice && (
+                <View style={[prm.detailBadge, { backgroundColor: DS.accent + '18' }]}>
+                  <Text style={[prm.detailBadgeTxt, { color: DS.accent }]}>Amazon's Choice</Text>
+                </View>
+              )}
+              {winner.rank != null && (
+                <View style={prm.detailBadge}>
+                  <Text style={prm.detailBadgeTxt}>Rank #{winner.rank}</Text>
+                </View>
+              )}
+            </View>
+
+            {/* Extra signals */}
+            {winner.revenueEstLow != null && winner.revenueEstHigh != null && (
+              <View style={prm.infoRow}>
+                <Text style={prm.infoIcon}>💰</Text>
+                <Text style={prm.infoTxt}>~${winner.revenueEstLow.toLocaleString()}–${winner.revenueEstHigh.toLocaleString()}/mo estimated revenue range</Text>
+              </View>
+            )}
+            {winner.boughtPastMonth != null && (
+              <View style={prm.infoRow}>
+                <Text style={prm.infoIcon}>🛒</Text>
+                <Text style={prm.infoTxt}>{winner.boughtPastMonth.toLocaleString()}+ units sold last month</Text>
+              </View>
+            )}
+            {winner.ppcPressure && (
+              <View style={prm.infoRow}>
+                <Text style={prm.infoIcon}>📣</Text>
+                <Text style={prm.infoTxt}>{winner.ppcPressure} PPC pressure — {winner.ppcPressure === 'High' ? 'budget 15–20% of revenue for ads' : winner.ppcPressure === 'Medium' ? 'moderate ad spend required' : 'low cost to rank'}</Text>
+              </View>
+            )}
+            {winner.salesConfidence && (
+              <View style={prm.infoRow}>
+                <Text style={prm.infoIcon}>◎</Text>
+                <Text style={prm.infoTxt}>{winner.salesConfidence} sales confidence — {winner.salesConfidence === 'Low' ? 'validate demand before ordering' : 'decent demand with moderate uncertainty'}</Text>
+              </View>
+            )}
+
+            {/* Confidence bar */}
             <View style={prm.confWrap}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text style={prm.confLbl}>Recommendation confidence</Text>
+                <Text style={prm.confPct}>{conf}%</Text>
+              </View>
               <View style={prm.confBg}>
                 <View style={[prm.confFill, { width: `${conf}%` as any }]} />
               </View>
-              <Text style={prm.confTxt}>{conf}% confidence</Text>
             </View>
 
-            {reasons.map((r, i) => (
-              <View key={i} style={prm.reason}>
-                <Text style={prm.reasonDot}>✦</Text>
-                <Text style={prm.reasonTxt}>{r}</Text>
-              </View>
-            ))}
+            {/* Why this wins */}
+            <View style={{ gap: 6 }}>
+              <Text style={prm.recEye}>WHY THIS WINS</Text>
+              {reasons.map((r, i) => (
+                <View key={i} style={prm.reason}>
+                  <Text style={prm.reasonDot}>✦</Text>
+                  <Text style={prm.reasonTxt}>{r}</Text>
+                </View>
+              ))}
+            </View>
 
-            {onSaveWinner && (
-              <TouchableOpacity style={prm.saveWinBtn} onPress={() => onSaveWinner(winner)} activeOpacity={0.8}>
-                <Text style={prm.saveWinTxt}>✦  Save to Vault</Text>
-              </TouchableOpacity>
+            {/* Risk factors */}
+            {(winner.competition === 'High' || (winner.reviewCount ?? 0) > 500 || winner.badge === 'Saturated') && (
+              <View style={prm.riskBox}>
+                <Text style={prm.riskTitle}>⚠ Risk Factors</Text>
+                {winner.competition === 'High' && (
+                  <Text style={prm.riskTxt}>• High competition — ranking requires significant PPC investment</Text>
+                )}
+                {(winner.reviewCount ?? 0) > 500 && (
+                  <Text style={prm.riskTxt}>• Established review moat ({(winner.reviewCount ?? 0).toLocaleString()} reviews) — new listings will need time and ads to compete</Text>
+                )}
+                {winner.badge === 'Saturated' && (
+                  <Text style={prm.riskTxt}>• Market saturation signals — strong differentiation is critical to survive</Text>
+                )}
+              </View>
             )}
+
+            {/* CTAs */}
+            <View style={{ gap: 8, marginTop: 4 }}>
+              {onSaveWinner && (
+                <TouchableOpacity style={prm.saveWinBtn} onPress={() => onSaveWinner(winner)} activeOpacity={0.8}>
+                  <Text style={prm.saveWinTxt}>✦  Save to Vault</Text>
+                </TouchableOpacity>
+              )}
+              {!!winner.url && (
+                <TouchableOpacity style={prm.viewAmazonBtn} onPress={() => openURL(winner.url)} activeOpacity={0.85}>
+                  <Text style={prm.viewAmazonTxt}>↗ View on Amazon</Text>
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
 
-          {/* ── Column headers ────────────────────────────────────── */}
-          <AppCard padding={14} radius={18}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Text style={prm.secEye}>PRODUCTS COMPARED</Text>
-              <Text style={prm.tapHint}>Tap to select</Text>
-            </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 10 }}>
-              <View style={{ flexDirection: 'row', gap: 8 }}>
-                {items.map((p, i) => {
-                  const isSel  = i === safeIdx;
-                  const isAuto = i === autoIdx;
-                  const bLabel = p.badge === 'Promising' ? 'PROCEED' : p.badge === 'Saturated' ? 'SKIP' : 'EXPLORE';
-                  const bColor = p.badge === 'Promising' ? DS.successText : p.badge === 'Saturated' ? DS.dangerText : DS.warningText;
-                  const bBg    = p.badge === 'Promising' ? DS.successBg   : p.badge === 'Saturated' ? DS.dangerBg  : DS.warningBg;
-                  return (
-                    <TouchableOpacity
-                      key={p.id}
-                      style={[prm.colCard, isSel && prm.colCardWin]}
-                      onPress={() => setSelectedIdx(i)}
-                      activeOpacity={0.75}
-                    >
-                      {p.image ? (
-                        <Image source={{ uri: p.image }} style={prm.colImg} contentFit="contain" transition={150} accessibilityRole="image" accessibilityLabel={`Product photo: ${p.name}`} />
-                      ) : (
-                        <View style={prm.colImgFallback}>
-                          <Text style={prm.colImgIcon}>◎</Text>
-                        </View>
-                      )}
-                      <Text style={prm.colTitle} numberOfLines={2}>{p.name}</Text>
-                      <View style={prm.colFooter}>
-                        <View style={[prm.colBadge, { backgroundColor: bBg }]}>
-                          <Text style={[prm.colBadgeTxt, { color: bColor }]}>{bLabel}</Text>
-                        </View>
-                        {isSel  && <Text style={prm.winTag}>SELECTED</Text>}
-                        {!isSel && isAuto && <Text style={prm.aiTag}>AI PICK</Text>}
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </ScrollView>
-          </AppCard>
-
-          {/* ── Metric sections ───────────────────────────────────── */}
+          {/* ── Side-by-side metric table ─────────────────────────── */}
           {sections.map(sec => (
             <AppCard key={sec.title} padding={14} radius={18} style={{ gap: 0 }}>
               <Text style={prm.secEye}>{sec.title}</Text>
@@ -568,10 +668,7 @@ export function CompareProductsModal({
                         <Text style={prm.mLabelTxt}>{row.label}</Text>
                       </View>
                       {row.vals.map((v, vi) => (
-                        <View
-                          key={vi}
-                          style={[prm.mCell, { width: CMP_CELL_W, backgroundColor: hlBg(row.hls[vi]) }]}
-                        >
+                        <View key={vi} style={[prm.mCell, { width: CMP_CELL_W, backgroundColor: hlBg(row.hls[vi]) }]}>
                           <Text style={[prm.mCellTxt, { color: hlTxt(row.hls[vi]) }]} numberOfLines={1}>{v}</Text>
                           {row.hls[vi] === 'best' && <Text style={prm.trophy}>🏆</Text>}
                         </View>
@@ -591,7 +688,7 @@ export function CompareProductsModal({
                 onPress={() => { onSaveWinner(winner); onClose(); }}
                 activeOpacity={0.85}
               >
-                <Text style={prm.actionPrimaryTxt}>✦  Save Winner</Text>
+                <Text style={prm.actionPrimaryTxt}>✦  Save Winner to Vault</Text>
               </TouchableOpacity>
             )}
             <TouchableOpacity style={prm.actionGhost} onPress={onClose} activeOpacity={0.8}>
@@ -661,8 +758,28 @@ export const prm = StyleSheet.create({
   platformPill: { backgroundColor: DS.accentLight, borderRadius: DS.radiusBadge, paddingHorizontal: 10, paddingVertical: 4, alignSelf: 'flex-start' },
   platformTxt:  { fontSize: 11, fontWeight: '700', color: DS.accentDark },
 
+  // Winner product image
+  winnerImg: { width: '100%', height: 130, borderRadius: 12, backgroundColor: DS.bgSubtle },
+
+  // Winner stats grid
+  winnerStats:  { flexDirection: 'row', gap: 6 },
+  wStat:        { flex: 1, alignItems: 'center', gap: 3, backgroundColor: DS.bgSubtle, borderRadius: 10, paddingVertical: 10, paddingHorizontal: 4 },
+  wStatVal:     { fontSize: 13, fontWeight: '900', color: DS.textPrimary, letterSpacing: -0.2 },
+  wStatLbl:     { fontSize: 9, color: DS.textMuted, textTransform: 'uppercase' as const, letterSpacing: 0.4, textAlign: 'center' as const },
+
+  // Detail badges (competition, opportunity, signals)
+  detailBadge:    { backgroundColor: DS.bgSubtle, borderRadius: DS.radiusBadge, paddingHorizontal: 10, paddingVertical: 4 },
+  detailBadgeTxt: { fontSize: 10, fontWeight: '700', color: DS.textSecondary },
+
+  // Info rows (revenue range, boughtPastMonth, ppcPressure)
+  infoRow:  { flexDirection: 'row', gap: 8, alignItems: 'flex-start' },
+  infoIcon: { fontSize: 12, marginTop: 1 },
+  infoTxt:  { flex: 1, fontSize: 12, color: DS.textSecondary, lineHeight: 17 },
+
   // Confidence bar
   confWrap: { gap: 5 },
+  confLbl:  { fontSize: 10, fontWeight: '600', color: DS.textMuted },
+  confPct:  { fontSize: 12, fontWeight: '800', color: DS.accent },
   confBg:   { height: 6, backgroundColor: DS.bgElevated, borderRadius: 3, overflow: 'hidden' },
   confFill: { height: 6, backgroundColor: DS.accent, borderRadius: 3 },
   confTxt:  { fontSize: 11, fontWeight: '600', color: DS.textMuted },
@@ -672,19 +789,30 @@ export const prm = StyleSheet.create({
   reasonDot: { fontSize: 10, color: DS.accent, marginTop: 3 },
   reasonTxt: { flex: 1, fontSize: 13, color: DS.textSecondary, lineHeight: 19 },
 
+  // Risk box
+  riskBox:   { backgroundColor: DS.warning + '10', borderRadius: 10, borderWidth: 1, borderColor: DS.warning + '30', padding: 12, gap: 5 },
+  riskTitle: { fontSize: 11, fontWeight: '800', color: DS.warning },
+  riskTxt:   { fontSize: 11, color: DS.textSecondary, lineHeight: 16 },
+
   // Save winner CTA
   saveWinBtn: {
     backgroundColor: DS.accent, borderRadius: DS.radiusButton,
-    paddingVertical: 11, alignItems: 'center', marginTop: 4,
+    paddingVertical: 11, alignItems: 'center',
   },
   saveWinTxt: { fontSize: 13, fontWeight: '800', color: '#fff', letterSpacing: -0.2 },
+
+  // View on Amazon secondary button
+  viewAmazonBtn: { backgroundColor: '#FF9900', borderRadius: DS.radiusButton, paddingVertical: 10, alignItems: 'center' as const },
+  viewAmazonTxt: { fontSize: 13, fontWeight: '800', color: '#fff', letterSpacing: -0.2 },
 
   // Section eyebrow
   secEye: { fontSize: 9, fontWeight: '800', color: DS.textMuted, letterSpacing: 2, textTransform: 'uppercase' },
 
+  // Column selector row — no horizontal scroll, cards flex side-by-side
+  colRow: { flexDirection: 'row', gap: 8 },
+
   // Column header cards
   colCard: {
-    width: CMP_CELL_W + 16,
     backgroundColor: DS.bgSubtle, borderRadius: 14,
     borderWidth: 1, borderColor: DS.border, padding: 10, gap: 6,
   },

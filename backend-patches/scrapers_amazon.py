@@ -12,15 +12,22 @@ keyword-derived price/competition guesses below. Every result is tagged with
 a "source" field ("dataforseo" = real, "keyword_estimate" = guessed price
 from a hardcoded category table) so the frontend can show this honestly
 instead of presenting guessed prices as real listings.
+
+When DataForSEO SERP API is unavailable (e.g. not enabled on the account),
+keyword_estimate results are still enriched with real monthly search volumes
+from the DataForSEO Labs bulk_search_volume endpoint (which IS accessible).
+This means the "search demand" claim on keyword_estimate banners is accurate.
 """
 import asyncio
 import hashlib
-import re
+import logging
 from typing import Optional
 import httpx
 
 from backend.scrapers.keywords import to_query_string, to_keywords
 from backend.scrapers import dataforseo
+
+log = logging.getLogger("siftly")
 
 AMAZON_SUGGEST = "https://completion.amazon.com/api/2017/suggestions"
 
@@ -112,24 +119,82 @@ async def _fetch_suggestions(prefix: str, client: httpx.AsyncClient) -> list[str
         return []
 
 
+async def _enrich_with_search_volumes(products: list[dict]) -> list[dict]:
+    """
+    Annotate keyword_estimate results with real monthly Amazon search volumes
+    from DataForSEO Labs bulk_search_volume endpoint.
+
+    Cost: ~$0.0001 per keyword. Only called when DataForSEO credentials are set.
+    Falls back silently if the API call fails — search_volume field is simply absent.
+    """
+    if not dataforseo._is_configured():
+        return products
+    if not dataforseo.budget_ok(estimated_cost=0.01 + len(products) * 0.0001):
+        return products
+
+    keywords = [p["title"] for p in products]
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.post(
+                "https://api.dataforseo.com/v3/dataforseo_labs/amazon/bulk_search_volume/live",
+                headers={
+                    "Authorization": dataforseo._auth_header(),
+                    "Content-Type": "application/json",
+                },
+                json=[{
+                    "keywords": keywords,
+                    "location_code": 2840,
+                    "language_code": "en",
+                }],
+            )
+            data = resp.json()
+            task = data.get("tasks", [{}])[0]
+            dataforseo.record_spend(task.get("cost", 0))
+            items = (
+                task
+                .get("result", [{}])[0]
+                .get("items", [])
+            )
+            vol_map: dict[str, Optional[int]] = {
+                item["keyword"]: item.get("keyword_info", {}).get("search_volume")
+                for item in items
+                if "keyword" in item
+            }
+            enriched = 0
+            for p in products:
+                title = p["title"]
+                sv = vol_map.get(title.lower()) or vol_map.get(title)
+                if sv is not None:
+                    p["search_volume"] = sv
+                    enriched += 1
+            log.info("Labs search volumes: enriched %d/%d keyword_estimate results", enriched, len(products))
+    except Exception as exc:
+        log.warning("DataForSEO Labs bulk_search_volume failed: %s", exc)
+
+    return products
+
+
 async def search_amazon(keyword: str, category: str = "all") -> list[dict]:
     """
     Returns Amazon product results.
 
     Uses real DataForSEO listing data when DATAFORSEO_LOGIN/PASSWORD are
-    configured. Otherwise falls back to keyword-autocomplete-derived
-    opportunities — real search-demand signal, but price/competition per
-    result is an estimate from a hardcoded category table, not the actual
-    product. Every result carries a "source" field so callers can tell
-    which path produced it.
+    configured AND the SERP Amazon API is accessible. Otherwise falls back to
+    keyword-autocomplete-derived opportunities — real search-demand signal, but
+    price/competition per result is an estimate from a hardcoded category table,
+    not the actual product. Every result carries a "source" field so callers
+    can tell which path produced it.
+
+    keyword_estimate results are enriched with real monthly search volumes from
+    the DataForSEO Labs API (separate endpoint, always accessible with valid creds).
     """
     if dataforseo._is_configured():
         try:
             real = await dataforseo.search_amazon_products(keyword, marketplace="US", max_results=15)
             if real:
                 return real
-        except Exception:
-            pass  # fall through to the estimate-based path below
+        except Exception as exc:
+            log.warning("DataForSEO SERP Amazon failed (%s) — falling back to keyword estimates", exc)
 
     base = " ".join(to_keywords(keyword)[:3])
     alphabet = "abcdefghijklmnopqrstuvwxyz"
@@ -170,5 +235,8 @@ async def search_amazon(keyword: str, category: str = "all") -> list[dict]:
             "url": f"https://www.amazon.com/s?k={kw.replace(' ', '+')}",
             "source": "keyword_estimate",
         })
+
+    # Enrich with real monthly search volumes from DataForSEO Labs
+    products = await _enrich_with_search_volumes(products)
 
     return products

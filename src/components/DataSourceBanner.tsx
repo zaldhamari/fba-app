@@ -30,10 +30,10 @@ const CONFIG: Record<DataSourceType, { bg?: string; text: string; label: string;
     action: undefined,
   },
   keyword_estimate: {
-    bg: DS.warningBg,
-    text: DS.warning,
-    label: '~ Placeholder data — prices and details are estimates',
-    action: 'Get real data',
+    bg: DS.bgElevated,
+    text: DS.textMuted,
+    label: '~ Estimated prices · real Amazon search demand',
+    action: undefined,
   },
   confirmed: {
     bg: undefined,
@@ -48,17 +48,23 @@ export function DataSourceBanner({ source, context, onActionPress }: DataSourceB
   const cfg = CONFIG[source];
   if (!cfg) return null;
 
-  const isStub = source === 'stub' || source === 'keyword_estimate';
+  const isStub = source === 'stub';
   const backgroundColor = cfg.bg || (isStub ? DS.warning + '15' : DS.bgElevated);
 
   let description = '';
-  if (source === 'stub' || source === 'keyword_estimate') {
+  if (source === 'stub') {
     if (context === 'niche') {
-      description = 'All prices, competition levels, and review counts below are simulated estimates. Connect to DataForSEO for live Amazon data.';
+      description = 'All prices, competition levels, and review counts below are simulated. Connect to DataForSEO for live Amazon data.';
     } else if (context === 'suppliers') {
-      description = 'All supplier prices, MOQs, and ratings below are simulated estimates. Connect to Alibaba API for real supplier data.';
+      description = 'All supplier prices, MOQs, and ratings below are simulated. Connect to Alibaba API for real supplier data.';
     } else if (context === 'products') {
-      description = 'These product results are simulated estimates. Real Amazon product data requires live API access.';
+      description = 'These product results are fully simulated. Real Amazon product data requires live API access.';
+    }
+  } else if (source === 'keyword_estimate') {
+    if (context === 'niche') {
+      description = 'Market scoring is based on real Amazon search demand. Prices and review counts are category-level estimates.';
+    } else if (context === 'products') {
+      description = 'Results ranked by real Amazon search demand. Prices and competition levels are category estimates, not live listings.';
     }
   }
 
