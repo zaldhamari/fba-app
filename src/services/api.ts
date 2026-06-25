@@ -208,7 +208,7 @@ export const api = {
     post<{ asin: string; title: string | null; category: string | null; url: string; source: string; error?: string }>('/research/product', { input }),
 
   searchAmazon: async (keyword: string, marketplace = 'US', category = 'all') => {
-    const data = await post<{ products: Product[]; trends: TrendData; keyword: string }>('/research/amazon', { keyword, category, marketplace });
+    const data = await post<{ products: Product[]; trends: TrendData; keyword: string }>('/research/amazon', { keyword, category, marketplace }, SLOW_ENDPOINT_TIMEOUT_MS);
     validateSearchAmazon(data);
     return data;
   },
