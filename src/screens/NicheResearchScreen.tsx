@@ -359,11 +359,13 @@ export default function NicheResearchScreen({ embedded = false, focusTrigger = 0
               <Text style={s.clearTxt}>← New Search</Text>
             </TouchableOpacity>
 
-            {/* Verdict */}
+            {/* ── Verdict card — full market intelligence ── */}
             <View style={[s.verdictCard, { borderColor: vc + '40', backgroundColor: vc + '08' }]}>
+
+              {/* Header */}
               <View style={s.verdictTop}>
-                <View style={{ gap: 4 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <View style={{ gap: 4, flex: 1 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                     <Text style={s.verdictKeyword}>{report.keyword}</Text>
                     <EstimateLabel type={report.data_source && report.data_source !== 'stub' && report.data_source !== 'keyword_estimate' ? 'confirmed' : 'estimated'} />
                   </View>
@@ -372,6 +374,71 @@ export default function NicheResearchScreen({ embedded = false, focusTrigger = 0
                 <ScoreDot score={report.verdict.score} />
               </View>
 
+              {/* Entry difficulty bar */}
+              <View style={s.diffBar}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={s.diffLbl}>Market Entry Difficulty</Text>
+                  <Text style={[s.diffScore, { color: vc }]}>{report.verdict.score}/5</Text>
+                </View>
+                <View style={s.diffTrack}>
+                  <View style={[s.diffFill, { width: `${(report.verdict.score / 5) * 100}%` as any, backgroundColor: vc }]} />
+                </View>
+              </View>
+
+              {/* Key market stats inline */}
+              {report.market_snapshot && (
+                <View style={s.vStatsRow}>
+                  <View style={s.vStat}>
+                    <Text style={s.vStatVal}>${report.market_snapshot.avg_price}</Text>
+                    <Text style={s.vStatLbl}>Avg Price</Text>
+                  </View>
+                  <View style={s.vStatDiv} />
+                  <View style={s.vStat}>
+                    <Text style={s.vStatVal}>{report.market_snapshot.avg_reviews?.toLocaleString() ?? '—'}</Text>
+                    <Text style={s.vStatLbl}>Avg Reviews</Text>
+                  </View>
+                  <View style={s.vStatDiv} />
+                  <View style={s.vStat}>
+                    <Text style={s.vStatVal}>{report.market_snapshot.avg_rating}★</Text>
+                    <Text style={s.vStatLbl}>Rating</Text>
+                  </View>
+                  <View style={s.vStatDiv} />
+                  <View style={s.vStat}>
+                    <Text style={s.vStatVal}>{report.market_snapshot.total_products}</Text>
+                    <Text style={s.vStatLbl}>Products</Text>
+                  </View>
+                </View>
+              )}
+
+              {/* Competition density bar */}
+              {report.market_snapshot && report.market_snapshot.total_products > 0 && (
+                <View style={s.compDensity}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={s.compDensityLbl}>Low-competition slots</Text>
+                    <Text style={[s.compDensityVal, {
+                      color: report.market_snapshot.low_competition >= 3 ? DS.success
+                        : report.market_snapshot.low_competition >= 1 ? DS.warning
+                        : DS.danger
+                    }]}>
+                      {report.market_snapshot.low_competition} / {report.market_snapshot.total_products} products
+                    </Text>
+                  </View>
+                  <View style={s.compTrack}>
+                    <View style={[s.compFill, {
+                      width: `${Math.min(100, (report.market_snapshot.low_competition / report.market_snapshot.total_products) * 100)}%` as any,
+                      backgroundColor: report.market_snapshot.low_competition >= 3 ? DS.success
+                        : report.market_snapshot.low_competition >= 1 ? DS.warning
+                        : DS.danger,
+                    }]} />
+                  </View>
+                  <Text style={s.compDensityHint}>
+                    {report.market_snapshot.in_price_range} products in your price range ($
+                    {priceMin}–${priceMax}) · top seller has {report.market_snapshot.top_reviews?.toLocaleString() ?? '?'} reviews
+                  </Text>
+                </View>
+              )}
+
+              {/* Reasons */}
               {report.verdict.reasons.length > 0 && (
                 <View style={s.verdictReasons}>
                   {report.verdict.reasons.map((r, i) => (
@@ -383,6 +450,7 @@ export default function NicheResearchScreen({ embedded = false, focusTrigger = 0
                 </View>
               )}
 
+              {/* Warnings */}
               {report.verdict.warnings.length > 0 && (
                 <View style={s.verdictReasons}>
                   {report.verdict.warnings.map((w, i) => (
@@ -391,6 +459,39 @@ export default function NicheResearchScreen({ embedded = false, focusTrigger = 0
                       <Text style={[s.reasonTxt, { color: DS.warning }]}>{w}</Text>
                     </View>
                   ))}
+                </View>
+              )}
+
+              {/* Gap highlights (top 3 inline) */}
+              {(report.the_gap?.length ?? 0) > 0 && (
+                <View style={s.gapHighlight}>
+                  <Text style={s.gapHighlightTitle}>⬡ WHERE YOU CAN WIN</Text>
+                  {report.the_gap.slice(0, 3).map((g, i) => (
+                    <View key={i} style={s.reasonRow}>
+                      <Text style={[s.reasonIcon, { color: DS.accent }]}>◉</Text>
+                      <Text style={s.reasonTxt}>{g}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+
+              {/* Affordability inline */}
+              {report.can_you_afford_it && Object.keys(report.can_you_afford_it).length > 0 && (
+                <View style={[s.affordInline, {
+                  backgroundColor: report.can_you_afford_it.can_afford ? DS.success + '10' : DS.warning + '10',
+                  borderColor: report.can_you_afford_it.can_afford ? DS.success + '30' : DS.warning + '30',
+                }]}>
+                  <Text style={[s.affordInlineIcon, { color: report.can_you_afford_it.can_afford ? DS.success : DS.warning }]}>
+                    {report.can_you_afford_it.can_afford ? '✓' : '⚠'}
+                  </Text>
+                  <View style={{ flex: 1, gap: 3 }}>
+                    <Text style={[s.affordInlineTxt, { color: report.can_you_afford_it.can_afford ? DS.success : DS.warning }]}>
+                      {report.can_you_afford_it.verdict}
+                    </Text>
+                    <Text style={s.affordInlineSub}>
+                      Min. order est. ${report.can_you_afford_it.min_order_cost?.toLocaleString()} · target unit cost ${report.can_you_afford_it.target_unit_cost} · your budget ${report.can_you_afford_it.budget?.toLocaleString()}
+                    </Text>
+                  </View>
                 </View>
               )}
 
@@ -425,49 +526,17 @@ export default function NicheResearchScreen({ embedded = false, focusTrigger = 0
               </View>
             </View>
 
-            {/* Market snapshot */}
-            {report.market_snapshot && (
+            {/* The Gap — full list below the verdict */}
+            {report.the_gap?.length > 3 && (
               <View style={s.card}>
-                <Text style={s.cardTitle}>Market Snapshot</Text>
-                <View style={s.statsGrid}>
-                  <Stat label="Avg Price" value={`$${report.market_snapshot.avg_price}`} />
-                  <Stat label="Avg Reviews" value={report.market_snapshot.avg_reviews?.toLocaleString() ?? '—'} />
-                  <Stat label="Avg Rating" value={`${report.market_snapshot.avg_rating}★`} />
-                  <Stat label="Products" value={`${report.market_snapshot.total_products}`} />
-                  <Stat label="In Range" value={`${report.market_snapshot.in_price_range}`} sub="price range" />
-                  <Stat label="Low Comp." value={`${report.market_snapshot.low_competition}`} sub="< max reviews" />
-                </View>
-              </View>
-            )}
-
-            {/* The Gap */}
-            {report.the_gap?.length > 0 && (
-              <View style={s.card}>
-                <Text style={s.cardTitle}>The Gap — Where You Can Win</Text>
-                <FeatureExplainer text="The space competitors are leaving open — common complaints, missing features, or price points no one serves well. This is the wedge a new product can use to stand out." />
-                {report.the_gap.map((g, i) => (
+                <Text style={s.cardTitle}>Full Gap Analysis</Text>
+                <FeatureExplainer text="Every competitive gap identified in this niche — complaints, missing features, and price points no current seller is covering." />
+                {report.the_gap.slice(3).map((g, i) => (
                   <View key={i} style={s.gapRow}>
                     <Text style={s.gapIcon}>◉</Text>
                     <Text style={s.gapTxt}>{g}</Text>
                   </View>
                 ))}
-              </View>
-            )}
-
-            {/* Can you afford it */}
-            {report.can_you_afford_it && Object.keys(report.can_you_afford_it).length > 0 && (
-              <View style={[s.card, { borderColor: report.can_you_afford_it.can_afford ? DS.success + '40' : DS.warning + '40' }]}>
-                <Text style={s.cardTitle}>Can You Afford It?</Text>
-                <View style={s.statsGrid}>
-                  <Stat label="Your Budget" value={`$${report.can_you_afford_it.budget?.toLocaleString()}`} />
-                  <Stat label="Target Unit Cost" value={`$${report.can_you_afford_it.target_unit_cost}`} />
-                  <Stat label="Min Order Est." value={`$${report.can_you_afford_it.min_order_cost?.toLocaleString()}`} />
-                </View>
-                <View style={[s.affordVerdict, { backgroundColor: report.can_you_afford_it.can_afford ? DS.success + '12' : DS.warning + '12' }]}>
-                  <Text style={[s.affordVerdictTxt, { color: report.can_you_afford_it.can_afford ? DS.success : DS.warning }]}>
-                    {report.can_you_afford_it.verdict}
-                  </Text>
-                </View>
               </View>
             )}
 
@@ -714,15 +783,47 @@ const s = StyleSheet.create({
     borderRadius:  DS.radiusCard,
     borderWidth:   1.5,
     padding:       DS.cardPadding,
-    gap:           14,
+    gap:           16,
   },
-  verdictTop:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  verdictTop:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 },
   verdictKeyword: { fontSize: 18, fontWeight: '900', color: DS.textPrimary, letterSpacing: -0.5 },
-  verdictLabel:   { fontSize: 13, fontWeight: '700' },
+  verdictLabel:   { fontSize: 14, fontWeight: '800' },
   verdictReasons: { gap: 6 },
   reasonRow:      { flexDirection: 'row', gap: 8, alignItems: 'flex-start' },
   reasonIcon:     { fontSize: 11, fontWeight: '800', marginTop: 2 },
   reasonTxt:      { flex: 1, fontSize: 13, color: DS.textSecondary, lineHeight: 19 },
+
+  // Entry difficulty bar
+  diffBar:   { gap: 6 },
+  diffLbl:   { fontSize: 10, fontWeight: '700', color: DS.textMuted, letterSpacing: 0.5 },
+  diffScore: { fontSize: 12, fontWeight: '900' },
+  diffTrack: { height: 6, backgroundColor: DS.bgElevated, borderRadius: 3, overflow: 'hidden' },
+  diffFill:  { height: 6, borderRadius: 3 },
+
+  // Inline market stats
+  vStatsRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: DS.bgCard + 'CC', borderRadius: DS.radiusChip, paddingVertical: 12, borderWidth: 1, borderColor: DS.border },
+  vStat:     { flex: 1, alignItems: 'center', gap: 3 },
+  vStatDiv:  { width: 1, height: 28, backgroundColor: DS.border },
+  vStatVal:  { fontSize: 14, fontWeight: '900', color: DS.textPrimary, letterSpacing: -0.3 },
+  vStatLbl:  { fontSize: 9, color: DS.textMuted, textTransform: 'uppercase' as const, letterSpacing: 0.5, textAlign: 'center' as const },
+
+  // Competition density
+  compDensity:    { gap: 6 },
+  compDensityLbl: { fontSize: 10, fontWeight: '700', color: DS.textMuted, letterSpacing: 0.5 },
+  compDensityVal: { fontSize: 11, fontWeight: '800' },
+  compTrack:      { height: 8, backgroundColor: DS.bgElevated, borderRadius: 4, overflow: 'hidden' },
+  compFill:       { height: 8, borderRadius: 4 },
+  compDensityHint:{ fontSize: 10, color: DS.textMuted, lineHeight: 14 },
+
+  // Gap highlights inside verdict card
+  gapHighlight:      { gap: 6, backgroundColor: DS.accent + '08', borderRadius: DS.radiusChip, padding: 12, borderWidth: 1, borderColor: DS.accent + '20' },
+  gapHighlightTitle: { fontSize: 9, fontWeight: '800', color: DS.accent, letterSpacing: 2 },
+
+  // Affordability inline
+  affordInline:     { flexDirection: 'row', gap: 10, alignItems: 'flex-start', borderWidth: 1, borderRadius: DS.radiusChip, padding: 12 },
+  affordInlineIcon: { fontSize: 14, fontWeight: '900', marginTop: 1 },
+  affordInlineTxt:  { fontSize: 13, fontWeight: '800' },
+  affordInlineSub:  { fontSize: 10, color: DS.textMuted, lineHeight: 14 },
 
   saveBtn: {
     borderWidth:     1,

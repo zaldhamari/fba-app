@@ -476,46 +476,7 @@ export function CompareProductsModal({
 
         <ScrollView ref={scrollRef} contentContainerStyle={prm.scroll} showsVerticalScrollIndicator={false}>
 
-          {/* ── Product selector — NOT in a ScrollView so taps always register ── */}
-          <AppCard padding={14} radius={18}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-              <Text style={prm.secEye}>SELECT A PRODUCT</Text>
-              <Text style={prm.tapHint}>Tap to update verdict</Text>
-            </View>
-            <View style={prm.colRow}>
-              {items.map((p, i) => {
-                const isSel  = i === safeIdx;
-                const isAuto = i === autoIdx;
-                const bLabel = p.badge === 'Promising' ? 'PROCEED' : p.badge === 'Saturated' ? 'SKIP' : 'EXPLORE';
-                const bColor = p.badge === 'Promising' ? DS.successText : p.badge === 'Saturated' ? DS.dangerText : DS.warningText;
-                const bBg    = p.badge === 'Promising' ? DS.successBg   : p.badge === 'Saturated' ? DS.dangerBg  : DS.warningBg;
-                return (
-                  <TouchableOpacity
-                    key={p.id ?? i}
-                    style={[prm.colCard, { flex: 1 }, isSel && prm.colCardWin]}
-                    onPress={() => setSelectedIdx(i)}
-                    activeOpacity={0.72}
-                  >
-                    {p.image ? (
-                      <Image source={{ uri: p.image }} style={prm.colImg} contentFit="contain" transition={150} />
-                    ) : (
-                      <View style={prm.colImgFallback}><Text style={prm.colImgIcon}>◎</Text></View>
-                    )}
-                    <Text style={prm.colTitle} numberOfLines={2}>{p.name}</Text>
-                    <View style={prm.colFooter}>
-                      <View style={[prm.colBadge, { backgroundColor: bBg }]}>
-                        <Text style={[prm.colBadgeTxt, { color: bColor }]}>{bLabel}</Text>
-                      </View>
-                      {isSel  && <Text style={prm.winTag}>SELECTED</Text>}
-                      {!isSel && isAuto && <Text style={prm.aiTag}>AI PICK</Text>}
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </AppCard>
-
-          {/* ── Full Verdict card ─────────────────────────────────── */}
+          {/* ── Full Verdict card — FIRST so it's visible immediately ─ */}
           <View style={prm.recCard}>
 
             {/* Header */}
@@ -532,10 +493,15 @@ export function CompareProductsModal({
               </View>
             </View>
 
-            {/* Product image */}
+            {/* Product image (always show — placeholder if no URL) */}
             {winner.image ? (
               <Image source={{ uri: winner.image }} style={prm.winnerImg} contentFit="contain" transition={150} />
-            ) : null}
+            ) : (
+              <View style={[prm.winnerImg, { alignItems: 'center', justifyContent: 'center', backgroundColor: DS.bgSubtle }]}>
+                <Text style={{ fontSize: 40 }}>🛒</Text>
+                <Text style={{ fontSize: 11, color: DS.textMuted, marginTop: 6 }}>No image available</Text>
+              </View>
+            )}
 
             {/* Stats grid */}
             <View style={prm.winnerStats}>
@@ -655,6 +621,45 @@ export function CompareProductsModal({
               )}
             </View>
           </View>
+
+          {/* ── Product selector — AFTER verdict so scrollTo(0) shows verdict first ── */}
+          <AppCard padding={14} radius={18}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+              <Text style={prm.secEye}>SWITCH PRODUCT</Text>
+              <Text style={prm.tapHint}>Tap to update verdict ↑</Text>
+            </View>
+            <View style={prm.colRow}>
+              {items.map((p, i) => {
+                const isSel  = i === safeIdx;
+                const isAuto = i === autoIdx;
+                const bLabel = p.badge === 'Promising' ? 'PROCEED' : p.badge === 'Saturated' ? 'SKIP' : 'EXPLORE';
+                const bColor = p.badge === 'Promising' ? DS.successText : p.badge === 'Saturated' ? DS.dangerText : DS.warningText;
+                const bBg    = p.badge === 'Promising' ? DS.successBg   : p.badge === 'Saturated' ? DS.dangerBg  : DS.warningBg;
+                return (
+                  <TouchableOpacity
+                    key={p.id ?? i}
+                    style={[prm.colCard, { flex: 1 }, isSel && prm.colCardWin]}
+                    onPress={() => setSelectedIdx(i)}
+                    activeOpacity={0.72}
+                  >
+                    {p.image ? (
+                      <Image source={{ uri: p.image }} style={prm.colImg} contentFit="contain" transition={150} />
+                    ) : (
+                      <View style={prm.colImgFallback}><Text style={prm.colImgIcon}>🛒</Text></View>
+                    )}
+                    <Text style={prm.colTitle} numberOfLines={2}>{p.name}</Text>
+                    <View style={prm.colFooter}>
+                      <View style={[prm.colBadge, { backgroundColor: bBg }]}>
+                        <Text style={[prm.colBadgeTxt, { color: bColor }]}>{bLabel}</Text>
+                      </View>
+                      {isSel  && <Text style={prm.winTag}>SELECTED</Text>}
+                      {!isSel && isAuto && <Text style={prm.aiTag}>AI PICK</Text>}
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </AppCard>
 
           {/* ── Side-by-side metric table ─────────────────────────── */}
           {sections.map(sec => (
