@@ -3252,12 +3252,6 @@ export default function BrandStudioScreen() {
 
         /* ── STEPS MODE ──────────────────────────────────────────────────── */
         <>
-          <StepProgressBar
-            currentStep={brandStep}
-            completedSteps={completedBrandSteps}
-            onStepPress={setBrandStep}
-          />
-
           <ScrollView
             style={s.scroll}
             contentContainerStyle={s.content}
