@@ -16,6 +16,7 @@ const API_KEY  = process.env.EXPO_PUBLIC_API_KEY ?? '';
 const REQUEST_TIMEOUT_MS       = 15_000;
 const SLOW_ENDPOINT_TIMEOUT_MS = 25_000;
 const NICHE_TIMEOUT_MS         = 35_000;
+const BRAND_TIMEOUT_MS         = 75_000; // Sonnet SVG + cold Railway start can take 60s+
 
 // ── Keepa signal types ────────────────────────────────────────────────────────
 
@@ -109,6 +110,35 @@ async function post<T>(endpoint: string, body: object, timeoutMs = REQUEST_TIMEO
 // Slow endpoints (brand generation, AI copilot) run with a 25s timeout.
 function postSlow<T>(endpoint: string, body: object): Promise<T> {
   return post<T>(endpoint, body, SLOW_ENDPOINT_TIMEOUT_MS);
+}
+
+// Wakes Railway before a slow generation call. Fire-and-forget — we don't await
+// the health check; we just give it a head start so the server is warm by the
+// time the real request arrives.
+function warmServer(): void {
+  const controller = new AbortController();
+  setTimeout(() => controller.abort(), 5_000);
+  fetch(`${BASE_URL}/health`, {
+    method:  'GET',
+    headers: { 'X-API-Key': API_KEY },
+    signal:  controller.signal,
+  }).catch(() => {});
+}
+
+// Brand generation: wake server first, then generate with generous timeout + 1 retry.
+async function postBrand<T>(endpoint: string, body: object): Promise<T> {
+  warmServer();
+  // Small delay so the wake ping has a chance to reach the server first
+  await new Promise(r => setTimeout(r, 800));
+  try {
+    return await post<T>(endpoint, body, BRAND_TIMEOUT_MS);
+  } catch (err: any) {
+    // On timeout or network error, retry once — server should now be warm
+    if (err?.name === 'AbortError' || err?.message?.includes('timeout') || err?.message?.includes('network')) {
+      return await post<T>(endpoint, body, BRAND_TIMEOUT_MS);
+    }
+    throw err;
+  }
 }
 
 export interface Product {
@@ -257,7 +287,7 @@ export const api = {
     brand_tone?:     string;
     use_premium?:    boolean; // true → Sonnet (high quality); false → Haiku (standard)
   }) => {
-    const data = await postSlow<BrandResult>('/brand/create', { keywords: [], use_premium: true, ...body });
+    const data = await postBrand<BrandResult>('/brand/create', { keywords: [], use_premium: true, ...body });
     validateCreateBrand(data);
     return data;
   },
@@ -289,7 +319,7 @@ export const api = {
     qr_text?:          string;
     manufacturer?:     string;
   }) => {
-    const data = await postSlow<{ label_svg: string; insert_svg: string }>('/brand/label', body);
+    const data = await postBrand<{ label_svg: string; insert_svg: string }>('/brand/label', body);
     validateCreateLabel(data);
     return data;
   },
@@ -641,7 +671,7 @@ export const api = {
   },
 
   generateBrandAsset: async (body: { prompt: string; type: string }) => {
-    const data = await postSlow<{ svg: string; url?: string }>('/brand/asset', body);
+    const data = await postBrand<{ svg: string; url?: string }>('/brand/asset', body);
     return data;
   },
 
