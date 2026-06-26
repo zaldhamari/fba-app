@@ -270,12 +270,17 @@ const sc = StyleSheet.create({
 
 // ── Premium Compare suppliers modal ──────────────────────────────────────────
 
+const cmp = StyleSheet.create({
+  colStat: { fontSize: 10, fontWeight: '700', color: DS.textSecondary, marginTop: 2 },
+});
+
 export function CompareSuppliersModal({
-  visible, items, onClose,
+  visible, items, onClose, sellingPrice,
 }: {
-  visible: boolean;
-  items:   SupplierDisplay[];
-  onClose: () => void;
+  visible:       boolean;
+  items:         SupplierDisplay[];
+  onClose:       () => void;
+  sellingPrice?: number;
 }) {
   const { fmt } = useCurrency();
   const scores  = items.length > 0 ? items.map(scoreSupplierForCompare) : [];
@@ -291,19 +296,33 @@ export function CompareSuppliersModal({
   const conf    = Math.round(Math.min(96, Math.max(54, 65 + rawConf * 0.3)));
   const reasons = buildSupplierReasons(winner, items);
 
-  const priceHL = numHL(items.map(s => s.priceUSD), false);
-  const moqHL   = numHL(items.map(s => s.moqNum), false);
-  const trustHL = numHL(items.map(s => s.trust), true);
+  const landedCosts = items.map(s => s.priceUSD != null && s.priceUSD > 0 ? roughLandedCost(s.priceUSD) : null);
+  const roiPcts     = items.map((s, i) =>
+    sellingPrice && landedCosts[i] != null ? roughROIPct(sellingPrice, s.priceUSD!) : null,
+  );
+  const investmentUSD = items.map(s =>
+    s.priceUSD != null ? Math.round(s.priceUSD * s.moqNum) : null,
+  );
+
+  const priceHL      = numHL(items.map(s => s.priceUSD), false);
+  const moqHL        = numHL(items.map(s => s.moqNum), false);
+  const trustHL      = numHL(items.map(s => s.trust), true);
+  const landedHL     = numHL(landedCosts, false);
+  const roiHL        = numHL(roiPcts, true);
+  const investHL     = numHL(investmentUSD, false);
 
   const tableW = CMP_LABEL_W + CMP_CELL_W * items.length;
 
   const rows: { label: string; vals: string[]; hls: HL[] }[] = [
-    { label: 'Unit Price',  vals: items.map(s => s.priceUSD != null ? `${fmt(s.priceUSD)}/unit` : s.price), hls: priceHL },
-    { label: 'Min. Order',  vals: items.map(s => s.moq),                                                    hls: moqHL   },
-    { label: 'Score (est.)', vals: items.map(s => `${s.trust.toFixed(1)}/10`),                              hls: trustHL },
-    { label: 'Platform',    vals: items.map(s => s.platform),    hls: items.map(() => 'neutral' as HL) },
-    { label: 'Country',     vals: items.map(s => s.country),     hls: items.map(() => 'neutral' as HL) },
-    { label: 'Badge',       vals: items.map(s => s.badge),       hls: items.map(() => 'neutral' as HL) },
+    { label: 'Unit Price',    vals: items.map(s => s.priceUSD != null ? `${fmt(s.priceUSD)}/unit` : s.price), hls: priceHL   },
+    { label: 'Landed Cost',   vals: landedCosts.map(l => l != null ? `${fmt(l)}/unit` : '—'),                 hls: landedHL  },
+    { label: 'ROI (est.)',    vals: roiPcts.map(r => r != null ? `${r.toFixed(0)}%` : '—'),                   hls: roiHL     },
+    { label: 'Investment',    vals: investmentUSD.map(v => v != null ? fmt(v) : '—'),                         hls: investHL  },
+    { label: 'Min. Order',    vals: items.map(s => s.moq),                                                    hls: moqHL     },
+    { label: 'Trust Score',   vals: items.map(s => `${s.trust.toFixed(1)}/10`),                               hls: trustHL   },
+    { label: 'Platform',      vals: items.map(s => s.platform),   hls: items.map(() => 'neutral' as HL)       },
+    { label: 'Country',       vals: items.map(s => s.country),    hls: items.map(() => 'neutral' as HL)       },
+    { label: 'Badge',         vals: items.map(s => s.badge),      hls: items.map(() => 'neutral' as HL)       },
   ];
 
   return (
@@ -360,39 +379,45 @@ export function CompareSuppliersModal({
             ))}
           </View>
 
-          {/* ── Column headers ────────────────────────────────────── */}
+          {/* ── Column headers — flat row (no ScrollView so taps work) */}
           <AppCard padding={14} radius={18}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
               <Text style={prm.secEye}>SUPPLIERS COMPARED</Text>
               <Text style={prm.tapHint}>Tap to select</Text>
             </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 10 }}>
-              <View style={{ flexDirection: 'row', gap: 8 }}>
-                {items.map((s, i) => {
-                  const isSel  = i === safeIdx;
-                  const isAuto = i === maxIdx;
-                  return (
-                    <TouchableOpacity
-                      key={s.id}
-                      style={[prm.colCard, isSel && prm.colCardWin, { width: CMP_CELL_W + 20 }]}
-                      onPress={() => setSelectedIdx(i)}
-                      activeOpacity={0.75}
-                    >
-                      <Text style={prm.supCountry}>{s.country}</Text>
-                      <Text style={prm.colTitle} numberOfLines={2}>{s.name}</Text>
-                      <View style={prm.colFooter}>
-                        <View style={prm.platformBadge}>
-                          <Text style={prm.platformBadgeTxt}>{s.platform}</Text>
-                        </View>
-                        {isSel  && isAuto && <Text style={prm.winTag}>WINNER</Text>}
-                        {isSel  && !isAuto && <Text style={prm.aiTag}>SELECTED</Text>}
-                        {!isSel && isAuto  && <Text style={prm.aiTag}>AI PICK</Text>}
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
+              {items.map((s, i) => {
+                const isSel  = i === safeIdx;
+                const isAuto = i === maxIdx;
+                const lc     = landedCosts[i];
+                const roi    = roiPcts[i];
+                return (
+                  <TouchableOpacity
+                    key={s.id}
+                    style={[prm.colCard, isSel && prm.colCardWin, { flex: 1, minWidth: 120 }]}
+                    onPress={() => setSelectedIdx(i)}
+                    activeOpacity={0.75}
+                  >
+                    <Text style={prm.supCountry}>{s.country}</Text>
+                    <Text style={prm.colTitle} numberOfLines={2}>{s.name}</Text>
+                    {lc != null && (
+                      <Text style={cmp.colStat}>{fmt(lc)}/unit landed</Text>
+                    )}
+                    {roi != null && (
+                      <Text style={[cmp.colStat, { color: roiColor(roi) }]}>{roi.toFixed(0)}% ROI</Text>
+                    )}
+                    <View style={prm.colFooter}>
+                      <View style={prm.platformBadge}>
+                        <Text style={prm.platformBadgeTxt}>{s.platform}</Text>
                       </View>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </ScrollView>
+                      {isSel  && isAuto  && <Text style={prm.winTag}>WINNER</Text>}
+                      {isSel  && !isAuto && <Text style={prm.aiTag}>SELECTED</Text>}
+                      {!isSel && isAuto  && <Text style={prm.aiTag}>AI PICK</Text>}
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
           </AppCard>
 
           {/* ── Sourcing metrics ──────────────────────────────────── */}

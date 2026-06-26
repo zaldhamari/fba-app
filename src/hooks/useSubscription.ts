@@ -29,22 +29,24 @@ const SecureStorage = {
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
 export type Tier = 'explorer' | 'builder' | 'operator';
-export type Feature = 'research' | 'suppliers' | 'keywords' | 'brands';
+export type Feature = 'research' | 'suppliers' | 'keywords' | 'brands' | 'brands_sonnet';
 
 export interface UsageData {
-  month: string; // 'YYYY-MM' — auto-resets when month changes
-  research: number;
-  suppliers: number;
-  keywords: number;
-  brands: number;
+  month:         string; // 'YYYY-MM' — auto-resets when month changes
+  research:      number;
+  suppliers:     number;
+  keywords:      number;
+  brands:        number;
+  brands_sonnet: number;
 }
 
 // ─── Limits ────────────────────────────────────────────────────────────────────
 
 export const MONTHLY_LIMITS: Record<Tier, Record<Feature, number>> = {
-  explorer: { research: 5,    suppliers: 1,    keywords: 0,    brands: 1    },
-  builder:  { research: 50,   suppliers: 20,   keywords: 20,   brands: 5    },
-  operator: { research: 9999, suppliers: 9999, keywords: 9999, brands: 9999 },
+  //                                                          brands = total allowed | brands_sonnet = how many use Sonnet
+  explorer: { research: 5,    suppliers: 1,    keywords: 0,    brands: 0,    brands_sonnet: 0  },
+  builder:  { research: 50,   suppliers: 20,   keywords: 20,   brands: 9999, brands_sonnet: 5  },
+  operator: { research: 9999, suppliers: 9999, keywords: 9999, brands: 9999, brands_sonnet: 10 },
 };
 
 export const SAVE_LIMITS: Record<Tier, number> = {
@@ -67,16 +69,16 @@ export const PLAN_FEATURES: Record<Tier, string[]> = {
   explorer: [
     '5 product searches / month',
     '1 supplier search / month',
-    '1 AI brand kit',
     'Full profit calculator',
     'Full Co-Pilot journey',
     'Launch checklist',
+    'Brand Studio not included',
   ],
   builder: [
     'Discover opportunities — 50 searches/mo',
     'Source suppliers — 20 searches/mo',
     'Keyword intelligence — 20 searches/mo',
-    'Brand kits & listings — 5/mo',
+    '5 premium brand kits/mo, then standard quality',
     'Save up to 10 opportunities',
     'Supplier outreach templates',
     'Opportunity scoring',
@@ -86,7 +88,7 @@ export const PLAN_FEATURES: Record<Tier, string[]> = {
     'Unlimited opportunity discovery',
     'Unlimited supplier sourcing',
     'Unlimited keyword intelligence',
-    'Unlimited brand kits & listings',
+    '10 premium brand kits/mo, then standard quality',
     'Unlimited opportunity vault',
     'Priority AI generation',
     'Export data to CSV',
@@ -173,7 +175,7 @@ function currentMonth(): string {
 }
 
 function freshUsage(): UsageData {
-  return { month: currentMonth(), research: 0, suppliers: 0, keywords: 0, brands: 0 };
+  return { month: currentMonth(), research: 0, suppliers: 0, keywords: 0, brands: 0, brands_sonnet: 0 };
 }
 
 // ─── Hook ──────────────────────────────────────────────────────────────────────
@@ -317,11 +319,12 @@ export function useSubscription() {
       if (server.month !== currentMonth()) return;
       const local = usageRef.current.month === currentMonth() ? usageRef.current : freshUsage();
       const merged: UsageData = {
-        month:     currentMonth(),
-        research:  Math.max(local.research,  server.research  ?? 0),
-        suppliers: Math.max(local.suppliers, server.suppliers ?? 0),
-        keywords:  Math.max(local.keywords,  server.keywords  ?? 0),
-        brands:    Math.max(local.brands,    server.brands    ?? 0),
+        month:         currentMonth(),
+        research:      Math.max(local.research,      server.research      ?? 0),
+        suppliers:     Math.max(local.suppliers,     server.suppliers     ?? 0),
+        keywords:      Math.max(local.keywords,      server.keywords      ?? 0),
+        brands:        Math.max(local.brands,        server.brands        ?? 0),
+        brands_sonnet: Math.max(local.brands_sonnet, server.brands_sonnet ?? 0),
       };
       usageRef.current = merged;
       setUsage(merged);
@@ -384,6 +387,7 @@ export function useSubscription() {
     const featureMap: Record<string, Feature | 'saves' | null> = {
       research: 'research', supplier: 'suppliers', suppliers: 'suppliers',
       keywords: 'keywords', brand: 'brands', brands: 'brands',
+      brands_sonnet: 'brands_sonnet',
       calculator: null, trends: null, opportunity: null,
       feasibility: null, // available on builder+ (non-explorer) — checked separately via tier
       saves: 'saves',

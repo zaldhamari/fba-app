@@ -1993,7 +1993,7 @@ function ListingPreparationCard({
 
       {reconInsights && reconInsights.complaints.length > 0 && (
         <View style={{ gap: 8, paddingTop: 10, borderTopWidth: 1, borderTopColor: DS.border }}>
-          <Text style={{ fontSize: 11, fontWeight: '700', color: DS.danger, textTransform: 'uppercase', letterSpacing: 0.8 }}>Customer Pain Points (from Teardown)</Text>
+          <Text style={{ fontSize: 11, fontWeight: '700', color: DS.danger, textTransform: 'uppercase', letterSpacing: 0.8 }}>Customer Pain Points (from Recon)</Text>
           <Text style={{ fontSize: 11, color: DS.textMuted, lineHeight: 16 }}>Address these in your bullets — they are why buyers leave bad reviews.</Text>
           {reconInsights.complaints.slice(0, 3).map((c, i) => (
             <View key={i} style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start' }}>
@@ -2006,7 +2006,7 @@ function ListingPreparationCard({
 
       {reconInsights && reconInsights.positioningAngles.length > 0 && (
         <View style={{ gap: 8, paddingTop: 10, borderTopWidth: 1, borderTopColor: DS.border }}>
-          <Text style={{ fontSize: 11, fontWeight: '700', color: DS.accent, textTransform: 'uppercase', letterSpacing: 0.8 }}>Positioning Angles (from Teardown)</Text>
+          <Text style={{ fontSize: 11, fontWeight: '700', color: DS.accent, textTransform: 'uppercase', letterSpacing: 0.8 }}>Positioning Angles (from Recon)</Text>
           {reconInsights.positioningAngles.slice(0, 2).map((a, i) => (
             <View key={i} style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start' }}>
               <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: DS.accent, marginTop: 7, flexShrink: 0 }} />
@@ -2196,6 +2196,427 @@ const aiDraftBadgeTxtStyle = {
   letterSpacing: 1,
 };
 
+// ── Compact brand name bar (Quick Tools mode only) ───────────────────────────
+
+function BrandNameBar({
+  inputs, onChange,
+}: {
+  inputs:   BrandInputs;
+  onChange: (k: keyof BrandInputs, v: string) => void;
+}) {
+  return (
+    <AppCard style={{ gap: 10 }}>
+      <InputField
+        label="Brand Name"
+        value={inputs.brandName}
+        onChangeText={v => onChange('brandName', v)}
+        placeholder="e.g. HydroGlow"
+      />
+      <InputField
+        label="Tagline (optional)"
+        value={inputs.tagline}
+        onChangeText={v => onChange('tagline', v)}
+        placeholder="e.g. Pure hydration, pure you"
+      />
+      <Text style={{ fontSize: 11, color: DS.textMuted, lineHeight: 16 }}>
+        Brand style, colours, and direction — set these in the <Text style={{ fontWeight: '700', color: DS.accent }}>Make Assets</Text> flow.
+      </Text>
+    </AppCard>
+  );
+}
+
+// ── Tool hub types ────────────────────────────────────────────────────────────
+
+type ToolId = 'logo' | 'label' | 'insert' | 'barcode' | 'listing';
+
+const TOOLS: {
+  id: ToolId; icon: string; color: string; name: string; desc: string;
+}[] = [
+  { id: 'logo',    icon: '✦', color: '#2563EB', name: 'Logo',     desc: 'AI-generated SVG logo'    },
+  { id: 'label',   icon: '≡', color: '#0891B2', name: 'Label',    desc: 'Product packaging label'  },
+  { id: 'insert',  icon: '◻', color: '#059669', name: 'Insert',   desc: 'Thank-you card for box'   },
+  { id: 'barcode', icon: '▣', color: '#B45309', name: 'Barcode',  desc: 'GS1 UPC & FNSKU setup'    },
+  { id: 'listing', icon: '📝', color: '#7C3AED', name: 'Listing',  desc: 'Amazon title & bullets'   },
+];
+
+const TOOL_HELP: Record<ToolId, FeatureKey> = {
+  logo:    'brand_logo',
+  label:   'brand_label',
+  insert:  'brand_insert',
+  barcode: 'brand_studio',
+  listing: 'brand_studio',
+};
+
+// ── Tool selector (2-col card grid — matches ProfitLab CalcSelector) ──────────
+
+function ToolSelector({
+  active, onSelect,
+  hasBrandResult, hasLabelSvg, hasInsertSvg, hasBarcodeConfig,
+}: {
+  active:           ToolId;
+  onSelect:         (t: ToolId) => void;
+  hasBrandResult:   boolean;
+  hasLabelSvg:      boolean;
+  hasInsertSvg:     boolean;
+  hasBarcodeConfig: boolean;
+}) {
+  function isDone(id: ToolId): boolean {
+    if (id === 'logo')    return hasBrandResult;
+    if (id === 'label')   return hasLabelSvg;
+    if (id === 'insert')  return hasInsertSvg;
+    if (id === 'barcode') return hasBarcodeConfig;
+    if (id === 'listing') return hasBrandResult;
+    return false;
+  }
+
+  const activeTool = TOOLS.find(t => t.id === active) ?? TOOLS[0];
+
+  return (
+    <View style={tsl.wrap}>
+      <View style={tsl.grid}>
+        {TOOLS.map(tool => {
+          const isActive = tool.id === active;
+          const done     = isDone(tool.id);
+          return (
+            <TouchableOpacity
+              key={tool.id}
+              style={[tsl.card, isActive && { backgroundColor: tool.color, borderColor: tool.color }]}
+              onPress={() => onSelect(tool.id)}
+              activeOpacity={0.75}
+            >
+              <View style={[tsl.iconBlock, { backgroundColor: isActive ? 'rgba(255,255,255,0.2)' : tool.color + '18' }]}>
+                <Text style={[tsl.icon, { color: isActive ? '#fff' : tool.color }]}>{tool.icon}</Text>
+              </View>
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text style={[tsl.name, isActive && tsl.nameActive]} numberOfLines={1}>{tool.name}</Text>
+                <Text style={[tsl.desc, isActive && tsl.descActive]} numberOfLines={1}>{tool.desc}</Text>
+              </View>
+              {done && (
+                <View style={[tsl.doneBadge, isActive && tsl.doneBadgeActive]}>
+                  <Text style={[tsl.doneTxt, isActive && tsl.doneTxtActive]}>✓</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      {/* Active tool description */}
+      <View style={[tsl.descCard, { borderColor: activeTool.color + '40', backgroundColor: activeTool.color + '08' }]}>
+        <View style={[tsl.descDot, { backgroundColor: activeTool.color }]} />
+        <Text style={[tsl.descText, { color: activeTool.color }]}>
+          {activeTool.name}: {activeTool.desc}
+          {isDone(activeTool.id) ? ' — done ✓' : ' — tap to generate'}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+const tsl = StyleSheet.create({
+  wrap:  { gap: 12 },
+  grid:  { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+
+  card: {
+    flexDirection:   'row',
+    alignItems:      'center',
+    gap:             10,
+    width:           '47.5%' as any,
+    backgroundColor: DS.bgCard,
+    borderRadius:    DS.radiusCard,
+    borderWidth:     1.5,
+    borderColor:     DS.border,
+    padding:         12,
+  },
+
+  iconBlock: {
+    width: 40, height: 40, borderRadius: 10,
+    alignItems: 'center', justifyContent: 'center',
+    flexShrink: 0,
+  },
+  icon: { fontSize: 20 },
+
+  name:       { fontSize: 13, fontWeight: '800', color: DS.textPrimary, letterSpacing: -0.1 },
+  nameActive: { color: '#fff' },
+  desc:       { fontSize: 11, color: DS.textMuted, fontWeight: '500' },
+  descActive: { color: 'rgba(255,255,255,0.75)' },
+
+  doneBadge:      { borderRadius: DS.radiusBadge, paddingHorizontal: 6, paddingVertical: 2, backgroundColor: DS.success + '20' },
+  doneBadgeActive:{ backgroundColor: 'rgba(255,255,255,0.25)' },
+  doneTxt:        { fontSize: 9, fontWeight: '900', color: DS.success },
+  doneTxtActive:  { color: '#fff' },
+
+  descCard:  { flexDirection: 'row', alignItems: 'flex-start', gap: 8, borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10 },
+  descDot:   { width: 6, height: 6, borderRadius: 3, marginTop: 5, flexShrink: 0 },
+  descText:  { flex: 1, fontSize: 12, lineHeight: 18, fontWeight: '500' },
+});
+
+// ── Collapsible brand setup ───────────────────────────────────────────────────
+
+function BrandSetupCard({
+  inputs, onChange, selectedDirection, onSelectDirection, onTryNextDirection,
+}: {
+  inputs:             BrandInputs;
+  onChange:           (k: keyof BrandInputs, v: string) => void;
+  selectedDirection:  string | null;
+  onSelectDirection:  (dir: BrandDirection) => void;
+  onTryNextDirection: () => void;
+}) {
+  const hasName = inputs.brandName.trim().length > 0;
+  const [open, setOpen] = React.useState(!hasName);
+
+  return (
+    <AppCard style={{ gap: 0 }}>
+      <TouchableOpacity style={bsu.header} onPress={() => setOpen(v => !v)} activeOpacity={0.75}>
+        <View style={bsu.headerIcon}>
+          <Text style={{ fontSize: 16, color: DS.accent }}>✦</Text>
+        </View>
+        <View style={{ flex: 1, gap: 2 }}>
+          {hasName ? (
+            <>
+              <Text style={bsu.headerName}>{inputs.brandName}</Text>
+              <Text style={bsu.headerMeta}>{inputs.style} · {inputs.colorPalette} · {inputs.fontStyle}</Text>
+            </>
+          ) : (
+            <>
+              <Text style={bsu.headerTitle}>Brand Setup</Text>
+              <Text style={bsu.headerSub}>Tap to set name, style, and direction</Text>
+            </>
+          )}
+        </View>
+        <Text style={bsu.chevron}>{open ? '▲' : '▼'}</Text>
+      </TouchableOpacity>
+
+      {open && (
+        <View style={bsu.body}>
+          <BrandDirectionPicker selectedId={selectedDirection} onSelect={onSelectDirection} />
+          {selectedDirection && (
+            <TouchableOpacity
+              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: DS.radiusButton, borderWidth: 1.5, borderColor: DS.accent + '40', backgroundColor: DS.accentLight }}
+              onPress={onTryNextDirection}
+              activeOpacity={0.8}
+            >
+              <Text style={{ fontSize: 13, fontWeight: '700', color: DS.accent }}>↻ Try Another Direction</Text>
+            </TouchableOpacity>
+          )}
+          <BrandIdentityCard inputs={inputs} onChange={onChange} />
+          <CopilotTipCard
+            icon="✦"
+            tip="Keep your brand name short and memorable. The direction picker above sets your style, colors, and font — you can still fine-tune below."
+            accent={DS.pink}
+          />
+          <TouchableOpacity
+            style={bsu.doneBtn}
+            onPress={() => setOpen(false)}
+            activeOpacity={0.8}
+          >
+            <Text style={bsu.doneBtnTxt}>{hasName ? '✓  Done — pick a tool above' : 'Enter a brand name to get started'}</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </AppCard>
+  );
+}
+
+const bsu = StyleSheet.create({
+  header:     { flexDirection: 'row', alignItems: 'center', gap: 12, padding: DS.cardPadding },
+  headerIcon: { width: 36, height: 36, borderRadius: 10, backgroundColor: DS.accentLight, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  headerName: { fontSize: 15, fontWeight: '900', color: DS.textPrimary, letterSpacing: -0.3 },
+  headerMeta: { fontSize: 11, color: DS.textMuted },
+  headerTitle:{ fontSize: 14, fontWeight: '800', color: DS.textPrimary },
+  headerSub:  { fontSize: 11, color: DS.textMuted },
+  chevron:    { fontSize: 10, color: DS.textMuted, fontWeight: '700' },
+  body:       { gap: DS.sectionGap, paddingHorizontal: DS.cardPadding, paddingBottom: DS.cardPadding, borderTopWidth: 1, borderTopColor: DS.border },
+  doneBtn:    { backgroundColor: DS.accent, borderRadius: DS.radiusButton, paddingVertical: 11, alignItems: 'center' },
+  doneBtnTxt: { fontSize: 13, fontWeight: '800', color: '#fff' },
+});
+
+// ── Step Progress Bar (steps mode) ───────────────────────────────────────────
+
+const STEP_LABELS = ['Brand', 'Logo', 'Barcode', 'Label', 'Insert', 'Listing'];
+
+function StepProgressBar({
+  currentStep, completedSteps, onStepPress,
+}: {
+  currentStep:    number;
+  completedSteps: Set<number>;
+  onStepPress:    (n: number) => void;
+}) {
+  return (
+    <View style={spb.wrap}>
+      {STEP_LABELS.map((label, i) => {
+        const n          = i + 1;
+        const done       = completedSteps.has(n);
+        const active     = currentStep === n;
+        const accessible = done || currentStep >= n;
+        return (
+          <React.Fragment key={n}>
+            {i > 0 && <View style={[spb.line, done && spb.lineDone]} />}
+            <TouchableOpacity
+              style={spb.step}
+              onPress={() => { if (accessible) onStepPress(n); }}
+              disabled={!accessible}
+              activeOpacity={0.7}
+            >
+              <View style={[spb.dot, active && spb.dotActive, done && spb.dotDone]}>
+                <Text style={[spb.dotTxt, (active || done) && spb.dotTxtActive]}>
+                  {done ? '✓' : n}
+                </Text>
+              </View>
+              <Text style={[spb.lbl, active && spb.lblActive, done && spb.lblDone]} numberOfLines={1}>
+                {label}
+              </Text>
+            </TouchableOpacity>
+          </React.Fragment>
+        );
+      })}
+    </View>
+  );
+}
+
+const spb = StyleSheet.create({
+  wrap:        { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: DS.pagePadding, paddingVertical: 10, backgroundColor: DS.bgCard, borderBottomWidth: 1, borderBottomColor: DS.border },
+  line:        { flex: 1, height: 1.5, backgroundColor: DS.border, marginTop: 11, marginHorizontal: 2 },
+  lineDone:    { backgroundColor: DS.accent },
+  step:        { alignItems: 'center', gap: 3, minWidth: 36 },
+  dot:         { width: 22, height: 22, borderRadius: 11, backgroundColor: DS.bgElevated, borderWidth: 1.5, borderColor: DS.border, alignItems: 'center', justifyContent: 'center' },
+  dotActive:   { backgroundColor: DS.accent, borderColor: DS.accent },
+  dotDone:     { backgroundColor: DS.accent, borderColor: DS.accent },
+  dotTxt:      { fontSize: 9, fontWeight: '900', color: DS.textMuted },
+  dotTxtActive:{ color: '#fff' },
+  lbl:         { fontSize: 8, fontWeight: '500', color: DS.textMuted, textAlign: 'center' },
+  lblActive:   { color: DS.accent, fontWeight: '800' },
+  lblDone:     { color: DS.textSecondary, fontWeight: '700' },
+});
+
+// ── Brand Report (final step in steps mode) ───────────────────────────────────
+
+function BrandReportCard({
+  brandName, tagline, colorPalette,
+  brandResult, labelResult,
+  barcodeMode, barcodeIdent, barcodePlace,
+  exportLoading, onExportLogo, onExportLabel, onExportInsert,
+  onLaunch,
+}: {
+  brandName:     string;
+  tagline:       string;
+  colorPalette:  ColorPalette;
+  brandResult:   BrandResult | null;
+  labelResult:   LabelResult | null;
+  barcodeMode?:  string;
+  barcodeIdent?: string;
+  barcodePlace?: string;
+  exportLoading: boolean;
+  onExportLogo:  () => void;
+  onExportLabel: () => void;
+  onExportInsert:() => void;
+  onLaunch:      () => void;
+}) {
+  const accent       = COLOR_OPTIONS.find(c => c.id === colorPalette)?.swatch ?? DS.accent;
+  const hasSvgLogo   = !!brandResult?.logo_svg   && isValidSvg(brandResult.logo_svg);
+  const hasSvgLabel  = !!labelResult?.label_svg  && isValidSvg(labelResult.label_svg);
+  const hasSvgInsert = !!labelResult?.insert_svg && isValidSvg(labelResult.insert_svg);
+  const assetsReady  = hasSvgLogo || hasSvgLabel || hasSvgInsert;
+
+  return (
+    <AppCard style={{ gap: 20, borderWidth: 2, borderColor: DS.success + '50' }}>
+      {/* Header */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+        <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: DS.success + '18', alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ fontSize: 22, color: DS.success }}>◆</Text>
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontSize: 17, fontWeight: '900', color: DS.textPrimary, letterSpacing: -0.4 }}>Brand Report</Text>
+          <Text style={{ fontSize: 12, color: DS.textMuted }}>Your complete brand kit</Text>
+        </View>
+        <StatusBadge label={assetsReady ? 'Ready' : 'In Progress'} variant={assetsReady ? 'success' : 'info'} />
+      </View>
+
+      {/* Brand summary */}
+      <View style={{ padding: 14, backgroundColor: DS.bgSubtle, borderRadius: DS.radiusCard, borderWidth: 1, borderColor: DS.border, gap: 6 }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <Text style={{ fontSize: 20, fontWeight: '900', color: DS.textPrimary, letterSpacing: -0.4, flex: 1 }}>{brandName || '—'}</Text>
+          <View style={{ backgroundColor: accent + '18', borderRadius: DS.radiusBadge, paddingHorizontal: 10, paddingVertical: 4, marginLeft: 8 }}>
+            <Text style={{ fontSize: 10, fontWeight: '800', color: accent }}>{colorPalette.toUpperCase()}</Text>
+          </View>
+        </View>
+        {tagline ? <Text style={{ fontSize: 12, color: DS.textMuted, fontStyle: 'italic' }}>"{tagline}"</Text> : null}
+      </View>
+
+      {/* Asset preview row */}
+      <View style={{ gap: 10 }}>
+        <Text style={{ fontSize: 11, fontWeight: '700', color: DS.textMuted, textTransform: 'uppercase', letterSpacing: 0.8 }}>Generated Assets</Text>
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          {[
+            { label: 'Logo',   hasSvg: hasSvgLogo,   xml: brandResult?.logo_svg,   icon: '✦', onExport: onExportLogo   },
+            { label: 'Label',  hasSvg: hasSvgLabel,  xml: labelResult?.label_svg,  icon: '≡', onExport: onExportLabel  },
+            { label: 'Insert', hasSvg: hasSvgInsert, xml: labelResult?.insert_svg, icon: '◻', onExport: onExportInsert },
+          ].map(asset => (
+            <View
+              key={asset.label}
+              style={{ flex: 1, borderRadius: DS.radiusCard, overflow: 'hidden', borderWidth: 1.5, borderColor: asset.hasSvg ? accent + '50' : DS.border, backgroundColor: DS.bgSubtle, minHeight: 100 }}
+            >
+              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 8 }}>
+                {asset.hasSvg && asset.xml ? (
+                  <SvgXml xml={asset.xml} width="100%" height={64} />
+                ) : (
+                  <Text style={{ fontSize: 24, color: DS.textMuted }}>{asset.icon}</Text>
+                )}
+              </View>
+              <TouchableOpacity
+                style={{ paddingVertical: 7, alignItems: 'center', borderTopWidth: 1, borderTopColor: DS.border, backgroundColor: asset.hasSvg ? accent + '10' : DS.bgSubtle }}
+                onPress={asset.onExport}
+                disabled={!asset.hasSvg || exportLoading}
+                activeOpacity={0.75}
+              >
+                <Text style={{ fontSize: 10, fontWeight: '800', color: asset.hasSvg ? accent : DS.textMuted }}>
+                  {asset.hasSvg ? `↓ ${asset.label}` : asset.label}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          ))}
+        </View>
+        {!assetsReady && (
+          <Text style={{ fontSize: 11, color: DS.textMuted, textAlign: 'center' }}>Generate assets in the steps above — they'll appear here.</Text>
+        )}
+      </View>
+
+      {/* Barcode summary */}
+      {barcodeMode && (
+        <View style={{ gap: 8 }}>
+          <Text style={{ fontSize: 11, fontWeight: '700', color: DS.textMuted, textTransform: 'uppercase', letterSpacing: 0.8 }}>Barcode Config</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+            {[barcodeMode, barcodeIdent, barcodePlace].filter(Boolean).map((v, i) => (
+              <View key={i} style={{ backgroundColor: i === 0 ? DS.accentLight : DS.bgElevated, borderRadius: DS.radiusBadge, paddingHorizontal: 10, paddingVertical: 4 }}>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: i === 0 ? DS.accent : DS.textSecondary }}>{v!.replace(/_/g, ' ')}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      )}
+
+      {/* Listing summary */}
+      {brandResult?.listing?.title && (
+        <View style={{ gap: 8 }}>
+          <Text style={{ fontSize: 11, fontWeight: '700', color: DS.textMuted, textTransform: 'uppercase', letterSpacing: 0.8 }}>AI Listing Title</Text>
+          <View style={{ backgroundColor: DS.bgSubtle, borderRadius: DS.radiusInput, padding: 12, borderLeftWidth: 3, borderLeftColor: accent }}>
+            <Text style={{ fontSize: 12, color: DS.textPrimary, lineHeight: 18, fontWeight: '600' }}>{brandResult.listing.title}</Text>
+          </View>
+        </View>
+      )}
+
+      {/* Launch CTA */}
+      <TouchableOpacity
+        style={{ backgroundColor: DS.success, borderRadius: DS.radiusButton, paddingVertical: 15, alignItems: 'center', shadowColor: DS.success, shadowOpacity: 0.28, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 5 }}
+        onPress={onLaunch}
+        activeOpacity={0.85}
+      >
+        <Text style={{ fontSize: 15, fontWeight: '900', color: '#fff', letterSpacing: -0.3 }}>Save Brand & Open Launch Decision →</Text>
+      </TouchableOpacity>
+    </AppCard>
+  );
+}
+
 // ── Screen ────────────────────────────────────────────────────────────────────
 
 export default function BrandStudioScreen() {
@@ -2204,7 +2625,24 @@ export default function BrandStudioScreen() {
   const { activeProduct } = useActiveProduct();
   const pipeline = usePipeline();
 
-  const [studioMode, setStudioMode] = useState<'quick' | 'kit'>('quick');
+  const [studioMode, setStudioMode] = useState<'steps' | 'tools' | 'kit'>('steps');
+
+  // Step-flow state (used in 'steps' mode)
+  const [brandStep, setBrandStep] = useState<number>(() => {
+    if (pipeline.brandData?.labelTemplate) return 6;
+    if (pipeline.brandData?.barcodeMode)   return 4;
+    return 1;
+  });
+  const [completedBrandSteps, setCompletedBrandSteps] = useState<Set<number>>(() => {
+    const done = new Set<number>();
+    if (pipeline.brandData?.barcodeMode)  { done.add(1); done.add(2); done.add(3); }
+    if (pipeline.brandData?.labelTemplate){ done.add(1); done.add(2); done.add(3); done.add(4); }
+    return done;
+  });
+  function advanceBrandStep(from: number) {
+    setCompletedBrandSteps(prev => new Set([...prev, from]));
+    setBrandStep(Math.min(from + 1, 6));
+  }
 
   const [inputs, setInputs] = useState<BrandInputs>({
     brandName:      '',
@@ -2235,23 +2673,12 @@ export default function BrandStudioScreen() {
 
   const navigation = useNavigation<any>();
 
-  // Brand step flow state
-  const [brandStep, setBrandStep] = useState<number>(() => {
-    if (pipeline.brandData?.labelTemplate) return 6;
-    if (pipeline.brandData?.barcodeMode)   return 4;
-    return 1;
-  });
-  const [completedBrandSteps, setCompletedBrandSteps] = useState<Set<number>>(() => {
-    const done = new Set<number>();
-    if (pipeline.brandData?.barcodeMode) { done.add(1); done.add(2); done.add(3); }
-    if (pipeline.brandData?.labelTemplate) { done.add(1); done.add(2); done.add(3); done.add(4); }
-    return done;
-  });
-
-  function advanceBrandStep(from: number) {
-    setCompletedBrandSteps(prev => new Set([...prev, from]));
-    setBrandStep(Math.min(from + 1, 6));
+  function handleLaunchDecision() {
+    pipeline.trackPipelineEvent('launch_decision_viewed', { from: 'brand_report' });
+    navigation.navigate('LaunchDecision');
   }
+
+  const [activeTool, setActiveTool] = useState<ToolId>('logo');
 
   // Barcode workflow state
   const [barcodeMode,     setBarcodeMode]     = useState<string | undefined>(pipeline.brandData?.barcodeMode);
@@ -2331,11 +2758,14 @@ export default function BrandStudioScreen() {
       setBrandError('No internet connection. Connect and try again.');
       return;
     }
+    // Explorer (brands limit = 0) → paywall immediately
     if (!can('brands')) {
       track('paywall_shown', { feature: 'brands', source: 'brand_studio' });
       setShowPaywall(true);
       return;
     }
+    // Sonnet quota: Builder gets 5, Operator gets 10. After that → Haiku.
+    const usePremium = can('brands_sonnet');
     setBrandLoading(true);
     setBrandError('');
     setActiveConceptIdx(0);
@@ -2352,8 +2782,10 @@ export default function BrandStudioScreen() {
         tagline:         inputs.tagline || undefined,
         target_audience: inputs.targetAudience || undefined,
         brand_tone:      inputs.brandTone || undefined,
+        use_premium:     usePremium,
       });
-      await increment('brands');
+      // Increment Sonnet counter only when Sonnet was used
+      if (usePremium) await increment('brands_sonnet');
       setBrandResult(result);
       setDirectionChanged(false);
       setSelectedLogoName(undefined);
@@ -2501,13 +2933,13 @@ export default function BrandStudioScreen() {
         generated_keywords: [],
       });
       setDirectionChanged(false);
-      setBrandStep(2);
+      setActiveTool('logo');
     } else if (entry.assetType === 'label') {
       setLabelResult(prev => ({ insert_svg: prev?.insert_svg ?? '', label_svg: entry.svg }));
-      setBrandStep(4);
+      setActiveTool('label');
     } else {
       setLabelResult(prev => ({ label_svg: prev?.label_svg ?? '', insert_svg: entry.svg }));
-      setBrandStep(5);
+      setActiveTool('insert');
     }
   }
 
@@ -2525,7 +2957,7 @@ export default function BrandStudioScreen() {
     <SafeAreaView style={s.safe} edges={['top']}>
       <PaywallModal visible={showPaywall} onClose={() => setShowPaywall(false)} featureContext="brand" />
 
-      <AppHeader helpKey={STEP_HELP[brandStep] ?? 'brand_studio'} />
+      <AppHeader helpKey={studioMode === 'tools' ? (TOOL_HELP[activeTool] ?? 'brand_studio') : studioMode === 'kit' ? 'brand_studio' : 'brand_studio'} />
       {navigation.canGoBack() && (
         <TouchableOpacity style={bs.backBar} onPress={() => navigation.goBack()} activeOpacity={0.7}>
           <Text style={bs.backTxt}>← Back</Text>
@@ -2533,350 +2965,645 @@ export default function BrandStudioScreen() {
       )}
       <OfflineBanner visible={!isOnline} />
 
-      {/* Mode toggle */}
+      {/* Mode toggle — 3 segments */}
       <View style={bs.modeToggleRow}>
-        <TouchableOpacity
-          style={[bs.modeBtn, studioMode === 'quick' && bs.modeBtnActive]}
-          onPress={() => setStudioMode('quick')}
-          activeOpacity={0.8}
-        >
-          <Text style={[bs.modeBtnTxt, studioMode === 'quick' && bs.modeBtnTxtActive]}>
-            ⚡ Quick Generate
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[bs.modeBtn, studioMode === 'kit' && bs.modeBtnActive]}
-          onPress={() => setStudioMode('kit')}
-          activeOpacity={0.8}
-        >
-          <Text style={[bs.modeBtnTxt, studioMode === 'kit' && bs.modeBtnTxtActive]}>
-            🎨 Full Brand Kit
-          </Text>
-        </TouchableOpacity>
+        {([
+          { id: 'steps', label: '✦ Make Assets',   sub: 'Logo, label & listing' },
+          { id: 'tools', label: '⊞ Quick Tools',  sub: 'Jump to any asset'     },
+          { id: 'kit',   label: '🎨 Brand Identity', sub: 'Story & guidelines' },
+        ] as const).map(m => (
+          <TouchableOpacity
+            key={m.id}
+            style={[bs.modeBtn, studioMode === m.id && bs.modeBtnActive]}
+            onPress={() => setStudioMode(m.id)}
+            activeOpacity={0.8}
+          >
+            <Text style={[bs.modeBtnTxt, studioMode === m.id && bs.modeBtnTxtActive]}>{m.label}</Text>
+            <Text style={[bs.modeBtnSub, studioMode === m.id && bs.modeBtnSubActive]}>{m.sub}</Text>
+          </TouchableOpacity>
+        ))}
       </View>
 
       {studioMode === 'kit' ? (
         <CompleteBrandKitBuilder />
-      ) : (
-      <ScrollView
-        style={s.scroll}
-        contentContainerStyle={s.content}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
-        {/* Pipeline context banner */}
-        <PipelineContextBanner
-          product={pipeline.activeProduct?.title ?? activeProduct?.name}
-          niche={pipeline.activeNiche?.keyword}
-          supplier={pipeline.selectedSupplier?.name}
-        />
-
-        {/* ── STEP 1: Brand Identity ── */}
-        <BrandStepSection
-          step={1}
-          title="Brand Identity"
-          subtitle="Name, tagline, colors, personality"
-          doneLabel={`${inputs.brandName || 'Set'} · ${inputs.style} · ${inputs.colorPalette}`}
-          current={brandStep === 1}
-          done={completedBrandSteps.has(1)}
-          locked={false}
-          onExpand={() => setBrandStep(1)}
-        >
-          <BrandDirectionPicker selectedId={selectedDirection} onSelect={handleSelectDirection} />
-          {selectedDirection && (
-            <TouchableOpacity
-              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: DS.radiusButton, borderWidth: 1.5, borderColor: DS.accent + '40', backgroundColor: DS.accentLight }}
-              onPress={handleTryNextDirection}
-              activeOpacity={0.8}
-            >
-              <Text style={{ fontSize: 13, fontWeight: '700', color: DS.accent }}>↻  Try Another Direction</Text>
-            </TouchableOpacity>
-          )}
-          <BrandIdentityCard inputs={inputs} onChange={handleInputChange} />
-          <CopilotTipCard
-            icon="✦"
-            tip="Strong Amazon brands keep names short and memorable. Match your tone to the category — earthy for wellness, sleek for tech, warm for home."
-            accent={DS.pink}
-          />
-          {inputs.brandName.trim().length >= 2 && (
-            <StepContinueBtn label="Continue to Logo Concepts →" onPress={() => advanceBrandStep(1)} />
-          )}
-        </BrandStepSection>
-
-        {/* ── STEP 2: Logo Concepts ── */}
-        <BrandStepSection
-          step={2}
-          title="Logo Concepts"
-          subtitle="Generate and select your brand logo"
-          doneLabel={selectedLogoName || brandResult?.brand_name || inputs.brandName || 'Generated'}
-          current={brandStep === 2}
-          done={completedBrandSteps.has(2)}
-          locked={brandStep < 2 && !completedBrandSteps.has(1)}
-          onExpand={() => setBrandStep(2)}
-        >
-          {directionChanged && brandResult && (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 10, borderRadius: DS.radiusChip, backgroundColor: DS.warning + '18', borderWidth: 1, borderColor: DS.warning + '40', marginBottom: 4 }}>
-              <Text style={{ fontSize: 13, color: DS.warning, fontWeight: '600' }}>⚠  Direction changed — tap Regenerate to update your logo.</Text>
-            </View>
-          )}
-          <LogoMakerTab
-            brandName={inputs.brandName}
-            tagline={inputs.tagline}
-            style={inputs.style}
-            colorPalette={inputs.colorPalette}
-            loading={brandLoading}
-            warmingUp={warmingUp}
-            result={brandResult}
-            onGenerate={handleGenerateBrand}
-            genError={brandError}
-            onRetry={handleGenerateBrand}
-            exportLoading={exportLoading}
-            exportError={exportError}
-            onExport={handleExportLogo}
-            accentColor={DS.pink}
-            selectedName={selectedLogoName}
-            onSelectName={setSelectedLogoName}
-            activeConceptIdx={activeConceptIdx}
-            onConceptIdx={setActiveConceptIdx}
-            directionId={selectedDirection}
-          />
-          {brandResult && !labelResult && (
-            <TouchableOpacity
-              onPress={() => { advanceBrandStep(2); setBrandStep(5); }}
-              activeOpacity={0.8}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12, borderRadius: DS.radiusCard, backgroundColor: DS.bgSubtle, borderWidth: 1, borderColor: DS.border }}
-            >
-              <Text style={{ fontSize: 22 }}>📦</Text>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 13, fontWeight: '700', color: DS.textPrimary }}>Packaging Insert</Text>
-                <Text style={{ fontSize: 11, color: DS.textSecondary, lineHeight: 16, marginTop: 2 }}>Drive reviews and repeat purchases with a custom post-purchase card — generated in Step 5.</Text>
-              </View>
-              <Text style={{ fontSize: 16, color: DS.textMuted }}>›</Text>
-            </TouchableOpacity>
-          )}
-          <StepContinueBtn label="Continue to Barcode Setup →" onPress={() => advanceBrandStep(2)} />
-        </BrandStepSection>
-
-        {/* ── STEP 3: Barcode Setup ── */}
-        <BrandStepSection
-          step={3}
-          title="Barcode Setup"
-          subtitle="GS1 UPC, FNSKU, placement — guided flow"
-          doneLabel={barcodeMode ? `${barcodeIdent?.replace(/_/g,' ')} · ${barcodePackage}` : 'Configured'}
-          current={brandStep === 3}
-          done={completedBrandSteps.has(3)}
-          locked={brandStep < 3 && !completedBrandSteps.has(2)}
-          onExpand={() => setBrandStep(3)}
-        >
-          <CopilotTipCard
-            icon="🔲"
-            tip="Private labellers need GS1 UPCs for retail + FNSKU for FBA. FNSKU-only is fine if selling exclusively on Amazon and not pursuing Brand Registry."
-            accent={DS.accent}
-          />
-          <BarcodeWorkflowCard
-            brandName={effectiveBrandName}
-            onSave={(mode, ident, place, pack, gs1, fnsku) => {
-              setBarcodeMode(mode); setBarcodeIdent(ident);
-              setBarcodePlace(place); setBarcodePackage(pack);
-              setBarcodeGs1(gs1); setBarcodeFnsku(fnsku);
-              advanceBrandStep(3);
-            }}
-            savedMode={barcodeMode}
-            savedIdentifier={barcodeIdent}
-            savedPlacement={barcodePlace}
-            savedPackaging={barcodePackage}
-          />
-          <BarcodeIdentifierCard />
-          {barcodeMode && <StepContinueBtn label="Continue to Label & Packaging →" onPress={() => advanceBrandStep(3)} />}
-        </BrandStepSection>
-
-        {/* ── STEP 4: Label & Packaging ── */}
-        <BrandStepSection
-          step={4}
-          title="Label & Packaging"
-          subtitle="Packaging type, label content, and shelf preview"
-          doneLabel={labelTemplate ? `${PACKAGING_TYPES.find(p => p.id === packagingType)?.label ?? 'Label'} · ${labelFields?.['productName'] || inputs.brandName}` : 'Designed'}
-          current={brandStep === 4}
-          done={completedBrandSteps.has(4)}
-          locked={brandStep < 4 && !completedBrandSteps.has(3)}
-          onExpand={() => setBrandStep(4)}
-        >
-          <CopilotTipCard
-            icon="⚠"
-            tip="Warnings and directions are legally required for supplements, cosmetics, and children's products. Verify requirements for your category before printing."
-            accent={DS.warning}
-          />
-          <LabelGeneratorTab
-            brandName={inputs.brandName}
-            tagline={inputs.tagline}
-            loading={labelLoading}
-            warmingUp={labelWarmingUp}
-            result={labelResult}
-            onGenerate={handleGenerateLabel}
-            genError={labelError}
-            onRetry={handleGenerateLabel}
-            exportLoading={exportLoading}
-            exportError={exportError}
-            onExport={handleExportLabel}
-            accentColor={DS.accent}
-            packagingType={packagingType}
-            onPackagingType={setPackagingType}
-          />
-          <LabelContentFields
-            brandName={effectiveBrandName}
-            tagline={inputs.tagline || brandResult?.tagline || ''}
-            onSave={(flds) => {
-              setLabelFields(flds); setLabelTemplate(packagingType); setLabelBarcodeP(barcodePlace);
-              advanceBrandStep(4);
-            }}
-            savedFields={labelFields}
-            barcodePlacement={barcodePlace}
-          />
-          <PackagingMockupCard
-            brandName={effectiveBrandName}
-            colorPalette={inputs.colorPalette}
-            tagline={inputs.tagline || brandResult?.tagline || ''}
-          />
-          {labelTemplate && <StepContinueBtn label="Continue to Packaging Insert →" onPress={() => advanceBrandStep(4)} />}
-        </BrandStepSection>
-
-        {/* ── STEP 5: Packaging Insert ── */}
-        <BrandStepSection
-          step={5}
-          title="Packaging Insert"
-          subtitle="Post-purchase insert card to drive reviews and repeat buys"
-          doneLabel={labelResult?.insert_svg ? 'Generated' : 'Not yet generated'}
-          current={brandStep === 5}
-          done={completedBrandSteps.has(5)}
-          locked={brandStep < 5 && !completedBrandSteps.has(4)}
-          onExpand={() => setBrandStep(5)}
-        >
-          <PackagingInsertTab
-            brandName={inputs.brandName} loading={insertLoading} result={labelResult}
-            onGenerate={handleGenerateInsert} genError={labelError}
-            exportLoading={exportLoading} exportError={exportError} onExport={handleExportInsert}
-            accentColor={DS.accent} labelFields={labelFields}
-          />
-          <StepContinueBtn label="Continue to Listing Preparation →" onPress={() => advanceBrandStep(5)} />
-        </BrandStepSection>
-
-        {/* ── STEP 6: Listing Preparation ── */}
-        <BrandStepSection
-          step={6}
-          title="Listing Preparation"
-          subtitle="Title, bullets, keywords, positioning"
-          doneLabel={brandResult?.listing?.title ? 'Listing ready' : 'Complete brand first'}
-          current={brandStep === 6}
-          done={completedBrandSteps.has(6)}
-          locked={brandStep < 6 && !completedBrandSteps.has(5)}
-          onExpand={() => setBrandStep(6)}
-        >
-          <CopilotTipCard
-            icon="📝"
-            tip="Your bullets should directly address customer complaints from Teardown. Complaints = your strongest selling points when solved correctly."
-            accent={DS.accent}
-          />
-          {brandResult ? (
-            <ListingPreparationCard result={brandResult} niche={pipeline.activeNiche?.keyword} reconInsights={pipeline.reconInsights} />
-          ) : (
-            <AppCard style={{ alignItems: 'center', gap: 10, paddingVertical: 22 }}>
-              <Text style={{ fontSize: 22 }}>✦</Text>
-              <Text style={{ fontSize: 13, fontWeight: '700', color: DS.textPrimary, textAlign: 'center' }}>Generate your logo first</Text>
-              <Text style={{ fontSize: 12, color: DS.textMuted, textAlign: 'center', lineHeight: 18 }}>Go back to Step 2 and generate your brand kit to unlock AI listing suggestions.</Text>
-            </AppCard>
-          )}
-
-          <AmazonComplianceCard category={productCategory} />
-          <CopilotTipCard
-            icon="✅"
-            tip="Some categories require legal disclaimers before launch. Missing required labels can result in Amazon suppressing your listing."
-            accent={DS.success}
-          />
-
-          {inputs.brandName.trim().length > 0 && (
-            <BrandPipelineActions
-              brandName={effectiveBrandName}
-              productTitle={pipeline.activeProduct?.title ?? inputs.brandName}
-              tagline={inputs.tagline || brandResult?.tagline || ''}
-              keywords={brandResult?.generated_keywords ?? []}
-              style={inputs.style}
-              pipeline={pipeline}
-              personality={inputs.personality}
-              colorPalette={inputs.colorPalette}
-              fontStyle={inputs.fontStyle}
-              brandDirection={selectedDirection ?? undefined}
-              listingTitle={brandResult?.listing?.title}
-              listingBullets={brandResult?.listing?.bullet_points}
-              backendKeywords={brandResult?.listing?.backend_keywords}
-              barcodeMode={barcodeMode}
-              barcodeIdentifier={barcodeIdent}
-              barcodePlacement={barcodePlace}
-              barcodePackagingType={barcodePackage}
-              barcodeGs1Required={barcodeGs1}
-              barcodeFnskuRequired={barcodeFnsku}
-              labelTemplate={labelTemplate}
-              labelFields={labelFields}
-              labelBarcodePlacement={labelBarcodeP}
+      ) : studioMode === 'tools' ? (
+        <>
+          <ScrollView
+            style={s.scroll}
+            contentContainerStyle={s.content}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            {/* Pipeline context */}
+            <PipelineContextBanner
+              product={pipeline.activeProduct?.title ?? activeProduct?.name}
+              niche={pipeline.activeNiche?.keyword}
+              supplier={pipeline.selectedSupplier?.name}
             />
-          )}
 
-          <StepContinueBtn
-            variant="success"
-            label="Save Brand & Open Launch Decision →"
-            onPress={() => {
-              setCompletedBrandSteps(prev => new Set([...prev, 6]));
-              pipeline.trackPipelineEvent('brand_launch_decision', { brandName: inputs.brandName });
-              navigation.navigate('LaunchDecision' as any);
-            }}
-          />
-        </BrandStepSection>
+            {/* Compact brand name — direction/style set in Make Assets flow */}
+            <BrandNameBar inputs={inputs} onChange={handleInputChange} />
 
-        {/* Recommendations */}
-        <SectionHeader title="Brand Tips" style={s.sectionHead} />
-        <BrandRecommendationsCard />
+            {/* Tool selector — 2-col card grid matching ProfitLab */}
+            <ToolSelector
+              active={activeTool}
+              onSelect={setActiveTool}
+              hasBrandResult={!!brandResult}
+              hasLabelSvg={!!labelResult?.label_svg}
+              hasInsertSvg={!!labelResult?.insert_svg}
+              hasBarcodeConfig={!!barcodeMode}
+            />
 
-        {/* Recent Assets */}
-        {history.length > 0 && (
-          <>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: -4 }}>
-              <SectionHeader title="Recent Assets" style={s.sectionHead} />
-              <TouchableOpacity onPress={handleClearHistory} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Text style={{ fontSize: 12, fontWeight: '600', color: DS.danger }}>Clear</Text>
-              </TouchableOpacity>
-            </View>
-            <AppCard style={{ gap: 0 }}>
-              {history.map((entry, i) => {
-                const daysAgo = Math.floor((Date.now() - new Date(entry.createdAt).getTime()) / 86_400_000);
-                return (
-                  <View key={i} style={[bh.row, i > 0 && bh.rowBorder]}>
-                    <View style={bh.iconWrap}>
-                      <SvgXml xml={entry.svg} width={32} height={32} />
+            {/* Active tool workspace header */}
+            <SectionHeader
+              title={TOOLS.find(t => t.id === activeTool)?.name ?? ''}
+              subtitle={TOOLS.find(t => t.id === activeTool)?.desc}
+            />
+
+            {/* ── LOGO TOOL ── */}
+            {activeTool === 'logo' && (
+              <View style={{ gap: DS.sectionGap }}>
+                <LogoMakerTab
+                  brandName={inputs.brandName}
+                  tagline={inputs.tagline}
+                  style={inputs.style}
+                  colorPalette={inputs.colorPalette}
+                  loading={brandLoading}
+                  warmingUp={warmingUp}
+                  result={brandResult}
+                  onGenerate={handleGenerateBrand}
+                  genError={brandError}
+                  onRetry={handleGenerateBrand}
+                  exportLoading={exportLoading}
+                  exportError={exportError}
+                  onExport={handleExportLogo}
+                  accentColor={DS.pink}
+                  selectedName={selectedLogoName}
+                  onSelectName={setSelectedLogoName}
+                  activeConceptIdx={activeConceptIdx}
+                  onConceptIdx={setActiveConceptIdx}
+                  directionId={selectedDirection}
+                />
+                {brandResult && (
+                  <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10, padding: 12, borderRadius: DS.radiusChip, backgroundColor: DS.success + '10', borderWidth: 1, borderColor: DS.success + '30' }}>
+                    <Text style={{ fontSize: 13, fontWeight: '900', color: DS.success }}>✓</Text>
+                    <View style={{ flex: 1, gap: 2 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: DS.success }}>Logo generated</Text>
+                        <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: DS.radiusBadge, backgroundColor: brandResult.quality_tier === 'standard' ? DS.warning + '20' : DS.accent + '15' }}>
+                          <Text style={{ fontSize: 9, fontWeight: '800', color: brandResult.quality_tier === 'standard' ? DS.warning : DS.accent, letterSpacing: 0.5 }}>
+                            {brandResult.quality_tier === 'standard' ? 'STANDARD' : 'PREMIUM'}
+                          </Text>
+                        </View>
+                      </View>
+                      <Text style={{ fontSize: 11, color: DS.textMuted, lineHeight: 16 }}>
+                        {brandResult.quality_tier === 'standard'
+                          ? "You've used your premium generations this month — upgrade for higher quality."
+                          : 'Listing content ready in the Listing tool.'}
+                      </Text>
                     </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={bh.name}>{entry.brandName || 'Untitled'}</Text>
-                      <Text style={bh.meta}>{entry.assetType} · {entry.style} · {daysAgo === 0 ? 'today' : `${daysAgo}d ago`}</Text>
-                    </View>
-                    <TouchableOpacity
-                      style={bh.reExport}
-                      onPress={() => handleRestoreHistory(entry)}
-                      activeOpacity={0.75}
-                    >
-                      <Text style={bh.reExportTxt}>Restore</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[bh.reExport, { marginLeft: 6 }]}
-                      onPress={makeExportHandler(entry.svg, `siftly-${entry.assetType}`)}
-                      activeOpacity={0.75}
-                    >
-                      <Text style={bh.reExportTxt}>Export</Text>
-                    </TouchableOpacity>
                   </View>
-                );
-              })}
-            </AppCard>
-          </>
-        )}
-      </ScrollView>
+                )}
+              </View>
+            )}
+
+            {/* ── LABEL TOOL ── */}
+            {activeTool === 'label' && (
+              <View style={{ gap: DS.sectionGap }}>
+                <LabelGeneratorTab
+                  brandName={inputs.brandName}
+                  tagline={inputs.tagline}
+                  loading={labelLoading}
+                  warmingUp={labelWarmingUp}
+                  result={labelResult}
+                  onGenerate={handleGenerateLabel}
+                  genError={labelError}
+                  onRetry={handleGenerateLabel}
+                  exportLoading={exportLoading}
+                  exportError={exportError}
+                  onExport={handleExportLabel}
+                  accentColor={DS.accent}
+                  packagingType={packagingType}
+                  onPackagingType={setPackagingType}
+                />
+                <LabelContentFields
+                  brandName={effectiveBrandName}
+                  tagline={inputs.tagline || brandResult?.tagline || ''}
+                  onSave={(flds) => {
+                    setLabelFields(flds);
+                    setLabelTemplate(packagingType);
+                    setLabelBarcodeP(barcodePlace);
+                  }}
+                  savedFields={labelFields}
+                  barcodePlacement={barcodePlace}
+                />
+                <PackagingMockupCard
+                  brandName={effectiveBrandName}
+                  colorPalette={inputs.colorPalette}
+                  tagline={inputs.tagline || brandResult?.tagline || ''}
+                />
+              </View>
+            )}
+
+            {/* ── INSERT TOOL ── */}
+            {activeTool === 'insert' && (
+              <View style={{ gap: DS.sectionGap }}>
+                <PackagingInsertTab
+                  brandName={inputs.brandName}
+                  loading={insertLoading}
+                  result={labelResult}
+                  onGenerate={handleGenerateInsert}
+                  genError={labelError}
+                  exportLoading={exportLoading}
+                  exportError={exportError}
+                  onExport={handleExportInsert}
+                  accentColor={DS.accent}
+                  labelFields={labelFields}
+                />
+              </View>
+            )}
+
+            {/* ── BARCODE TOOL ── */}
+            {activeTool === 'barcode' && (
+              <View style={{ gap: DS.sectionGap }}>
+                <BarcodeWorkflowCard
+                  brandName={effectiveBrandName}
+                  onSave={(mode, ident, place, pack, gs1, fnsku) => {
+                    setBarcodeMode(mode);
+                    setBarcodeIdent(ident);
+                    setBarcodePlace(place);
+                    setBarcodePackage(pack);
+                    setBarcodeGs1(gs1);
+                    setBarcodeFnsku(fnsku);
+                  }}
+                  savedMode={barcodeMode}
+                  savedIdentifier={barcodeIdent}
+                  savedPlacement={barcodePlace}
+                  savedPackaging={barcodePackage}
+                />
+                <BarcodeIdentifierCard />
+              </View>
+            )}
+
+            {/* ── LISTING TOOL ── */}
+            {activeTool === 'listing' && (
+              <View style={{ gap: DS.sectionGap }}>
+                {brandResult ? (
+                  <ListingPreparationCard
+                    result={brandResult}
+                    niche={pipeline.activeNiche?.keyword}
+                    reconInsights={pipeline.reconInsights}
+                  />
+                ) : (
+                  <AppCard style={{ alignItems: 'center', gap: 12, paddingVertical: 24 }}>
+                    <Text style={{ fontSize: 26 }}>✦</Text>
+                    <View style={{ gap: 6, alignItems: 'center' }}>
+                      <Text style={{ fontSize: 14, fontWeight: '800', color: DS.textPrimary, textAlign: 'center' }}>Generate a logo first</Text>
+                      <Text style={{ fontSize: 12, color: DS.textMuted, textAlign: 'center', lineHeight: 18, paddingHorizontal: 12 }}>
+                        Your AI listing title, bullets, and keywords are generated alongside your logo.
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      style={{ backgroundColor: DS.accent, borderRadius: DS.radiusButton, paddingVertical: 11, paddingHorizontal: 24 }}
+                      onPress={() => setActiveTool('logo')}
+                      activeOpacity={0.85}
+                    >
+                      <Text style={{ fontSize: 13, fontWeight: '800', color: '#fff' }}>Go to Logo →</Text>
+                    </TouchableOpacity>
+                  </AppCard>
+                )}
+                <AmazonComplianceCard category={productCategory} />
+                <CopilotTipCard
+                  icon="✅"
+                  tip="Some categories require legal disclaimers before launch. Missing required labels can result in Amazon suppressing your listing."
+                  accent={DS.success}
+                />
+              </View>
+            )}
+
+            {/* Pipeline save + launch */}
+            {inputs.brandName.trim().length > 0 && (
+              <BrandPipelineActions
+                brandName={effectiveBrandName}
+                productTitle={pipeline.activeProduct?.title ?? inputs.brandName}
+                tagline={inputs.tagline || brandResult?.tagline || ''}
+                keywords={brandResult?.generated_keywords ?? []}
+                style={inputs.style}
+                pipeline={pipeline}
+                personality={inputs.personality}
+                colorPalette={inputs.colorPalette}
+                fontStyle={inputs.fontStyle}
+                brandDirection={selectedDirection ?? undefined}
+                listingTitle={brandResult?.listing?.title}
+                listingBullets={brandResult?.listing?.bullet_points}
+                backendKeywords={brandResult?.listing?.backend_keywords}
+                barcodeMode={barcodeMode}
+                barcodeIdentifier={barcodeIdent}
+                barcodePlacement={barcodePlace}
+                barcodePackagingType={barcodePackage}
+                barcodeGs1Required={barcodeGs1}
+                barcodeFnskuRequired={barcodeFnsku}
+                labelTemplate={labelTemplate}
+                labelFields={labelFields}
+                labelBarcodePlacement={labelBarcodeP}
+              />
+            )}
+
+            {/* Brand tips */}
+            <SectionHeader title="Brand Tips" style={s.sectionHead} />
+            <BrandRecommendationsCard />
+
+            {/* Recent Assets */}
+            {history.length > 0 && (
+              <>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: -4 }}>
+                  <SectionHeader title="Recent Assets" style={s.sectionHead} />
+                  <TouchableOpacity onPress={handleClearHistory} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: DS.danger }}>Clear</Text>
+                  </TouchableOpacity>
+                </View>
+                <AppCard style={{ gap: 0 }}>
+                  {history.map((entry, i) => {
+                    const daysAgo = Math.floor((Date.now() - new Date(entry.createdAt).getTime()) / 86_400_000);
+                    return (
+                      <View key={i} style={[bh.row, i > 0 && bh.rowBorder]}>
+                        <View style={bh.iconWrap}>
+                          <SvgXml xml={entry.svg} width={32} height={32} />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={bh.name}>{entry.brandName || 'Untitled'}</Text>
+                          <Text style={bh.meta}>{entry.assetType} · {entry.style} · {daysAgo === 0 ? 'today' : `${daysAgo}d ago`}</Text>
+                        </View>
+                        <TouchableOpacity style={bh.reExport} onPress={() => handleRestoreHistory(entry)} activeOpacity={0.75}>
+                          <Text style={bh.reExportTxt}>Restore</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={[bh.reExport, { marginLeft: 6 }]} onPress={makeExportHandler(entry.svg, `siftly-${entry.assetType}`)} activeOpacity={0.75}>
+                          <Text style={bh.reExportTxt}>Export</Text>
+                        </TouchableOpacity>
+                      </View>
+                    );
+                  })}
+                </AppCard>
+              </>
+            )}
+          </ScrollView>
+        </>
+      ) : (
+
+        /* ── STEPS MODE ──────────────────────────────────────────────────── */
+        <>
+          <StepProgressBar
+            currentStep={brandStep}
+            completedSteps={completedBrandSteps}
+            onStepPress={setBrandStep}
+          />
+
+          <ScrollView
+            style={s.scroll}
+            contentContainerStyle={s.content}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            <PipelineContextBanner
+              product={pipeline.activeProduct?.title ?? activeProduct?.name}
+              niche={pipeline.activeNiche?.keyword}
+              supplier={pipeline.selectedSupplier?.name}
+            />
+
+            {/* Step 1 — Brand Identity */}
+            <BrandStepSection
+              step={1}
+              title="Brand Identity"
+              subtitle="Name, style, palette & direction"
+              doneLabel={effectiveBrandName ? `"${effectiveBrandName}" · ${inputs.style}` : 'Set up your brand'}
+              current={brandStep === 1}
+              done={completedBrandSteps.has(1)}
+              locked={false}
+              onExpand={() => setBrandStep(1)}
+            >
+              <BrandIdentityCard inputs={inputs} onChange={handleInputChange} />
+              <BrandDirectionPicker
+                selectedId={selectedDirection}
+                onSelect={handleSelectDirection}
+              />
+              <CopilotTipCard
+                icon="✦"
+                tip="Your brand direction shapes every asset — logo, label, and insert — so choosing one that fits your product niche is worth a moment of thought."
+                accent={DS.accent}
+              />
+              <StepContinueBtn
+                label="Set brand & continue →"
+                onPress={() => advanceBrandStep(1)}
+              />
+            </BrandStepSection>
+
+            {/* Step 2 — Logo */}
+            <BrandStepSection
+              step={2}
+              title="Logo"
+              subtitle="AI-generated SVG logo"
+              doneLabel="Logo generated ✓"
+              current={brandStep === 2}
+              done={completedBrandSteps.has(2)}
+              locked={brandStep < 2 && !completedBrandSteps.has(1)}
+              onExpand={() => setBrandStep(2)}
+            >
+              {directionChanged && brandResult && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, borderRadius: DS.radiusChip, backgroundColor: DS.warning + '18', borderWidth: 1, borderColor: DS.warning + '40' }}>
+                  <Text style={{ fontSize: 12, color: DS.warning, fontWeight: '600' }}>⚠ Direction changed — tap Regenerate to update your logo.</Text>
+                </View>
+              )}
+              <LogoMakerTab
+                brandName={inputs.brandName}
+                tagline={inputs.tagline}
+                style={inputs.style}
+                colorPalette={inputs.colorPalette}
+                loading={brandLoading}
+                warmingUp={warmingUp}
+                result={brandResult}
+                onGenerate={handleGenerateBrand}
+                genError={brandError}
+                onRetry={handleGenerateBrand}
+                exportLoading={exportLoading}
+                exportError={exportError}
+                onExport={handleExportLogo}
+                accentColor={DS.pink}
+                selectedName={selectedLogoName}
+                onSelectName={setSelectedLogoName}
+                activeConceptIdx={activeConceptIdx}
+                onConceptIdx={setActiveConceptIdx}
+                directionId={selectedDirection}
+              />
+              {brandResult && (
+                <StepContinueBtn
+                  label="Logo done — continue →"
+                  onPress={() => advanceBrandStep(2)}
+                />
+              )}
+            </BrandStepSection>
+
+            {/* Step 3 — Barcode */}
+            <BrandStepSection
+              step={3}
+              title="Barcode"
+              subtitle="GS1 UPC & FNSKU setup"
+              doneLabel={barcodeMode ? `${barcodeMode.replace(/_/g, ' ')} configured ✓` : 'Barcode configured ✓'}
+              current={brandStep === 3}
+              done={completedBrandSteps.has(3)}
+              locked={brandStep < 3 && !completedBrandSteps.has(2)}
+              onExpand={() => setBrandStep(3)}
+            >
+              <CopilotTipCard
+                icon="🔲"
+                tip="Private labellers typically need GS1 UPCs for retail + FNSKU for FBA. FNSKU-only works if you're selling exclusively on Amazon without Brand Registry."
+                accent={DS.accent}
+              />
+              <BarcodeWorkflowCard
+                brandName={effectiveBrandName}
+                onSave={(mode, ident, place, pack, gs1, fnsku) => {
+                  setBarcodeMode(mode);
+                  setBarcodeIdent(ident);
+                  setBarcodePlace(place);
+                  setBarcodePackage(pack);
+                  setBarcodeGs1(gs1);
+                  setBarcodeFnsku(fnsku);
+                  advanceBrandStep(3);
+                }}
+                savedMode={barcodeMode}
+                savedIdentifier={barcodeIdent}
+                savedPlacement={barcodePlace}
+                savedPackaging={barcodePackage}
+              />
+              <BarcodeIdentifierCard />
+              <TouchableOpacity onPress={() => advanceBrandStep(3)} activeOpacity={0.7}>
+                <Text style={{ textAlign: 'center', fontSize: 12, color: DS.textMuted, fontWeight: '600', paddingVertical: 4 }}>
+                  Skip barcode setup for now →
+                </Text>
+              </TouchableOpacity>
+            </BrandStepSection>
+
+            {/* Step 4 — Label */}
+            <BrandStepSection
+              step={4}
+              title="Label & Packaging"
+              subtitle="Generate your product label SVG"
+              doneLabel="Label generated ✓"
+              current={brandStep === 4}
+              done={completedBrandSteps.has(4)}
+              locked={brandStep < 4 && !completedBrandSteps.has(3)}
+              onExpand={() => setBrandStep(4)}
+            >
+              <CopilotTipCard
+                icon="⚠"
+                tip="Warnings and directions are legally required for supplements, cosmetics, and children's products. Verify your category requirements before printing."
+                accent={DS.warning}
+              />
+              <LabelGeneratorTab
+                brandName={inputs.brandName}
+                tagline={inputs.tagline}
+                loading={labelLoading}
+                warmingUp={labelWarmingUp}
+                result={labelResult}
+                onGenerate={handleGenerateLabel}
+                genError={labelError}
+                onRetry={handleGenerateLabel}
+                exportLoading={exportLoading}
+                exportError={exportError}
+                onExport={handleExportLabel}
+                accentColor={DS.accent}
+                packagingType={packagingType}
+                onPackagingType={setPackagingType}
+              />
+              <LabelContentFields
+                brandName={effectiveBrandName}
+                tagline={inputs.tagline || brandResult?.tagline || ''}
+                onSave={(flds) => {
+                  setLabelFields(flds);
+                  setLabelTemplate(packagingType);
+                  setLabelBarcodeP(barcodePlace);
+                }}
+                savedFields={labelFields}
+                barcodePlacement={barcodePlace}
+              />
+              <PackagingMockupCard
+                brandName={effectiveBrandName}
+                colorPalette={inputs.colorPalette}
+                tagline={inputs.tagline || brandResult?.tagline || ''}
+              />
+              {(labelResult?.label_svg || labelTemplate) && (
+                <StepContinueBtn
+                  label="Label done — continue →"
+                  onPress={() => advanceBrandStep(4)}
+                />
+              )}
+            </BrandStepSection>
+
+            {/* Step 5 — Insert */}
+            <BrandStepSection
+              step={5}
+              title="Packaging Insert"
+              subtitle="Thank-you card & review request"
+              doneLabel="Insert generated ✓"
+              current={brandStep === 5}
+              done={completedBrandSteps.has(5)}
+              locked={brandStep < 5 && !completedBrandSteps.has(4)}
+              onExpand={() => setBrandStep(5)}
+            >
+              <CopilotTipCard
+                icon="📦"
+                tip="A packaging insert asking for a review can significantly boost your review rate. Keep it warm, concise, and include a QR code direct to your Amazon review page."
+                accent={DS.accent}
+              />
+              <PackagingInsertTab
+                brandName={inputs.brandName}
+                loading={insertLoading}
+                result={labelResult}
+                onGenerate={handleGenerateInsert}
+                genError={labelError}
+                exportLoading={exportLoading}
+                exportError={exportError}
+                onExport={handleExportInsert}
+                accentColor={DS.accent}
+                labelFields={labelFields}
+              />
+              {labelResult?.insert_svg && (
+                <StepContinueBtn
+                  label="Insert done — continue →"
+                  onPress={() => advanceBrandStep(5)}
+                />
+              )}
+            </BrandStepSection>
+
+            {/* Step 6 — Listing */}
+            <BrandStepSection
+              step={6}
+              title="Listing Prep"
+              subtitle="AI title, bullets & compliance"
+              doneLabel="Listing ready ✓"
+              current={brandStep === 6}
+              done={completedBrandSteps.has(6)}
+              locked={brandStep < 6 && !completedBrandSteps.has(5)}
+              onExpand={() => setBrandStep(6)}
+            >
+              <CopilotTipCard
+                icon="📝"
+                tip="Your bullets should directly address customer complaints from Recon. Complaints = your strongest selling points when solved correctly."
+                accent={DS.accent}
+              />
+              {brandResult ? (
+                <ListingPreparationCard
+                  result={brandResult}
+                  niche={pipeline.activeNiche?.keyword}
+                  reconInsights={pipeline.reconInsights}
+                />
+              ) : (
+                <AppCard style={{ alignItems: 'center', gap: 10, paddingVertical: 20 }}>
+                  <Text style={{ fontSize: 13, color: DS.textMuted, textAlign: 'center' }}>
+                    Generate a logo in Step 2 — listing content is created alongside it.
+                  </Text>
+                  <TouchableOpacity
+                    style={{ backgroundColor: DS.accent, borderRadius: DS.radiusButton, paddingVertical: 9, paddingHorizontal: 20 }}
+                    onPress={() => setBrandStep(2)}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={{ fontSize: 12, fontWeight: '800', color: '#fff' }}>Go to Logo →</Text>
+                  </TouchableOpacity>
+                </AppCard>
+              )}
+              <AmazonComplianceCard category={productCategory} />
+              {brandResult && (
+                <StepContinueBtn
+                  label="Complete — view brand report ↓"
+                  variant="success"
+                  onPress={() => advanceBrandStep(6)}
+                />
+              )}
+            </BrandStepSection>
+
+            {/* Brand Report — unlocks when step 6 completed */}
+            {completedBrandSteps.has(6) && (
+              <BrandReportCard
+                brandName={effectiveBrandName}
+                tagline={inputs.tagline || brandResult?.tagline || ''}
+                colorPalette={inputs.colorPalette}
+                brandResult={brandResult}
+                labelResult={labelResult}
+                barcodeMode={barcodeMode}
+                barcodeIdent={barcodeIdent}
+                barcodePlace={barcodePlace}
+                exportLoading={exportLoading}
+                onExportLogo={handleExportLogo}
+                onExportLabel={handleExportLabel}
+                onExportInsert={handleExportInsert}
+                onLaunch={handleLaunchDecision}
+              />
+            )}
+
+            {/* Pipeline save always visible */}
+            {inputs.brandName.trim().length > 0 && (
+              <BrandPipelineActions
+                brandName={effectiveBrandName}
+                productTitle={pipeline.activeProduct?.title ?? inputs.brandName}
+                tagline={inputs.tagline || brandResult?.tagline || ''}
+                keywords={brandResult?.generated_keywords ?? []}
+                style={inputs.style}
+                pipeline={pipeline}
+                personality={inputs.personality}
+                colorPalette={inputs.colorPalette}
+                fontStyle={inputs.fontStyle}
+                brandDirection={selectedDirection ?? undefined}
+                listingTitle={brandResult?.listing?.title}
+                listingBullets={brandResult?.listing?.bullet_points}
+                backendKeywords={brandResult?.listing?.backend_keywords}
+                barcodeMode={barcodeMode}
+                barcodeIdentifier={barcodeIdent}
+                barcodePlacement={barcodePlace}
+                barcodePackagingType={barcodePackage}
+                barcodeGs1Required={barcodeGs1}
+                barcodeFnskuRequired={barcodeFnsku}
+                labelTemplate={labelTemplate}
+                labelFields={labelFields}
+                labelBarcodePlacement={labelBarcodeP}
+              />
+            )}
+
+            <SectionHeader title="Brand Tips" style={s.sectionHead} />
+            <BrandRecommendationsCard />
+
+            {history.length > 0 && (
+              <>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: -4 }}>
+                  <SectionHeader title="Recent Assets" style={s.sectionHead} />
+                  <TouchableOpacity onPress={handleClearHistory} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: DS.danger }}>Clear</Text>
+                  </TouchableOpacity>
+                </View>
+                <AppCard style={{ gap: 0 }}>
+                  {history.map((entry, i) => {
+                    const daysAgo = Math.floor((Date.now() - new Date(entry.createdAt).getTime()) / 86_400_000);
+                    return (
+                      <View key={i} style={[bh.row, i > 0 && bh.rowBorder]}>
+                        <View style={bh.iconWrap}>
+                          <SvgXml xml={entry.svg} width={32} height={32} />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={bh.name}>{entry.brandName || 'Untitled'}</Text>
+                          <Text style={bh.meta}>{entry.assetType} · {entry.style} · {daysAgo === 0 ? 'today' : `${daysAgo}d ago`}</Text>
+                        </View>
+                        <TouchableOpacity style={bh.reExport} onPress={() => handleRestoreHistory(entry)} activeOpacity={0.75}>
+                          <Text style={bh.reExportTxt}>Restore</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={[bh.reExport, { marginLeft: 6 }]} onPress={makeExportHandler(entry.svg, `siftly-${entry.assetType}`)} activeOpacity={0.75}>
+                          <Text style={bh.reExportTxt}>Export</Text>
+                        </TouchableOpacity>
+                      </View>
+                    );
+                  })}
+                </AppCard>
+              </>
+            )}
+          </ScrollView>
+        </>
       )}
     </SafeAreaView>
   );
@@ -2931,23 +3658,35 @@ const bs = StyleSheet.create({
   },
   modeBtn: {
     flex:            1,
-    paddingVertical: 10,
+    paddingVertical: 8,
     borderRadius:    DS.radiusButton,
     backgroundColor: DS.bgElevated,
     alignItems:      'center',
     borderWidth:     1.5,
     borderColor:     DS.border,
+    paddingHorizontal: 4,
   },
   modeBtnActive: {
     backgroundColor: DS.accent,
     borderColor:     DS.accent,
   },
   modeBtnTxt: {
-    fontSize:   13,
-    fontWeight: '700',
+    fontSize:   11,
+    fontWeight: '800',
     color:      DS.textSecondary,
+    textAlign:  'center',
   },
   modeBtnTxtActive: {
     color: '#FFFFFF',
+  },
+  modeBtnSub: {
+    fontSize:   9,
+    fontWeight: '500',
+    color:      DS.textMuted,
+    marginTop:  1,
+    textAlign:  'center',
+  },
+  modeBtnSubActive: {
+    color: 'rgba(255,255,255,0.75)',
   },
 });

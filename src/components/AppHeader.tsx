@@ -92,7 +92,7 @@ export function AppHeader({ helpKey, hideJourneyStrip }: AppHeaderProps = {}) {
     : !pipeline.activeProduct
     ? { label: 'Research a Product',   tab: 'Research',      route: 'Research' }
     : !pipeline.reconInsights
-    ? { label: 'Teardown Competitors', tab: 'Research',      route: 'Research' }
+    ? { label: 'Recon Competitors',    tab: 'Research',      route: 'Research' }
     : !pipeline.selectedSupplier
     ? { label: 'Find a Supplier',      tab: 'Sourcing',      route: 'Sourcing' }
     : !pipeline.freightEstimate
@@ -108,7 +108,7 @@ export function AppHeader({ helpKey, hideJourneyStrip }: AppHeaderProps = {}) {
   const STEP_HINTS: Record<string, string> = {
     'Pick a Niche':         'Search for a market category to start your journey.',
     'Research a Product':   'Find and select a product to research on this tab.',
-    'Teardown Competitors': 'Run a competitor teardown on your selected product.',
+    'Recon Competitors':    'Run a competitor recon on your selected product.',
     'Find a Supplier':      'Search for suppliers in the Suppliers tab.',
     'Estimate Freight':     'Switch to Freight and get a shipping estimate.',
     'Calculate Profit':     'Run the FBA Profit calculator and save your result.',

@@ -1198,7 +1198,7 @@ ${brand?.brandName ?? 'Our Brand'}` : '';
   ` : ''}
 
   ${recon ? `
-  <h2>Competitor Teardown</h2>
+  <h2>Competitor Recon</h2>
   ${recon.complaints?.length ? `<p style="font-weight:700;margin-bottom:6px;">Customer Complaints</p><ul>${recon.complaints.map(c => `<li>${c}</li>`).join('')}</ul>` : ''}
   ${recon.opportunities?.length ? `<p style="font-weight:700;margin:12px 0 6px;">Opportunities</p><ul>${recon.opportunities.map(o => `<li>${o}</li>`).join('')}</ul>` : ''}
   ${recon.improvementSpecs?.length ? `<p style="font-weight:700;margin:12px 0 6px;">Improvement Specs</p><ul>${recon.improvementSpecs.map(i => `<li>${i}</li>`).join('')}</ul>` : ''}
@@ -1380,7 +1380,7 @@ function LaunchReportModal({ visible, onClose }: { visible: boolean; onClose: ()
               ['Competition', product?.competition],
               ['Est. Sales', product?.salesEstLow ? `${product.salesEstLow}–${product.salesEstHigh} units/mo` : null],
             ]},
-            { title: '🔬 Competitor Teardown', rows: [
+            { title: '🔬 Competitor Recon', rows: [
               ['Complaints found', pipeline.reconInsights?.complaints?.length ? `${pipeline.reconInsights.complaints.length} issues` : null],
               ['Opportunities', pipeline.reconInsights?.opportunities?.length ? `${pipeline.reconInsights.opportunities.length} gaps` : null],
             ]},
@@ -1502,7 +1502,7 @@ const JOURNEY_PHASES = [
     steps: [
       { key: 'niche',   icon: '🔍', label: 'Pick a Niche',         tab: 'Home'     as keyof TabParamList | null },
       { key: 'product', icon: '📦', label: 'Research a Product',   tab: 'Research' as keyof TabParamList | null },
-      { key: 'recon',   icon: '🔬', label: 'Teardown Competitors', tab: 'Research' as keyof TabParamList | null },
+      { key: 'recon',   icon: '🔬', label: 'Recon Competitors',    tab: 'Research' as keyof TabParamList | null },
     ],
   },
   {

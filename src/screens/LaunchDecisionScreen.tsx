@@ -324,15 +324,15 @@ function calcReadiness(
   if (recon) {
     const pts = recon.complaints.length >= 3 ? 5 : 3;
     score += pts;
-    factors.push({ label: 'Teardown Intel', pts, max: 5, note: `${recon.complaints.length} complaints, ${recon.opportunities.length} angles` });
-    strengths.push(`Teardown: ${recon.complaints.length} buyer complaints and ${recon.opportunities.length} differentiation angles mapped`);
+    factors.push({ label: 'Recon Intel', pts, max: 5, note: `${recon.complaints.length} complaints, ${recon.opportunities.length} angles` });
+    strengths.push(`Recon: ${recon.complaints.length} buyer complaints and ${recon.opportunities.length} differentiation angles mapped`);
     if (recon.improvementSpecs.length > 0) {
       strengths.push(`Product improvements identified: ${recon.improvementSpecs[0]}`);
     }
   } else {
-    factors.push({ label: 'Teardown Intel', pts: 0, max: 5, note: 'Not completed' });
+    factors.push({ label: 'Recon Intel', pts: 0, max: 5, note: 'Not completed' });
     if (product) {
-      actions.push('Run Teardown in Research tab to map buyer complaints and differentiation angles');
+      actions.push('Run Recon in the Research tab to map buyer complaints and differentiation angles');
     }
   }
 
@@ -473,7 +473,7 @@ function calcReadiness(
       }
     }
     if (!recon) {
-      improvements.push('Run Teardown in Research tab — maps buyer complaints into product improvement specs');
+      improvements.push('Run Recon in the Research tab — maps buyer complaints into product improvement specs');
     }
     if (supplier && supplier.moq > 500) {
       improvements.push(`Negotiate MOQ down from ${supplier.moq} to 300–400 units — reduces launch capital and inventory risk`);
@@ -1175,11 +1175,11 @@ export default function LaunchDecisionScreen() {
             navLabel="Brand Studio"
           />
           <DataRow
-            label="Teardown"
+            label="Recon"
             value={reconInsights ? `${reconInsights.complaints.length} complaints mapped` : '—'}
             missing={!reconInsights}
             onPress={!reconInsights ? () => navigateToTab('Research', { autoRecon: activeProduct?.title ?? activeNiche?.keyword }) : undefined}
-            navLabel="Run Teardown"
+            navLabel="Run Recon"
           />
         </Section>
 

@@ -3,6 +3,7 @@ import {
   View, Text, Modal, ScrollView, StyleSheet, TouchableOpacity,
   ActivityIndicator, TextInput,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   AppCard,
@@ -10,6 +11,7 @@ import {
   DS,
 } from '../../components/ds';
 import FeasibilityHeart from '../../components/FeasibilityHeart';
+import { AnimatedLoader } from '../../components/AnimatedLoader';
 import VerdictFeedback from '../../components/VerdictFeedback';
 import { useCurrency } from '../../context/CurrencyContext';
 import { SmartSearchSummary } from '../../lib/smartSearch';
@@ -19,13 +21,14 @@ import { Alert } from 'react-native';
 import {
   Mode,
   ProductDisplay,
+  SupplierDisplay,
   KeywordMetric,
   EnrichedKeyword,
   AnalyzeProductResult,
   AnalyzeSupplierResult,
   KeepaSignals,
 } from './types';
-import { buildKeywordCSV } from './productHelpers';
+import { buildKeywordCSV, buildOpportunitySignals } from './productHelpers';
 
 // ── Recent searches component ─────────────────────────────────────────────────
 
@@ -79,8 +82,8 @@ const recent = StyleSheet.create({
 // ── Mode segmented control (3 tabs) ──────────────────────────────────────────
 
 export const MODE_TABS: { id: Mode; label: string; color: string }[] = [
-  { id: 'lookup',    label: 'Teardown',  color: DS.accent  },
-  { id: 'market',   label: 'Products',  color: DS.info    },
+  { id: 'lookup',    label: 'Recon',     color: DS.accent  },
+  { id: 'market',   label: 'Scout',     color: DS.info    },
   { id: 'suppliers', label: 'Suppliers', color: DS.accent  },
   { id: 'freight',   label: 'Shipping',  color: DS.warning },
   { id: 'vault',     label: 'Vault',     color: DS.gold    },
@@ -124,7 +127,7 @@ const seg = StyleSheet.create({
 
 const MODE_DESC: Record<Mode, string> = {
   market:    'Find products: search any keyword to discover opportunities ranked by demand and competition.',
-  lookup:    'Teardown a product: paste any product, ASIN, or Amazon URL — AI reads the reviews and surfaces every flaw you can fix to beat it.',
+  lookup:    'Recon a competitor: paste any product, ASIN, or Amazon URL — AI reads the reviews and surfaces every flaw you can exploit to beat it.',
   suppliers: 'Find suppliers: matching factories on Alibaba, DHgate, and 1688. Pick a product in the Products tab first for better matches.',
   freight:   'Estimate shipping: costs from China to your FBA warehouse. Enter units, weight, and dimensions to compare air vs sea.',
   vault:     'Your saved products: browse, filter, and manage every opportunity you\'ve saved. Export a report or get a launch pack.',
@@ -428,14 +431,17 @@ const sig = StyleSheet.create({
 // ── Analyze Product modal ─────────────────────────────────────────────────────
 
 export function AnalyzeProductModal({
-  visible, loading, result, error, onClose,
+  visible, loading, result, error, product, onClose,
 }: {
-  visible: boolean;
-  loading: boolean;
-  result: AnalyzeProductResult | null;
-  error: string;
-  onClose: () => void;
+  visible:  boolean;
+  loading:  boolean;
+  result:   AnalyzeProductResult | null;
+  error:    string;
+  product?: ProductDisplay | null;
+  onClose:  () => void;
 }) {
+  const { fmt } = useCurrency();
+
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <SafeAreaView style={am.sheet}>
@@ -446,10 +452,123 @@ export function AnalyzeProductModal({
           </TouchableOpacity>
         </View>
         <ScrollView contentContainerStyle={am.content} showsVerticalScrollIndicator={false}>
+
+          {/* ── Product header (always visible while loading too) ── */}
+          {product && (
+            <View style={am.productHeader}>
+              {/* Image */}
+              <View style={am.productImgWrap}>
+                {product.image ? (
+                  <Image source={{ uri: product.image }} style={am.productImg} contentFit="contain" transition={150} />
+                ) : (
+                  <Text style={{ fontSize: 36 }}>🛒</Text>
+                )}
+              </View>
+
+              {/* Name + badges */}
+              <Text style={am.productName}>{product.name}</Text>
+
+              {/* Amazon signals row */}
+              {(product.brand || product.isBestSeller || product.isAmazonChoice || product.rank != null) && (
+                <View style={am.signalsRow}>
+                  {product.brand && (
+                    <View style={am.sigChip}>
+                      <Text style={am.sigTxt}>{product.brand}</Text>
+                    </View>
+                  )}
+                  {product.isBestSeller && (
+                    <View style={[am.sigChip, { backgroundColor: DS.warning + '22', borderColor: DS.warning + '44' }]}>
+                      <Text style={[am.sigTxt, { color: DS.warningText }]}>Best Seller</Text>
+                    </View>
+                  )}
+                  {product.isAmazonChoice && (
+                    <View style={[am.sigChip, { backgroundColor: DS.accent + '18', borderColor: DS.accent + '33' }]}>
+                      <Text style={[am.sigTxt, { color: DS.accent }]}>Amazon's Choice</Text>
+                    </View>
+                  )}
+                  {product.rank != null && (
+                    <View style={am.sigChip}>
+                      <Text style={am.sigTxt}>Rank #{product.rank}</Text>
+                    </View>
+                  )}
+                </View>
+              )}
+
+              {/* Stats grid */}
+              <View style={am.statsGrid}>
+                {[
+                  { label: 'Price',    val: product.price != null ? fmt(product.price) : '—' },
+                  { label: 'Rating',   val: product.rating != null ? `${product.rating.toFixed(1)} ★` : '—' },
+                  { label: 'Reviews',  val: product.reviewCount != null ? product.reviewCount.toLocaleString() : '—' },
+                  { label: 'Rev./mo',  val: product.revenueUSD != null ? `~${fmt(product.revenueUSD, 0)}` : '—' },
+                ].map(({ label, val }) => (
+                  <View key={label} style={am.statBox}>
+                    <Text style={am.statVal}>{val}</Text>
+                    <Text style={am.statLbl}>{label}</Text>
+                  </View>
+                ))}
+              </View>
+
+              {/* Competition + opportunity pills */}
+              <View style={am.pillsRow}>
+                {(() => {
+                  const compColor = product.competition === 'Low' ? DS.successText : product.competition === 'High' ? DS.dangerText : DS.warningText;
+                  const compBg    = product.competition === 'Low' ? DS.successBg   : product.competition === 'High' ? DS.dangerBg  : DS.warningBg;
+                  const oppColor  = product.badge === 'Promising' ? DS.successText : product.badge === 'Saturated' ? DS.dangerText : DS.warningText;
+                  const oppBg     = product.badge === 'Promising' ? DS.successBg   : product.badge === 'Saturated' ? DS.dangerBg  : DS.warningBg;
+                  return (
+                    <>
+                      <View style={[am.pill, { backgroundColor: compBg }]}>
+                        <Text style={[am.pillTxt, { color: compColor }]}>{product.competition} Competition</Text>
+                      </View>
+                      <View style={[am.pill, { backgroundColor: oppBg }]}>
+                        <Text style={[am.pillTxt, { color: oppColor }]}>{product.badge ?? 'Moderate'} Opportunity</Text>
+                      </View>
+                    </>
+                  );
+                })()}
+                {product.boughtPastMonth != null && (
+                  <View style={[am.pill, { backgroundColor: DS.success + '14' }]}>
+                    <Text style={[am.pillTxt, { color: DS.successText }]}>{product.boughtPastMonth.toLocaleString()}+ bought/mo</Text>
+                  </View>
+                )}
+              </View>
+
+              {/* Revenue range */}
+              {product.revenueEstLow != null && product.revenueEstHigh != null && (
+                <View style={am.infoRow}>
+                  <Text style={am.infoIcon}>💰</Text>
+                  <Text style={am.infoTxt}>~${product.revenueEstLow.toLocaleString()}–${product.revenueEstHigh.toLocaleString()}/mo est. revenue range</Text>
+                </View>
+              )}
+              {product.ppcPressure && (
+                <View style={am.infoRow}>
+                  <Text style={am.infoIcon}>📣</Text>
+                  <Text style={am.infoTxt}>{product.ppcPressure} PPC pressure — {product.ppcPressure === 'High' ? 'budget 15–20% of revenue for ads' : product.ppcPressure === 'Low' ? 'low cost to rank organically' : 'moderate ad spend required'}</Text>
+                </View>
+              )}
+              {product.salesConfidence && (
+                <View style={am.infoRow}>
+                  <Text style={am.infoIcon}>◎</Text>
+                  <Text style={am.infoTxt}>{product.salesConfidence} sales confidence — {product.salesConfidence === 'Low' ? 'validate demand before ordering' : 'decent demand signal'}</Text>
+                </View>
+              )}
+            </View>
+          )}
+
           {loading && (
             <View style={am.center}>
-              <ActivityIndicator size="large" color={DS.accent} />
-              <Text style={am.loadTxt}>Analyzing product...</Text>
+              <AnimatedLoader
+                color={DS.accent}
+                msPerStep={1250}
+                messages={[
+                  'Reading product signals…',
+                  'Checking market saturation…',
+                  'Scoring your entry window…',
+                  'Weighing risk factors…',
+                  'Building your verdict…',
+                ]}
+              />
             </View>
           )}
           {error !== '' && !loading && (
@@ -473,7 +592,7 @@ export function AnalyzeProductModal({
                     <View style={{ flex: 1, gap: 6 }}>
                       <Text style={am.confidenceLabel}>{result.confidence}% confidence</Text>
                       <View style={am.confBar}>
-                        <View style={[am.confFill, { width: `${result.confidence}%`, backgroundColor: verdictColor }]} />
+                        <View style={[am.confFill, { width: `${result.confidence ?? 50}%` as any, backgroundColor: verdictColor }]} />
                       </View>
                     </View>
                   </View>
@@ -512,7 +631,68 @@ export function AnalyzeProductModal({
                   </View>
                 )}
 
-                {/* Reality-Check feedback — trust / utility / influence → analytics */}
+                {/* Opportunity signals derived from product data */}
+                {product && (() => {
+                  const sigs = buildOpportunitySignals(product);
+                  if (sigs.length === 0) return null;
+                  return (
+                    <View style={am.section}>
+                      <Text style={am.sectionTitle}>Opportunity Signals</Text>
+                      {sigs.map((sig, i) => {
+                        const sigColor = sig.type === 'positive' ? DS.success : sig.type === 'warning' ? DS.warning : DS.textMuted;
+                        const sigIcon  = sig.type === 'positive' ? '↑' : sig.type === 'warning' ? '⚠' : '→';
+                        return (
+                          <View key={i} style={[am.sigRow, { borderLeftColor: sigColor }]}>
+                            <Text style={[am.sigLabel, { color: sigColor }]}>{sigIcon} {sig.label}</Text>
+                            <Text style={am.bullet}>{sig.detail}</Text>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  );
+                })()}
+
+                {/* Launch estimate snapshot */}
+                {product && (() => {
+                  const price       = product.price ?? 0;
+                  const revLow      = product.revenueEstLow;
+                  const revHigh     = product.revenueEstHigh;
+                  const fbaFee      = price > 0 ? Math.max(3.22, price * 0.15 + 2.5) : null;
+                  const cogs        = price > 0 ? price * 0.3  : null;
+                  const margin      = (fbaFee != null && cogs != null && price > 0)
+                    ? Math.round(((price - fbaFee - cogs) / price) * 100)
+                    : null;
+                  const launchCap   = revLow != null ? Math.round(revLow * 1.5) : null;
+
+                  if (!price) return null;
+                  return (
+                    <View style={am.section}>
+                      <Text style={am.sectionTitle}>Launch Estimate</Text>
+                      <Text style={[am.bullet, { fontSize: 11, color: DS.textMuted, marginBottom: 4 }]}>Rough estimates — always run your own numbers before ordering.</Text>
+                      <View style={am.estimateGrid}>
+                        {[
+                          { label: 'Est. FBA Fees', val: fbaFee != null ? `~$${fbaFee.toFixed(2)}` : '—', hint: 'per unit' },
+                          { label: 'COGS (30%)',    val: cogs   != null ? `~$${cogs.toFixed(2)}`   : '—', hint: 'per unit' },
+                          { label: 'Net Margin',    val: margin != null ? `~${margin}%`             : '—', hint: 'estimate' },
+                          { label: 'Launch Capital',val: launchCap != null ? `~$${launchCap.toLocaleString()}` : '—', hint: 'to test' },
+                        ].map(({ label, val, hint }) => (
+                          <View key={label} style={am.estimateCell}>
+                            <Text style={am.estimateVal}>{val}</Text>
+                            <Text style={am.estimateLbl}>{label}</Text>
+                            <Text style={am.estimateHint}>{hint}</Text>
+                          </View>
+                        ))}
+                      </View>
+                      {revLow != null && revHigh != null && (
+                        <View style={[am.infoRow, { marginTop: 8 }]}>
+                          <Text style={am.infoIcon}>💰</Text>
+                          <Text style={am.infoTxt}>Revenue range: ~${revLow.toLocaleString()}–${revHigh.toLocaleString()}/mo at current market prices</Text>
+                        </View>
+                      )}
+                    </View>
+                  );
+                })()}
+
                 <VerdictFeedback verdict={result.verdict} confidence={result.confidence} />
 
                 <View style={am.disclaimer}>
@@ -555,70 +735,273 @@ export const am = StyleSheet.create({
   summaryTxt:  { fontSize: 13, color: DS.textSecondary, lineHeight: 20 },
   reasonRow:   { flexDirection: 'row', gap: 8, alignItems: 'flex-start' },
   reasonIcon:  { fontSize: 12, fontWeight: '800', marginTop: 3 },
+
+  // Product header
+  productHeader:   { backgroundColor: DS.bgCard, borderRadius: DS.radiusCard, borderWidth: 1, borderColor: DS.border, padding: DS.cardPadding, gap: 12 },
+  productImgWrap:  { alignSelf: 'center', width: 120, height: 120, backgroundColor: DS.bgElevated, borderRadius: DS.radiusCard, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  productImg:      { width: 120, height: 120 },
+  productName:     { fontSize: 14, fontWeight: '800', color: DS.textPrimary, lineHeight: 20 },
+  signalsRow:      { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  sigChip:         { borderRadius: DS.radiusBadge, paddingHorizontal: 8, paddingVertical: 3, backgroundColor: DS.bgElevated, borderWidth: 1, borderColor: DS.border },
+  sigTxt:          { fontSize: 10, fontWeight: '700', color: DS.textSecondary },
+  statsGrid:       { flexDirection: 'row', gap: 8 },
+  statBox:         { flex: 1, backgroundColor: DS.bgElevated, borderRadius: DS.radiusChip, padding: 10, alignItems: 'center', gap: 2 },
+  statVal:         { fontSize: 13, fontWeight: '800', color: DS.textPrimary },
+  statLbl:         { fontSize: 9, fontWeight: '600', color: DS.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
+  pillsRow:        { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  pill:            { borderRadius: DS.radiusBadge, paddingHorizontal: 10, paddingVertical: 4 },
+  pillTxt:         { fontSize: 11, fontWeight: '700' },
+  infoRow:         { flexDirection: 'row', gap: 8, alignItems: 'flex-start' },
+  infoIcon:        { fontSize: 13 },
+  infoTxt:         { fontSize: 12, color: DS.textSecondary, lineHeight: 18, flex: 1 },
+
+  // Opportunity signals
+  sigRow:    { borderLeftWidth: 3, paddingLeft: 10, gap: 2, paddingVertical: 4 },
+  sigLabel:  { fontSize: 11, fontWeight: '800', letterSpacing: 0.3 },
+
+  // Launch estimate grid
+  estimateGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
+  estimateCell: { flex: 1, minWidth: '44%', backgroundColor: DS.bgElevated, borderRadius: DS.radiusChip, padding: 10, gap: 1 },
+  estimateVal:  { fontSize: 14, fontWeight: '900', color: DS.textPrimary },
+  estimateLbl:  { fontSize: 10, fontWeight: '700', color: DS.textSecondary },
+  estimateHint: { fontSize: 9,  fontWeight: '600', color: DS.textMuted, textTransform: 'uppercase', letterSpacing: 0.4 },
 });
 
 // ── Analyze Supplier modal ────────────────────────────────────────────────────
 
 export function AnalyzeSupplierModal({
-  visible, loading, result, error, onClose,
+  visible, loading, result, error, supplier, onClose,
 }: {
-  visible: boolean;
-  loading: boolean;
-  result: AnalyzeSupplierResult | null;
-  error: string;
-  onClose: () => void;
+  visible:   boolean;
+  loading:   boolean;
+  result:    AnalyzeSupplierResult | null;
+  error:     string;
+  supplier?: SupplierDisplay | null;
+  onClose:   () => void;
 }) {
+  const { fmt } = useCurrency();
+
+  const isNewVerdict = !!(result?.verdict);
+
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <SafeAreaView style={am.sheet}>
         <View style={am.toolbar}>
-          <Text style={am.title}>Supplier Analysis</Text>
+          <Text style={am.title}>Supplier Verdict</Text>
           <TouchableOpacity style={am.closeBtn} onPress={onClose} activeOpacity={0.7}>
             <Text style={am.closeTxt}>Done</Text>
           </TouchableOpacity>
         </View>
+
         <ScrollView contentContainerStyle={am.content} showsVerticalScrollIndicator={false}>
+
+          {/* ── Supplier header (always visible while loading) ── */}
+          {supplier && (
+            <View style={am.productHeader}>
+              {/* Platform badge + name */}
+              <View style={am.signalsRow}>
+                <View style={[am.sigChip, { backgroundColor: DS.accentLight, borderColor: DS.accent + '33' }]}>
+                  <Text style={[am.sigTxt, { color: DS.accent }]}>{supplier.platform}</Text>
+                </View>
+                {supplier.country ? (
+                  <View style={am.sigChip}>
+                    <Text style={am.sigTxt}>{supplier.country}</Text>
+                  </View>
+                ) : null}
+                {supplier.badge === 'Gold Supplier' && (
+                  <View style={[am.sigChip, { backgroundColor: DS.warning + '18', borderColor: DS.warning + '44' }]}>
+                    <Text style={[am.sigTxt, { color: DS.warningText }]}>★ Gold Supplier</Text>
+                  </View>
+                )}
+              </View>
+
+              <Text style={am.productName}>{supplier.name}</Text>
+
+              {/* Stats grid */}
+              <View style={am.statsGrid}>
+                {[
+                  { label: 'Unit Cost',   val: supplier.priceUSD != null ? fmt(supplier.priceUSD) : supplier.price },
+                  { label: 'MOQ',         val: supplier.moq },
+                  { label: 'Trust Score', val: `${supplier.trust.toFixed(1)}/10` },
+                  { label: '~Landed',     val: supplier.priceUSD != null ? fmt(supplier.priceUSD * 1.35) : '—' },
+                ].map(({ label, val }) => (
+                  <View key={label} style={am.statBox}>
+                    <Text style={am.statVal}>{String(val)}</Text>
+                    <Text style={am.statLbl}>{label}</Text>
+                  </View>
+                ))}
+              </View>
+
+              {/* Signals from new endpoint */}
+              {result?.signals && (
+                <View style={am.pillsRow}>
+                  {(() => {
+                    const s = result.signals;
+                    const roiColor = s.roi_pct >= 30 ? DS.successText : s.roi_pct >= 15 ? DS.warningText : DS.dangerText;
+                    const roiBg    = s.roi_pct >= 30 ? DS.successBg   : s.roi_pct >= 15 ? DS.warningBg   : DS.dangerBg;
+                    const moqColor = s.moq_risk === 'Low' ? DS.successText : s.moq_risk === 'High' ? DS.dangerText : DS.warningText;
+                    const moqBg    = s.moq_risk === 'Low' ? DS.successBg   : s.moq_risk === 'High' ? DS.dangerBg   : DS.warningBg;
+                    const cfColor  = s.cashflow_stress === 'Low' ? DS.successText : s.cashflow_stress === 'High' ? DS.dangerText : DS.warningText;
+                    const cfBg     = s.cashflow_stress === 'Low' ? DS.successBg   : s.cashflow_stress === 'High' ? DS.dangerBg   : DS.warningBg;
+                    return (
+                      <>
+                        <View style={[am.pill, { backgroundColor: roiBg }]}>
+                          <Text style={[am.pillTxt, { color: roiColor }]}>~{s.roi_pct.toFixed(0)}% ROI</Text>
+                        </View>
+                        <View style={[am.pill, { backgroundColor: moqBg }]}>
+                          <Text style={[am.pillTxt, { color: moqColor }]}>{s.moq_risk} MOQ Risk</Text>
+                        </View>
+                        <View style={[am.pill, { backgroundColor: cfBg }]}>
+                          <Text style={[am.pillTxt, { color: cfColor }]}>{s.cashflow_stress} Cashflow</Text>
+                        </View>
+                        <View style={[am.pill, { backgroundColor: DS.bgElevated }]}>
+                          <Text style={[am.pillTxt, { color: DS.textMuted }]}>Trust {s.platform_trust}/100</Text>
+                        </View>
+                      </>
+                    );
+                  })()}
+                </View>
+              )}
+
+              {/* Investment estimate */}
+              {result?.signals && (
+                <View style={am.infoRow}>
+                  <Text style={am.infoIcon}>💰</Text>
+                  <Text style={am.infoTxt}>
+                    ~{fmt(result.signals.investment_usd, 0)} inventory investment · ~{fmt(result.signals.landed_cost_usd)} landed per unit
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
+
           {loading && (
             <View style={am.center}>
-              <ActivityIndicator size="large" color={DS.accent} />
-              <Text style={am.loadTxt}>Scoring supplier...</Text>
+              <AnimatedLoader
+                color={DS.warning}
+                msPerStep={1300}
+                messages={[
+                  'Reading supplier profile…',
+                  'Scoring trust signals…',
+                  'Calculating landed cost…',
+                  'Assessing MOQ risk…',
+                  'Checking cashflow stress…',
+                  'Building your verdict…',
+                ]}
+              />
             </View>
           )}
           {error !== '' && !loading && (
             <View style={am.errBox}><Text style={am.errTxt}>{error}</Text></View>
           )}
-          {result && !loading && (
+
+          {result && !loading && isNewVerdict && (() => {
+            const v = result.verdict!;
+            const verdictColor = v === 'GO' ? DS.success : v === 'NEGOTIATE' ? DS.warning : DS.danger;
+            const verdictIcon  = v === 'GO' ? '✓' : v === 'NEGOTIATE' ? '↕' : '✕';
+
+            return (
+              <>
+                {/* Verdict card */}
+                <View style={[am.verdictCard, { borderColor: verdictColor + '50', backgroundColor: verdictColor + '08' }]}>
+                  <View style={am.verdictTop}>
+                    <View style={[am.verdictBadge, { backgroundColor: verdictColor }]}>
+                      <Text style={am.verdictIcon}>{verdictIcon}</Text>
+                      <Text style={am.verdictWord}>{v}</Text>
+                    </View>
+                    <View style={{ flex: 1, gap: 6 }}>
+                      <Text style={am.confidenceLabel}>{result.confidence}% confidence</Text>
+                      <View style={am.confBar}>
+                        <View style={[am.confFill, { width: `${result.confidence ?? 50}%` as any, backgroundColor: verdictColor }]} />
+                      </View>
+                    </View>
+                  </View>
+                  <Text style={am.summaryTxt}>{result.summary}</Text>
+                </View>
+
+                {/* Reasons */}
+                {(result.reasons ?? []).length > 0 && (
+                  <View style={am.section}>
+                    <Text style={am.sectionTitle}>Why This Verdict</Text>
+                    {result.reasons!.map((r, i) => (
+                      <View key={i} style={am.reasonRow}>
+                        <Text style={[am.reasonIcon, { color: verdictColor }]}>
+                          {v === 'AVOID' ? '✕' : v === 'NEGOTIATE' ? '↕' : '✓'}
+                        </Text>
+                        <Text style={am.bullet}>{r}</Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+
+                {/* Risk */}
+                {!!result.risk && (
+                  <View style={[am.section, { borderColor: DS.warning + '40', backgroundColor: DS.warning + '08' }]}>
+                    <Text style={am.sectionTitle}>Risk to Watch</Text>
+                    <View style={am.reasonRow}>
+                      <Text style={[am.reasonIcon, { color: DS.warning }]}>⚠</Text>
+                      <Text style={[am.bullet, { color: DS.warning }]}>{result.risk}</Text>
+                    </View>
+                  </View>
+                )}
+
+                {/* Next step */}
+                {!!result.next_step && (
+                  <View style={[am.section, { borderColor: DS.accent + '30', backgroundColor: DS.accent + '06' }]}>
+                    <Text style={am.sectionTitle}>Recommended Next Step</Text>
+                    <Text style={[am.bullet, { color: DS.accent, fontWeight: '600' }]}>{result.next_step}</Text>
+                  </View>
+                )}
+
+                {/* Negotiation tips */}
+                {(result.negotiation_tips ?? []).length > 0 && (
+                  <View style={am.section}>
+                    <Text style={am.sectionTitle}>Negotiation Playbook</Text>
+                    {result.negotiation_tips!.map((tip, i) => (
+                      <View key={i} style={[am.sigRow, { borderLeftColor: DS.accent }]}>
+                        <Text style={[am.sigLabel, { color: DS.accent }]}>Tip {i + 1}</Text>
+                        <Text style={am.bullet}>{tip}</Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+
+                {/* Recon alignment */}
+                {!!result.recon_alignment && (
+                  <View style={[am.section, { borderColor: DS.info + '40', backgroundColor: DS.info + '06' }]}>
+                    <Text style={am.sectionTitle}>Recon Alignment</Text>
+                    <Text style={am.bullet}>{result.recon_alignment}</Text>
+                  </View>
+                )}
+
+                <View style={am.disclaimer}>
+                  <Text style={am.disclaimerText}>Estimates based on typical FBA cost structures. Always confirm with live Seller Central data.</Text>
+                </View>
+              </>
+            );
+          })()}
+
+          {/* Legacy result fallback */}
+          {result && !loading && !isNewVerdict && (
             <>
-              <View style={supm.scoreBox}>
-                <Text style={supm.score}>{result.total_score.toFixed(1)}/100</Text>
-                <Text style={supm.grade}>{result.grade}</Text>
-                <Text style={supm.conf}>{result.confidence_label}</Text>
-              </View>
-              {result.strengths.length > 0 && (
+              {(result.strengths ?? []).length > 0 && (
                 <View style={am.section}>
                   <Text style={am.sectionTitle}>Strengths</Text>
-                  {result.strengths.map((s, i) => <Text key={i} style={supm.green}>✓ {s}</Text>)}
+                  {result.strengths!.map((s, i) => <Text key={i} style={supm.green}>✓ {s}</Text>)}
                 </View>
               )}
-              {result.risk_flags.length > 0 && (
+              {(result.risk_flags ?? []).length > 0 && (
                 <View style={am.section}>
                   <Text style={am.sectionTitle}>Risk Flags</Text>
-                  {result.risk_flags.map((r, i) => <Text key={i} style={supm.red}>⚠ {r}</Text>)}
+                  {result.risk_flags!.map((r, i) => <Text key={i} style={supm.red}>⚠ {r}</Text>)}
                 </View>
               )}
-              <View style={am.section}>
-                <Text style={am.sectionTitle}>Recommendation</Text>
-                <Text style={am.bullet}>{result.recommendation}</Text>
-              </View>
-              <View style={am.section}>
-                <Text style={am.sectionTitle}>Negotiation Strategy</Text>
-                <Text style={am.bullet}>Open with: {result.negotiation_strategy.opening_offer}</Text>
-                <Text style={am.bullet}>Target price: {result.negotiation_strategy.target_price}</Text>
-                <Text style={am.bullet}>MOQ ask: {result.negotiation_strategy.moq_ask}</Text>
-                {result.negotiation_strategy.leverage_points.map((lp, i) => (
-                  <Text key={i} style={am.bullet}>· {lp}</Text>
-                ))}
-              </View>
+              {result.recommendation && (
+                <View style={am.section}>
+                  <Text style={am.sectionTitle}>Recommendation</Text>
+                  <Text style={am.bullet}>{result.recommendation}</Text>
+                </View>
+              )}
             </>
           )}
         </ScrollView>
@@ -626,13 +1009,10 @@ export function AnalyzeSupplierModal({
     </Modal>
   );
 }
+
 const supm = StyleSheet.create({
-  scoreBox: { backgroundColor: DS.accentLight, borderRadius: 18, padding: 20, alignItems: 'center', gap: 4 },
-  score:    { fontSize: 32, fontWeight: '900', color: DS.accent, letterSpacing: -1 },
-  grade:    { fontSize: 18, fontWeight: '800', color: DS.textPrimary },
-  conf:     { fontSize: 12, color: DS.textSecondary, fontWeight: '500' },
-  green:    { fontSize: 13, color: DS.accentDark, lineHeight: 20 },
-  red:      { fontSize: 13, color: DS.dangerText, lineHeight: 20 },
+  green: { fontSize: 13, color: DS.successText, lineHeight: 20 },
+  red:   { fontSize: 13, color: DS.dangerText,  lineHeight: 20 },
 });
 
 // ── Keyword metrics card ──────────────────────────────────────────────────────

@@ -96,13 +96,36 @@ export interface AnalyzeProductResult {
 }
 
 export interface AnalyzeSupplierResult {
-  total_score: number;
-  grade: string;
-  confidence_label: string;
-  strengths: string[];
-  risk_flags: string[];
-  recommendation: string;
-  negotiation_strategy: { opening_offer: string; target_price: string; moq_ask: string; leverage_points: string[] };
+  // Legacy fields (old endpoint — backward compat)
+  total_score?:          number;
+  grade?:                string;
+  confidence_label?:     string;
+  strengths?:            string[];
+  risk_flags?:           string[];
+  recommendation?:       string;
+  negotiation_strategy?: { opening_offer: string; target_price: string; moq_ask: string; leverage_points: string[] };
+
+  // New structured verdict (supplier_analyzer.py)
+  verdict?:           'GO' | 'NEGOTIATE' | 'AVOID';
+  confidence?:        number;
+  summary?:           string;
+  reasons?:           string[];
+  risk?:              string;
+  next_step?:         string;
+  negotiation_tips?:  string[];
+  recon_alignment?:   string | null;
+  signals?: {
+    roi_pct:           number;
+    margin_pct:        number;
+    moq_risk:          string;
+    lead_time_risk:    string;
+    cashflow_stress:   string;
+    platform_trust:    number;
+    investment_usd:    number;
+    landed_cost_usd:   number;
+    rough_freight_usd: number;
+    fba_fee_est_usd:   number | null;
+  };
 }
 
 export interface OutreachEmail { subject: string; body: string; tips: string[]; supplierUrl?: string; supplierName?: string; }

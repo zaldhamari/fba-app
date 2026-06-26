@@ -29,6 +29,7 @@ import { useVault } from '../hooks/useVault';
 import PaywallModal from '../components/PaywallModal';
 import { AppHeader } from '../components/AppHeader';
 import { SkeletonProductCard } from '../components/ds/LoadingSkeleton';
+import { AnimatedLoader } from '../components/AnimatedLoader';
 import { useCurrency } from '../context/CurrencyContext';
 import { useActiveProduct } from '../context/ActiveProductContext';
 import { usePipeline, PipelineReconInsights } from '../context/PipelineContext';
@@ -323,6 +324,7 @@ export default function ResearchWorkspaceScreen() {
   const [analyzeProductLoading, setAnalyzeProductLoading] = useState(false);
   const [analyzeProductResult,  setAnalyzeProductResult]  = useState<AnalyzeProductResult | null>(null);
   const [analyzeProductError,   setAnalyzeProductError]   = useState('');
+  const [analyzingProduct,      setAnalyzingProduct]      = useState<ProductDisplay | null>(null);
 
   // ── Review Intelligence state ──────────────────────────────────────────────
   const [revProductName,      setRevProductName]      = useState('');
@@ -616,6 +618,7 @@ export default function ResearchWorkspaceScreen() {
   const handleAnalyzeProduct = useCallback(async (item: ProductDisplay) => {
     setAnalyzeProductResult(null);
     setAnalyzeProductError('');
+    setAnalyzingProduct(item);
     setAnalyzeProductModal(true);
     setAnalyzeProductLoading(true);
 
@@ -852,11 +855,6 @@ export default function ResearchWorkspaceScreen() {
           onClear={clearRecentLookup}
         />
 
-        {/* ── Empty / loading state ─────────────────────────────────────── */}
-        {revLoading && (
-          <ReconLoadingView />
-        )}
-
         {!revLoading && revError !== '' && (
           <View style={xt.errBox}>
             <Text style={xt.errTxt}>{revError}</Text>
@@ -877,9 +875,9 @@ export default function ResearchWorkspaceScreen() {
         {!revLoading && !revResult && revError === '' && (
           <AppCard style={ri.emptyCard}>
             <Text style={ri.emptyIcon}>◎</Text>
-            <Text style={ri.emptyTitle}>Teardown a Product</Text>
+            <Text style={ri.emptyTitle}>Recon a Competitor</Text>
             <Text style={ri.emptyBody}>
-              Enter a product name, ASIN, or Amazon URL above and tap <Text style={{ fontWeight: '700', color: DS.accent }}>Run Teardown</Text>.{'\n\n'}
+              Enter a product name, ASIN, or Amazon URL above and tap <Text style={{ fontWeight: '700', color: DS.accent }}>Run Recon</Text>.{'\n\n'}
               AI reads the reviews and tells you exactly what to fix — so your version beats the original.
             </Text>
           </AppCard>
@@ -899,7 +897,7 @@ export default function ResearchWorkspaceScreen() {
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 activeOpacity={0.7}
                 accessibilityRole="button"
-                accessibilityLabel="Clear teardown"
+                accessibilityLabel="Clear recon"
               >
                 <Text style={ri.clearBtnTxt}>Clear ✕</Text>
               </TouchableOpacity>
@@ -1085,7 +1083,7 @@ export default function ResearchWorkspaceScreen() {
             <View style={ri.saveInsightsHeader}>
               <Text style={ri.saveInsightsIcon}>⬡</Text>
               <View style={{ flex: 1, gap: 2 }}>
-                <Text style={ri.saveInsightsTitle}>Use Teardown Insights for Supplier Specs</Text>
+                <Text style={ri.saveInsightsTitle}>Use Recon Insights for Supplier Specs</Text>
                 <Text style={ri.saveInsightsSub}>
                   Save pain points, improvements, and angles so your supplier sourcing and brand strategy target what customers actually want.
                 </Text>
@@ -1194,6 +1192,7 @@ export default function ResearchWorkspaceScreen() {
         loading={analyzeProductLoading}
         result={analyzeProductResult}
         error={analyzeProductError}
+        product={analyzingProduct}
         onClose={() => setAnalyzeProductModal(false)}
       />
 
@@ -1260,7 +1259,7 @@ export default function ResearchWorkspaceScreen() {
           </View>
           {searchQuery.length > 0 && (
             <PrimaryButton
-              label={!isOnline ? 'Offline' : mode === 'lookup' ? (revLoading ? 'Reading reviews…' : 'Run Teardown') : (amazonLoading ? 'Searching…' : 'Find Products')}
+              label={!isOnline ? 'Offline' : mode === 'lookup' ? (revLoading ? 'Reading reviews…' : 'Run Recon') : (amazonLoading ? 'Searching…' : 'Scout Products')}
               onPress={mode === 'lookup' ? () => handleDirectAnalysis(searchQuery) : handleAmazonSearch}
               size="sm"
               icon="◎"
@@ -1282,6 +1281,25 @@ export default function ResearchWorkspaceScreen() {
             }}
           />
         </AppCard>}
+
+        {/* ── Inline loading — right under search bar ──────── */}
+        {mode === 'market' && amazonLoading && (
+          <AnimatedLoader
+            color={DS.accent}
+            msPerStep={1200}
+            messages={[
+              'Searching Amazon products…',
+              'Pulling prices & ratings…',
+              'Estimating monthly revenue…',
+              'Scoring competition level…',
+              'Ranking opportunities…',
+              'Preparing your results…',
+            ]}
+          />
+        )}
+        {mode === 'lookup' && revLoading && (
+          <ReconLoadingView />
+        )}
 
         {/* ── Mode selector ────────────────────────────────── */}
         <ModeSegment value={mode} onChange={setMode} exclude={['suppliers', 'freight']} />
@@ -1337,18 +1355,20 @@ export default function ResearchWorkspaceScreen() {
 }
 
 function ReconLoadingView() {
-  const [slow, setSlow] = useState(false);
-  useEffect(() => {
-    const t = setTimeout(() => setSlow(true), 7_000);
-    return () => clearTimeout(t);
-  }, []);
   return (
-    <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 44, gap: 12 }}>
-      <ActivityIndicator size="large" color={DS.accent} />
-      <Text style={{ fontSize: 13, color: DS.textMuted, fontWeight: '600', textAlign: 'center' }}>
-        {slow ? 'Connecting to server… first request may take a moment.' : 'Analyzing product...'}
-      </Text>
-    </View>
+    <AnimatedLoader
+      color={DS.accent}
+      msPerStep={1300}
+      messages={[
+        'Looking up this product on Amazon…',
+        'Reading competitor reviews…',
+        'Mapping the review landscape…',
+        'Finding unmet buyer complaints…',
+        'Scoring your entry window…',
+        'Analysing sentiment patterns…',
+        'Building your recon report…',
+      ]}
+    />
   );
 }
 

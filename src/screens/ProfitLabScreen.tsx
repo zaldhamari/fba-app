@@ -52,16 +52,20 @@ import { DecisionSimulationPanel } from '../components/DecisionSimulationPanel';
 
 type CalcType =
   | 'fba' | 'breakeven'
-  | 'ppc' | 'freight' | 'duties';
+  | 'ppc' | 'storage' | 'cashflow'
+  | 'duties' | 'landed' | 'capital';
 
 const CALCS: {
-  id: CalcType; icon: string; name: string; desc: string; badge?: string; summary: string;
+  id: CalcType; abbr: string; color: string; name: string; desc: string; badge?: string; summary: string;
 }[] = [
-  { id: 'fba',      icon: '🏆', name: 'FBA Profit',   desc: 'Full P&L',        badge: 'Default',   summary: 'Calculate your net profit, margin %, and ROI per unit after all Amazon fees. Use your landed cost as product cost — never the raw supplier quote.' },
-  { id: 'breakeven',icon: '⚖️', name: 'Break-even',   desc: 'Units to profit',                     summary: 'Shows how many units you need to sell to recover your total investment. Enter a conservative launch velocity — 30-50% of what the top competitor sells.' },
-  { id: 'ppc',      icon: '📣', name: 'PPC / ACoS',   desc: 'Ad budget calc',  badge: 'Popular',   summary: 'Calculates your break-even ACoS and recommended launch ad budget. Run this before setting your PPC spend — enter the result into Capital Estimator.' },
-  { id: 'freight',  icon: '🚢', name: 'Freight Forwarders', desc: 'Compare & get quotes',          summary: 'Compares sea, air, and express shipping costs per unit and per shipment, then connects you with freight forwarders to request real quotes. For a quick shipping cost estimate, use the Freight tab in Sourcing.' },
-  { id: 'duties',   icon: '🌐', name: 'Duties',       desc: 'Import taxes',                        summary: 'Estimates import duty and VAT by country and HS tariff code. Take the duty % result and enter it into Feasibility Check and Landed Cost.' },
+  { id: 'fba',       abbr: 'P&L',  color: '#2563EB', name: 'FBA Profit',      desc: 'Full unit economics',    badge: 'Start here', summary: 'Calculate your net profit, margin %, and ROI per unit after all Amazon fees. Use your landed cost as product cost — never the raw supplier quote.' },
+  { id: 'landed',    abbr: 'LC',   color: '#0891B2', name: 'Landed Cost',      desc: 'True cost to warehouse',                     summary: 'Breaks down your true per-unit cost: supplier price + freight + duties + packaging. Run this first — the landed cost number flows into FBA Profit and Break-even.' },
+  { id: 'capital',   abbr: '$$$',  color: '#B45309', name: 'Launch Capital',   desc: 'Total budget needed',    badge: 'New',        summary: 'Estimates your full launch budget: inventory × landed cost + 90-day PPC + photography + listing + Vine + shipping to FBA + buffer. Know your cash need before you commit.' },
+  { id: 'breakeven', abbr: 'BE',   color: '#059669', name: 'Break-even',       desc: 'Units to recover costs',                     summary: 'Shows how many units you need to sell to recover your total investment. Enter a conservative launch velocity — 30-50% of what the top competitor sells.' },
+  { id: 'ppc',       abbr: 'PPC',  color: '#D97706', name: 'PPC / ACoS',       desc: 'Ad spend calculator',   badge: 'Popular',    summary: 'Calculates your break-even ACoS and recommended launch ad budget. Run this before setting your PPC spend — enter the result into Launch Capital.' },
+  { id: 'storage',   abbr: 'STR',  color: '#7C3AED', name: 'Storage Fees',     desc: 'FBA storage costs',                          summary: 'Calculates monthly and long-term FBA storage fees by unit size tier. Essential for Q4 planning — long-term fees spike dramatically after 365 days and destroy margins on slow-moving inventory.' },
+  { id: 'cashflow',  abbr: 'CF',   color: '#0F766E', name: 'Cash Flow',        desc: 'Months to full ROI',                         summary: 'Projects your monthly cash position from launch to full ROI recovery. Shows when you turn cash-flow positive, how much capital is tied up each month, and flags if you need a restock before you break even.' },
+  { id: 'duties',    abbr: 'TAX',  color: '#BE185D', name: 'Duties & VAT',     desc: 'Import tax estimate',                        summary: 'Estimates import duty and VAT by country and HS tariff code. Take the duty % result and enter it into Feasibility Check and Landed Cost.' },
 ];
 
 // ─── Shared helpers ───────────────────────────────────────────────────────────
@@ -85,25 +89,38 @@ const r = StyleSheet.create({
 
 function Field({
   label, value, onChange, placeholder,
-  keyboard = 'decimal-pad', hint,
+  keyboard = 'decimal-pad', hint, needsInput,
 }: {
   label: string; value: string; onChange: (v: string) => void;
   placeholder?: string; keyboard?: KeyboardTypeOptions; hint?: string;
+  needsInput?: boolean;
 }) {
+  const prompt = needsInput && !value;
   return (
-    <InputField
-      label={label}
-      value={value}
-      onChangeText={onChange}
-      placeholder={placeholder}
-      placeholderTextColor={DS.textMuted}
-      keyboardType={keyboard}
-      hint={hint}
-      containerStyle={fi.wrap}
-    />
+    <View style={[fi.wrap, prompt && fi.needsWrap]}>
+      <InputField
+        label={label}
+        value={value}
+        onChangeText={onChange}
+        placeholder={placeholder}
+        placeholderTextColor={prompt ? DS.warning : DS.textMuted}
+        keyboardType={keyboard}
+        hint={prompt ? '⚑ Enter manually' : hint}
+        containerStyle={{ flex: 1 }}
+      />
+    </View>
   );
 }
-const fi = StyleSheet.create({ wrap: { flex: 1, minWidth: 130 } });
+const fi = StyleSheet.create({
+  wrap:      { flex: 1, minWidth: 130 },
+  needsWrap: {
+    borderLeftWidth: 3,
+    borderLeftColor: DS.warning,
+    paddingLeft: 6,
+    backgroundColor: DS.warning + '08',
+    borderRadius: DS.radiusInput,
+  },
+});
 
 function Pair({ children }: { children: React.ReactNode }) {
   return <View style={pair.row}>{children}</View>;
@@ -187,108 +204,112 @@ const SCENARIO_CFG: Record<Scenario, { label: string; freightMult: number; dutyM
   optimistic:   { label: 'Optimistic',   freightMult: 0.90, dutyMult: 0.90 },
 };
 
-// ─── Calculator Selector ──────────────────────────────────────────────────────
+// ─── Calculator Selector — 2-column card grid ────────────────────────────────
+// Each card has a consistent colored abbreviation block, name, and short desc.
+// No emoji — abbreviations render identically on all platforms and OS versions.
 
 function CalcSelector({ active, onSelect }: { active: CalcType; onSelect: (id: CalcType) => void }) {
-  const [expanded, setExpanded] = useState(active !== 'fba');
-  const activeCalcInfo = CALCS.find(c => c.id === active) ?? CALCS[0];
-  const otherCalcs = CALCS.filter(c => c.id !== active);
-
-  if (expanded) {
-    return (
-      <View style={sel.expandedWrap}>
-        <Text style={sel.expandedTitle}>Calculators</Text>
-        <Text style={sel.expandedSub}>Select a workspace</Text>
-
-        <TouchableOpacity style={sel.featuredTile} onPress={() => setExpanded(false)} activeOpacity={0.85}>
-          {activeCalcInfo.badge && (
-            <View style={[sel.featBadge, activeCalcInfo.badge === 'Popular' && sel.featBadgeAmber]}>
-              <Text style={sel.featBadgeTxt}>{activeCalcInfo.badge.toUpperCase()}</Text>
-            </View>
-          )}
-          <Text style={sel.featIcon}>{activeCalcInfo.icon}</Text>
-          <Text style={sel.featName}>{activeCalcInfo.name}</Text>
-          <Text style={sel.featDesc}>{activeCalcInfo.desc}</Text>
-        </TouchableOpacity>
-
-        <View style={sel.grid}>
-          {otherCalcs.map(c => (
-            <TouchableOpacity
-              key={c.id}
-              style={sel.tile}
-              onPress={() => { onSelect(c.id); setExpanded(false); }}
-              activeOpacity={0.8}
-            >
-              {c.badge && (
-                <View style={[sel.tileBadge, c.badge === 'Popular' && sel.tileBadgeAmber]}>
-                  <Text style={[sel.tileBadgeTxt, c.badge === 'Popular' && sel.tileBadgeTxtAmber]}>
-                    {c.badge.toUpperCase()}
-                  </Text>
-                </View>
-              )}
-              <Text style={sel.tileIcon}>{c.icon}</Text>
-              <Text style={sel.tileName}>{c.name}</Text>
-              <Text style={sel.tileDesc}>{c.desc}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        <TouchableOpacity style={sel.doneBtn} onPress={() => setExpanded(false)} activeOpacity={0.85}>
-          <Text style={sel.doneTxt}>Done ▲</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
+  const activeCalc = CALCS.find(c => c.id === active) ?? CALCS[0];
 
   return (
-    <AppCard style={sel.card}>
-      <TouchableOpacity style={sel.headerRow} onPress={() => setExpanded(true)} activeOpacity={0.75}>
-        <Text style={sel.activeIcon}>{activeCalcInfo.icon}</Text>
-        <View style={{ flex: 1, gap: 2 }}>
-          <Text style={sel.heading}>{activeCalcInfo.name}</Text>
-          <Text style={sel.activeSub}>{activeCalcInfo.desc}</Text>
-        </View>
-        <Text style={sel.switchLink}>Switch ▼</Text>
-      </TouchableOpacity>
-      <Text style={sel.descLine}>{activeCalcInfo.summary}</Text>
-    </AppCard>
+    <View style={sel.wrap}>
+      {/* 2-column grid */}
+      <View style={sel.grid}>
+        {CALCS.map(c => {
+          const isActive = c.id === active;
+          return (
+            <TouchableOpacity
+              key={c.id}
+              style={[sel.card, isActive && sel.cardActive]}
+              onPress={() => onSelect(c.id)}
+              activeOpacity={0.75}
+            >
+              {/* Icon block */}
+              <View style={[sel.iconBlock, { backgroundColor: isActive ? '#fff' + '22' : c.color + '15' }]}>
+                <Text style={[sel.abbr, { color: isActive ? '#fff' : c.color }]}>{c.abbr}</Text>
+              </View>
+
+              {/* Text */}
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text style={[sel.name, isActive && sel.nameActive]} numberOfLines={1}>{c.name}</Text>
+                <Text style={[sel.desc, isActive && sel.descActive]} numberOfLines={1}>{c.desc}</Text>
+              </View>
+
+              {/* Badge */}
+              {c.badge && (
+                <View style={[
+                  sel.badge,
+                  isActive && sel.badgeActive,
+                  !isActive && c.badge === 'New'      && sel.badgeNew,
+                  !isActive && c.badge === 'Popular'  && sel.badgePopular,
+                  !isActive && c.badge === 'Start here' && sel.badgeStart,
+                ]}>
+                  <Text style={[
+                    sel.badgeTxt,
+                    isActive && sel.badgeTxtActive,
+                    !isActive && c.badge === 'New'      && sel.badgeTxtNew,
+                    !isActive && c.badge === 'Popular'  && sel.badgeTxtPopular,
+                    !isActive && c.badge === 'Start here' && sel.badgeTxtStart,
+                  ]}>{c.badge}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      {/* Active calculator description */}
+      <View style={[sel.descCard, { borderColor: activeCalc.color + '40', backgroundColor: activeCalc.color + '08' }]}>
+        <View style={[sel.descDot, { backgroundColor: activeCalc.color }]} />
+        <Text style={[sel.descText, { color: activeCalc.color }]}>{activeCalc.summary}</Text>
+      </View>
+    </View>
   );
 }
+
 const sel = StyleSheet.create({
-  card:           { gap: 8 },
-  headerRow:      { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  activeIcon:     { fontSize: 26 },
-  heading:        { fontSize: 16, fontWeight: '800', color: DS.textPrimary, letterSpacing: -0.3 },
-  activeSub:      { fontSize: 12, color: DS.textMuted },
-  switchLink:     { fontSize: 13, fontWeight: '700', color: DS.accent },
-  descLine:       { fontSize: 12, color: DS.textMuted, fontStyle: 'italic' as const, lineHeight: 17 },
-  expandedWrap:   { gap: 14, paddingBottom: 8 },
-  expandedTitle:  { fontSize: 26, fontWeight: '900', color: DS.textPrimary, letterSpacing: -0.6, textAlign: 'center' as const },
-  expandedSub:    { fontSize: 14, color: DS.textMuted, textAlign: 'center' as const, marginTop: -8 },
-  featuredTile:   { borderWidth: 2, borderColor: DS.accent, borderRadius: 20, backgroundColor: DS.accentLight, padding: 20, alignItems: 'center' as const, gap: 6 },
-  featBadge:      { position: 'absolute' as const, top: 12, right: 12, backgroundColor: DS.accent, borderRadius: DS.radiusBadge, paddingHorizontal: 10, paddingVertical: 4 },
-  featBadgeAmber: { backgroundColor: DS.warning },
-  featBadgeTxt:   { fontSize: 10, fontWeight: '800', color: '#fff', letterSpacing: 0.5 },
-  featIcon:       { fontSize: 40 },
-  featName:       { fontSize: 18, fontWeight: '800', color: DS.accent, letterSpacing: -0.3 },
-  featDesc:       { fontSize: 13, color: DS.textMuted },
-  grid:           { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  tile: {
-    width: '47%', flex: 1, minHeight: 110,
-    borderWidth: 1.5, borderColor: DS.border,
-    borderRadius: 18, padding: 14,
-    alignItems: 'center' as const, gap: 4,
+  wrap:  { gap: 12 },
+  grid:  { flexDirection: 'row' as const, flexWrap: 'wrap' as const, gap: 10 },
+
+  card: {
+    flexDirection: 'row' as const, alignItems: 'center' as const, gap: 10,
+    width: '47.5%' as any,
     backgroundColor: DS.bgCard,
+    borderRadius: DS.radiusCard, borderWidth: 1.5, borderColor: DS.border,
+    padding: 12,
   },
-  tileBadge:      { backgroundColor: DS.accentLight, borderRadius: DS.radiusBadge, paddingHorizontal: 8, paddingVertical: 3 },
-  tileBadgeAmber: { backgroundColor: DS.warning + '20' },
-  tileBadgeTxt:   { fontSize: 9, fontWeight: '800', color: DS.accent, letterSpacing: 0.5 },
-  tileBadgeTxtAmber: { color: DS.warning },
-  tileIcon:       { fontSize: 30, marginBottom: 2 },
-  tileName:       { fontSize: 13, fontWeight: '800', color: DS.textPrimary, letterSpacing: -0.2, textAlign: 'center' as const },
-  tileDesc:       { fontSize: 11, color: DS.textMuted, textAlign: 'center' as const },
-  doneBtn:        { backgroundColor: DS.accent, borderRadius: 28, paddingVertical: 14, paddingHorizontal: 36, alignSelf: 'center' as const, marginTop: 4 },
-  doneTxt:        { fontSize: 15, fontWeight: '800', color: '#fff' },
+  cardActive: {
+    backgroundColor: DS.accent, borderColor: DS.accent,
+  },
+
+  iconBlock: {
+    width: 40, height: 40, borderRadius: 10,
+    alignItems: 'center' as const, justifyContent: 'center' as const,
+    flexShrink: 0,
+  },
+  abbr: {
+    fontSize: 11, fontWeight: '900', letterSpacing: 0.3,
+  },
+
+  name:        { fontSize: 12, fontWeight: '800', color: DS.textPrimary, letterSpacing: -0.1 },
+  nameActive:  { color: '#fff' },
+  desc:        { fontSize: 10, color: DS.textMuted, fontWeight: '500' },
+  descActive:  { color: 'rgba(255,255,255,0.75)' },
+
+  badge:        { position: 'absolute' as const, top: 6, right: 6, borderRadius: DS.radiusBadge, paddingHorizontal: 5, paddingVertical: 2, backgroundColor: DS.border },
+  badgeActive:  { backgroundColor: 'rgba(255,255,255,0.25)' },
+  badgeNew:     { backgroundColor: '#059669' + '20' },
+  badgePopular: { backgroundColor: '#D97706' + '20' },
+  badgeStart:   { backgroundColor: DS.accent + '15' },
+  badgeTxt:     { fontSize: 8, fontWeight: '900', color: DS.textMuted, letterSpacing: 0.3 },
+  badgeTxtActive:   { color: '#fff' },
+  badgeTxtNew:      { color: '#059669' },
+  badgeTxtPopular:  { color: '#D97706' },
+  badgeTxtStart:    { color: DS.accent },
+
+  descCard:  { flexDirection: 'row' as const, alignItems: 'flex-start' as const, gap: 8, borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10 },
+  descDot:   { width: 6, height: 6, borderRadius: 3, marginTop: 5, flexShrink: 0 },
+  descText:  { flex: 1, fontSize: 12, lineHeight: 18, fontWeight: '500' },
 });
 
 // ─── Pipeline action buttons (cost model + launch decision) ──────────────────
@@ -458,6 +479,93 @@ const av = StyleSheet.create({
   k:        { fontWeight: '700', color: DS.textPrimary },
 });
 
+// ─── Pipeline Import ──────────────────────────────────────────────────────────
+// One-tap import chip. No modal — fills fields instantly.
+// After tap, empty fields that weren't filled show amber "⚑ Enter manually."
+
+interface PipelineField {
+  key:    string;
+  label:  string;
+  source: string;
+  value:  string;
+  apply:  () => void;
+}
+
+interface PipelineSection {
+  title: string;
+  icon:  string;
+  fields: PipelineField[];
+}
+
+function ImportChip({
+  sections,
+  onImport,
+}: {
+  sections: PipelineSection[];
+  onImport: (keys: Set<string>) => void;
+}) {
+  const [done, setDone] = useState(false);
+  const allFields = useMemo(() => sections.flatMap(s => s.fields), [sections]);
+  const prevCountRef = useRef(allFields.length);
+
+  useEffect(() => {
+    if (allFields.length !== prevCountRef.current) {
+      setDone(false);
+      prevCountRef.current = allFields.length;
+    }
+  }, [allFields.length]);
+
+  if (allFields.length === 0) return null;
+
+  function handleImport() {
+    allFields.forEach(f => f.apply());
+    onImport(new Set(allFields.map(f => f.key)));
+    setDone(true);
+  }
+
+  const sourceIcons = [...new Set(sections.map(s => s.icon))].join('  ');
+  const sourceTitles = sections.map(s => s.title.split(' ')[0]).join(' · ');
+
+  return (
+    <TouchableOpacity
+      style={[ic.row, done && ic.rowDone]}
+      onPress={handleImport}
+      activeOpacity={0.8}
+    >
+      <Text style={[ic.icon, done && ic.iconDone]}>{done ? '✓' : '⬇'}</Text>
+      <View style={{ flex: 1 }}>
+        <Text style={[ic.label, done && ic.labelDone]}>
+          {done
+            ? `${allFields.length} fields imported — tap to refresh`
+            : `Import from pipeline  ·  ${allFields.length} field${allFields.length !== 1 ? 's' : ''}`}
+        </Text>
+        <Text style={ic.sub} numberOfLines={1}>
+          {done
+            ? 'Amber fields below still need manual input'
+            : `${sourceIcons}  ${sourceTitles}`}
+        </Text>
+      </View>
+      {!done && <Text style={ic.caret}>›</Text>}
+    </TouchableOpacity>
+  );
+}
+
+const ic = StyleSheet.create({
+  row: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: DS.accentLight,
+    borderRadius: DS.radiusButton, borderWidth: 1.5, borderColor: DS.accent + '40',
+    paddingHorizontal: 14, paddingVertical: 11,
+  },
+  rowDone:   { backgroundColor: DS.successBg, borderColor: DS.success + '40' },
+  icon:      { fontSize: 16, color: DS.accent },
+  iconDone:  { color: DS.success },
+  label:     { fontSize: 13, fontWeight: '800', color: DS.accent, letterSpacing: -0.1 },
+  labelDone: { color: DS.success },
+  sub:       { fontSize: 11, color: DS.textMuted, marginTop: 1 },
+  caret:     { fontSize: 18, color: DS.accent, fontWeight: '300' },
+});
+
 function FBAWorkspace({
   onSave, onUnsave, saveLoading, saveSuccess, saveError, latestEntry, activeProductPrice, activeProductName,
 }: {
@@ -480,6 +588,12 @@ function FBAWorkspace({
   const [scenario,          setScenario]           = useState<Scenario>('expected');
   const [showFeeHelper,     setShowFeeHelper]      = useState(false);
   const [showStressTest,    setShowStressTest]     = useState(false);
+  const [importedKeys,      setImportedKeys]       = useState<Set<string>>(new Set());
+
+  // Helper: returns true when import has run but this field had no pipeline data
+  function needs(keys: string[]) {
+    return importedKeys.size > 0 && !keys.some(k => importedKeys.has(k));
+  }
 
   // Restore last saved calculation so tapping "Open in Profit Lab" from home isn't blank.
   useEffect(() => {
@@ -754,16 +868,78 @@ function FBAWorkspace({
     ? (latestEntry.product.price ?? latestEntry.analysis?.metrics.price ?? null)
     : null;
 
+  // Build pipeline import sections
+  const pipelineSections = useMemo<PipelineSection[]>(() => {
+    const sections: PipelineSection[] = [];
+
+    // ── Research (active product) ──────────────────────────────────────────
+    const productFields: PipelineField[] = [];
+    if (pipeline.activeProduct?.title)
+      productFields.push({ key: 'product_name', label: 'Product name', source: 'Research', value: pipeline.activeProduct.title, apply: () => setProductName(pipeline.activeProduct!.title) });
+    if (pipeline.activeProduct?.price)
+      productFields.push({ key: 'selling_price', label: 'Selling price', source: 'Research', value: `${symbol}${pipeline.activeProduct.price.toFixed(2)}`, apply: () => setInputs(p => ({ ...p, sellingPrice: pipeline.activeProduct!.price.toFixed(2) })) });
+    if (pipeline.activeProduct?.asin)
+      productFields.push({ key: 'asin', label: 'ASIN', source: 'Research', value: pipeline.activeProduct.asin, apply: () => setLoadedAsin(pipeline.activeProduct!.asin!) });
+    if (productFields.length > 0)
+      sections.push({ title: 'Product (Research tab)', icon: '🔍', fields: productFields });
+
+    // ── Sourcing — supplier ────────────────────────────────────────────────
+    const supplierFields: PipelineField[] = [];
+    if (pipeline.selectedSupplier?.unitCost)
+      supplierFields.push({ key: 'product_cost', label: 'Supplier cost', source: pipeline.selectedSupplier.platform ?? 'Sourcing', value: `${symbol}${pipeline.selectedSupplier.unitCost.toFixed(2)}/unit`, apply: () => setInputs(p => ({ ...p, productCost: pipeline.selectedSupplier!.unitCost.toFixed(2) })) });
+    if (pipeline.selectedSupplier?.moq)
+      supplierFields.push({ key: 'units_ordered', label: 'Units to order (MOQ)', source: pipeline.selectedSupplier.platform ?? 'Sourcing', value: `${pipeline.selectedSupplier.moq.toLocaleString()} units`, apply: () => setInputs(p => ({ ...p, unitsOrdered: String(pipeline.selectedSupplier!.moq) })) });
+    if (pipeline.selectedSupplier?.estimatedLandedCost)
+      supplierFields.push({ key: 'landed_hint', label: 'Est. landed cost', source: pipeline.selectedSupplier.platform ?? 'Sourcing', value: `${symbol}${pipeline.selectedSupplier.estimatedLandedCost.toFixed(2)}/unit`, apply: () => setInputs(p => ({ ...p, productCost: pipeline.selectedSupplier!.estimatedLandedCost!.toFixed(2) })) });
+    if (supplierFields.length > 0)
+      sections.push({ title: 'Supplier (Sourcing tab)', icon: '⬡', fields: supplierFields });
+
+    // ── Sourcing — freight ─────────────────────────────────────────────────
+    const freightFields: PipelineField[] = [];
+    if (pipeline.freightEstimate?.perUnitCost)
+      freightFields.push({ key: 'freight', label: 'Freight per unit', source: `${pipeline.freightEstimate.selectedMode.toUpperCase()} estimate`, value: `${symbol}${pipeline.freightEstimate.perUnitCost.toFixed(2)}/unit`, apply: () => setInputs(p => ({ ...p, freight: pipeline.freightEstimate!.perUnitCost.toFixed(2) })) });
+    if (freightFields.length > 0)
+      sections.push({ title: 'Freight estimate', icon: '🚢', fields: freightFields });
+
+    // ── Previous cost model ────────────────────────────────────────────────
+    const costFields: PipelineField[] = [];
+    if (pipeline.costModel?.fbaFee)
+      costFields.push({ key: 'fba_fees', label: 'FBA fulfillment fee', source: 'Saved cost model', value: `${symbol}${pipeline.costModel.fbaFee.toFixed(2)}`, apply: () => setInputs(p => ({ ...p, fbaFees: pipeline.costModel!.fbaFee.toFixed(2) })) });
+    if (pipeline.costModel?.referralFee)
+      costFields.push({ key: 'referral_fee', label: 'Referral fee', source: 'Saved cost model', value: `${symbol}${pipeline.costModel.referralFee.toFixed(2)}`, apply: () => setInputs(p => ({ ...p, referralFee: pipeline.costModel!.referralFee.toFixed(2) })) });
+    if (pipeline.costModel?.duties)
+      costFields.push({ key: 'duties', label: 'Import duties', source: 'Saved cost model', value: `${symbol}${pipeline.costModel.duties.toFixed(2)}`, apply: () => setInputs(p => ({ ...p, duties: pipeline.costModel!.duties.toFixed(2) })) });
+    if (pipeline.costModel?.packaging)
+      costFields.push({ key: 'packaging', label: 'Packaging', source: 'Saved cost model', value: `${symbol}${pipeline.costModel.packaging.toFixed(2)}`, apply: () => setInputs(p => ({ ...p, packaging: pipeline.costModel!.packaging.toFixed(2) })) });
+    if (costFields.length > 0)
+      sections.push({ title: 'Previous cost model', icon: '💾', fields: costFields });
+
+    // ── Niche context ──────────────────────────────────────────────────────
+    const nicheFields: PipelineField[] = [];
+    if (pipeline.activeNiche?.keyword)
+      nicheFields.push({ key: 'niche', label: 'Target niche', source: 'Niche tab', value: pipeline.activeNiche.keyword, apply: () => setProductName(prev => prev.trim() ? prev : (pipeline.activeNiche!.keyword)) });
+    if (nicheFields.length > 0)
+      sections.push({ title: 'Niche context', icon: '🎯', fields: nicheFields });
+
+    return sections;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pipeline.activeProduct, pipeline.selectedSupplier, pipeline.freightEstimate, pipeline.costModel, pipeline.activeNiche, symbol]);
+
   return (
     <View style={ws.wrap}>
+      {/* Pipeline import — one tap, no modal */}
+      <ImportChip sections={pipelineSections} onImport={setImportedKeys} />
+
       {/* Inputs */}
       <AppCard style={{ gap: 12 }}>
         <Text style={ws.cardTitle}>Inputs</Text>
         <Field label="Product name (optional)" value={productName} onChange={setProductName} placeholder="e.g. Yoga Mat Premium" keyboard="default" />
         <Field label="HS/HTS code (optional)" value={hsCode} onChange={setHsCode} placeholder="e.g. 9506.91" keyboard="default" hint="Verify with a customs broker — used for record-keeping only" />
         <Pair>
-          <Field label={`Selling price (${symbol})`} value={inputs.sellingPrice} onChange={v => set('sellingPrice', v)} placeholder="24.99" />
-          <Field label={`Supplier cost (${symbol})`} value={inputs.productCost} onChange={v => set('productCost', v)} placeholder="5.20" />
+          <Field label={`Selling price (${symbol})`} value={inputs.sellingPrice} onChange={v => set('sellingPrice', v)} placeholder="24.99"
+            needsInput={needs(['selling_price'])} />
+          <Field label={`Supplier cost (${symbol})`} value={inputs.productCost} onChange={v => set('productCost', v)} placeholder="5.20"
+            needsInput={needs(['product_cost', 'landed_hint'])} />
         </Pair>
 
         {/* Package weight & dimensions — drives the real FBA fee calc below */}
@@ -798,8 +974,10 @@ function FBAWorkspace({
         )}
 
         <Pair>
-          <Field label={`Freight / unit (${symbol})`} value={inputs.freight} onChange={v => set('freight', v)} placeholder="2.10" />
-          <Field label={`FBA fees (${symbol})`} value={inputs.fbaFees} onChange={v => set('fbaFees', v)} placeholder="4.50" />
+          <Field label={`Freight / unit (${symbol})`} value={inputs.freight} onChange={v => set('freight', v)} placeholder="2.10"
+            needsInput={needs(['freight'])} />
+          <Field label={`FBA fees (${symbol})`} value={inputs.fbaFees} onChange={v => set('fbaFees', v)} placeholder="4.50"
+            needsInput={needs(['fba_fees'])} />
         </Pair>
         {/* FBA Fee Helper */}
         <TouchableOpacity style={ws.helperLink} onPress={() => setShowFeeHelper(v => !v)} activeOpacity={0.7}>
@@ -836,12 +1014,14 @@ function FBAWorkspace({
           </Text>
         )}
         <Pair>
-          <Field label={`Referral fee (${symbol})`} value={inputs.referralFee} onChange={v => set('referralFee', v)} placeholder="3.67" />
+          <Field label={`Referral fee (${symbol})`} value={inputs.referralFee} onChange={v => set('referralFee', v)} placeholder="3.67"
+            needsInput={needs(['referral_fee'])} />
           <Field label={`Import duties (${symbol})`} value={inputs.duties} onChange={v => set('duties', v)} placeholder="0.73" />
         </Pair>
         <Pair>
           <Field label={`Packaging (${symbol})`} value={inputs.packaging} onChange={v => set('packaging', v)} placeholder="0.45" />
-          <Field label="Units ordered" value={inputs.unitsOrdered} onChange={v => set('unitsOrdered', v)} placeholder="500" keyboard="number-pad" />
+          <Field label="Units ordered" value={inputs.unitsOrdered} onChange={v => set('unitsOrdered', v)} placeholder="500" keyboard="number-pad"
+            needsInput={needs(['units_ordered'])} />
         </Pair>
         <Text style={ws.chipLabel}>SCENARIO</Text>
         <View style={ws.chips}>
@@ -1118,13 +1298,19 @@ function FBAWorkspace({
 
 function BreakevenWorkspace() {
   const { symbol } = useCurrency();
-  const [price,    setPrice]   = useState('');
-  const [cpu,      setCpu]     = useState('');
-  const [fees,     setFees]    = useState('');
-  const [startup,  setStartup] = useState('');
-  const [fixed,    setFixed]   = useState('');
-  const [sales,    setSales]   = useState('');
-  const [show,     setShow]    = useState(false);
+  const pipeline   = usePipeline();
+  const [price,        setPrice]       = useState('');
+  const [cpu,          setCpu]         = useState('');
+  const [fees,         setFees]        = useState('');
+  const [startup,      setStartup]     = useState('');
+  const [fixed,        setFixed]       = useState('');
+  const [sales,        setSales]       = useState('');
+  const [show,         setShow]        = useState(false);
+  const [importedKeys, setImportedKeys] = useState<Set<string>>(new Set());
+
+  function needs(keys: string[]) {
+    return importedKeys.size > 0 && !keys.some(k => importedKeys.has(k));
+  }
 
   const p = n(price); const c = n(cpu); const f = n(fees);
   const s = n(startup); const fx = n(fixed); const sl = n(sales);
@@ -1136,18 +1322,43 @@ function BreakevenWorkspace() {
     ? safe(s / monthlyNetProfit).toFixed(1) : null;
   const breakEvenBlocked = sl > 0 && profitPU > 0 && monthlyNetProfit <= 0;
 
+  const pipelineSections = useMemo<PipelineSection[]>(() => {
+    const secs: PipelineSection[] = [];
+    const pf: PipelineField[] = [];
+    if (pipeline.activeProduct?.price)
+      pf.push({ key: 'price', label: 'Selling price', source: 'Research', value: `${symbol}${pipeline.activeProduct.price.toFixed(2)}`, apply: () => setPrice(pipeline.activeProduct!.price.toFixed(2)) });
+    if (pf.length) secs.push({ title: 'Product', icon: '🔍', fields: pf });
+    const sf: PipelineField[] = [];
+    if (pipeline.selectedSupplier?.unitCost)
+      sf.push({ key: 'cpu', label: 'Cost per unit', source: pipeline.selectedSupplier.platform ?? 'Sourcing', value: `${symbol}${pipeline.selectedSupplier.unitCost.toFixed(2)}`, apply: () => setCpu(pipeline.selectedSupplier!.unitCost.toFixed(2)) });
+    if (sf.length) secs.push({ title: 'Supplier', icon: '⬡', fields: sf });
+    const cm: PipelineField[] = [];
+    if (pipeline.costModel?.fbaFee)
+      cm.push({ key: 'fees', label: 'FBA fees', source: 'Cost model', value: `${symbol}${pipeline.costModel.fbaFee.toFixed(2)}`, apply: () => setFees(pipeline.costModel!.fbaFee.toFixed(2)) });
+    if (pipeline.costModel?.totalInvestment)
+      cm.push({ key: 'startup', label: 'Total investment (startup costs)', source: 'Cost model', value: `${symbol}${pipeline.costModel.totalInvestment.toFixed(0)}`, apply: () => setStartup(pipeline.costModel!.totalInvestment.toFixed(0)) });
+    if (cm.length) secs.push({ title: 'Previous cost model', icon: '💾', fields: cm });
+    return secs;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pipeline.activeProduct, pipeline.selectedSupplier, pipeline.costModel, symbol]);
+
   return (
     <View style={ws.wrap}>
+      <ImportChip sections={pipelineSections} onImport={setImportedKeys} />
       <AppCard style={{ gap: 12 }}>
         <Text style={ws.cardTitle}>Inputs</Text>
         <Text style={ws.hint}>Break even within 90 days = healthy FBA product.</Text>
         <Pair>
-          <Field label={`Selling price (${symbol})`} value={price} onChange={setPrice} placeholder="29.99" />
-          <Field label={`Cost per unit (${symbol})`} value={cpu} onChange={setCpu} placeholder="5.00" />
+          <Field label={`Selling price (${symbol})`} value={price} onChange={setPrice} placeholder="29.99"
+            needsInput={needs(['price'])} />
+          <Field label={`Cost per unit (${symbol})`} value={cpu} onChange={setCpu} placeholder="5.00"
+            needsInput={needs(['cpu'])} />
         </Pair>
         <Pair>
-          <Field label={`FBA fees (${symbol})`} value={fees} onChange={setFees} placeholder="6.50" />
-          <Field label={`Startup costs (${symbol})`} value={startup} onChange={setStartup} placeholder="3000" />
+          <Field label={`FBA fees (${symbol})`} value={fees} onChange={setFees} placeholder="6.50"
+            needsInput={needs(['fees'])} />
+          <Field label={`Startup costs (${symbol})`} value={startup} onChange={setStartup} placeholder="3000"
+            needsInput={needs(['startup'])} />
         </Pair>
         <Pair>
           <Field label={`Monthly fixed (${symbol})`} value={fixed} onChange={setFixed} placeholder="500" />
@@ -1185,11 +1396,17 @@ function BreakevenWorkspace() {
 
 function PPCWorkspace() {
   const { symbol } = useCurrency();
-  const [price, setPrice] = useState('');
-  const [units, setUnits] = useState('');
-  const [acos,  setAcos]  = useState('30');
-  const [cpc,   setCpc]   = useState('0.75');
-  const [show,  setShow]  = useState(false);
+  const pipeline   = usePipeline();
+  const [price,        setPrice]       = useState('');
+  const [units,        setUnits]       = useState('');
+  const [acos,         setAcos]        = useState('30');
+  const [cpc,          setCpc]         = useState('0.75');
+  const [show,         setShow]        = useState(false);
+  const [importedKeys, setImportedKeys] = useState<Set<string>>(new Set());
+
+  function needs(keys: string[]) {
+    return importedKeys.size > 0 && !keys.some(k => importedKeys.has(k));
+  }
 
   const p = n(price); const u = n(units);
   const acosN = n(acos) || 30; const cpcN = n(cpc) || 0.75;
@@ -1198,13 +1415,28 @@ function PPCWorkspace() {
   const dailyClicks = cpcN > 0 ? dailyBudget / cpcN : 0;
   const acosColor = acosN <= 25 ? DS.accent : acosN <= 40 ? DS.warning : DS.danger;
 
+  const pipelineSections = useMemo<PipelineSection[]>(() => {
+    const pf: PipelineField[] = [];
+    if (pipeline.activeProduct?.price)
+      pf.push({ key: 'price', label: 'Selling price', source: 'Research', value: `${symbol}${pipeline.activeProduct.price.toFixed(2)}`, apply: () => setPrice(pipeline.activeProduct!.price.toFixed(2)) });
+    if (pipeline.activeProduct?.salesEstHigh)
+      pf.push({ key: 'units', label: 'Est. daily sales (optimistic)', source: 'Research', value: `${Math.round(pipeline.activeProduct.salesEstHigh / 30)} units/day`, apply: () => setUnits(String(Math.round(pipeline.activeProduct!.salesEstHigh! / 30))) });
+    if (pipeline.activeProduct?.salesEstLow)
+      pf.push({ key: 'units_low', label: 'Est. daily sales (conservative)', source: 'Research', value: `${Math.round(pipeline.activeProduct.salesEstLow / 30)} units/day (use this for safe planning)`, apply: () => setUnits(String(Math.round(pipeline.activeProduct!.salesEstLow! / 30))) });
+    return pf.length ? [{ title: 'Product & Sales Estimates', icon: '🔍', fields: pf }] : [];
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pipeline.activeProduct, symbol]);
+
   return (
     <View style={ws.wrap}>
+      <ImportChip sections={pipelineSections} onImport={setImportedKeys} />
       <AppCard style={{ gap: 12 }}>
         <Text style={ws.cardTitle}>Inputs</Text>
         <Pair>
-          <Field label={`Selling price (${symbol})`} value={price} onChange={setPrice} placeholder="29.99" />
-          <Field label="Target daily sales" value={units} onChange={setUnits} placeholder="10" keyboard="number-pad" />
+          <Field label={`Selling price (${symbol})`} value={price} onChange={setPrice} placeholder="29.99"
+            needsInput={needs(['price'])} />
+          <Field label="Target daily sales" value={units} onChange={setUnits} placeholder="10" keyboard="number-pad"
+            needsInput={needs(['units', 'units_low'])} />
         </Pair>
         <Pair>
           <Field label="Target ACoS (%)" value={acos} onChange={setAcos} placeholder="30" />
@@ -1410,6 +1642,291 @@ const FREIGHT_ORIGIN_OPTS: { id: ShipOrigin; label: string }[] = [
   { id: 'IN', label: 'India'   },
   { id: 'TR', label: 'Turkey'  },
 ];
+// ─── 5. Storage Fees ─────────────────────────────────────────────────────────
+
+function StorageFeesWorkspace() {
+  const { symbol } = useCurrency();
+  const pipeline = usePipeline();
+  const [length,   setLength]   = useState('');
+  const [width,    setWidth]    = useState('');
+  const [height,   setHeight]   = useState('');
+  const [weightLbs,setWeightLbs]= useState('');
+  const [units,    setUnits]    = useState('');
+  const [months,   setMonths]   = useState('3');
+  const [q4,       setQ4]       = useState(false);
+  const [show,     setShow]     = useState(false);
+  const [importedKeys, setImportedKeys] = useState<Set<string>>(new Set());
+
+  function needs(keys: string[]) {
+    return importedKeys.size > 0 && !keys.some(k => importedKeys.has(k));
+  }
+
+  const l = n(length); const w = n(width); const h = n(height);
+  const wt = n(weightLbs); const u = n(units); const mo = n(months) || 1;
+
+  const dims = [l, w, h].filter(d => d > 0).sort((a, b) => b - a);
+  const isOversize = dims[0] > 18 || dims[1] > 14 || dims[2] > 8 || wt > 20;
+  const tier = isOversize ? 'Oversize' : 'Standard';
+
+  const cubicFtPerUnit = l > 0 && w > 0 && h > 0 ? (l * w * h) / 1728 : 0;
+  const totalCubicFt   = cubicFtPerUnit * u;
+
+  // Amazon US 2024 monthly rates
+  const monthlyRate     = isOversize ? (q4 ? 1.40 : 0.56) : (q4 ? 2.40 : 0.87);
+  const monthlyFeeTotal = totalCubicFt * monthlyRate;
+  const monthlyFeePerUnit = u > 0 ? monthlyFeeTotal / u : 0;
+  const totalFeeForPeriod = monthlyFeeTotal * mo;
+
+  // Long-term storage: 365+ days, $6.90/cu ft (min $0.15/unit)
+  const ltFeePerUnit = cubicFtPerUnit > 0 ? Math.max(cubicFtPerUnit * 6.90, 0.15) : 0;
+  const ltFeeTotal   = ltFeePerUnit * u;
+
+  const pipelineSections = useMemo<PipelineSection[]>(() => {
+    const sf: PipelineField[] = [];
+    if (pipeline.selectedSupplier?.moq)
+      sf.push({ key: 'units', label: 'Units ordered (MOQ)', source: pipeline.selectedSupplier.platform ?? 'Sourcing', value: `${pipeline.selectedSupplier.moq.toLocaleString()} units`, apply: () => setUnits(String(pipeline.selectedSupplier!.moq)) });
+    else if (pipeline.costModel?.unitsOrdered)
+      sf.push({ key: 'units', label: 'Units ordered', source: 'Cost model', value: `${pipeline.costModel.unitsOrdered.toLocaleString()} units`, apply: () => setUnits(String(pipeline.costModel!.unitsOrdered)) });
+    return sf.length ? [{ title: 'Supplier', icon: '⬡', fields: sf }] : [];
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pipeline.selectedSupplier, pipeline.costModel]);
+
+  return (
+    <View style={ws.wrap}>
+      <ImportChip sections={pipelineSections} onImport={setImportedKeys} />
+      <AppCard style={{ gap: 12 }}>
+        <Text style={ws.cardTitle}>Inputs</Text>
+        <Text style={ws.hint}>Q4 rates (Oct–Dec) are roughly 3× higher — the single biggest surprise for first-time sellers.</Text>
+        <Text style={ws.chipLabel}>UNIT DIMENSIONS</Text>
+        <Pair>
+          <Field label="Length (in)" value={length} onChange={setLength} placeholder="10.0" />
+          <Field label="Width (in)"  value={width}  onChange={setWidth}  placeholder="8.0"  />
+        </Pair>
+        <Pair>
+          <Field label="Height (in)"  value={height}    onChange={setHeight}    placeholder="4.0" />
+          <Field label="Weight (lbs)" value={weightLbs} onChange={setWeightLbs} placeholder="1.2" />
+        </Pair>
+        <Pair>
+          <Field label="Units in storage" value={units}  onChange={setUnits}  placeholder="500" keyboard="number-pad" needsInput={needs(['units'])} />
+          <Field label="Months stored"    value={months} onChange={setMonths} placeholder="3"   keyboard="number-pad" />
+        </Pair>
+        <Text style={ws.chipLabel}>STORAGE PERIOD</Text>
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          {([false, true] as const).map(isQ4 => (
+            <TouchableOpacity key={String(isQ4)} style={[ws.chip, q4 === isQ4 && ws.chipActive]} onPress={() => setQ4(isQ4)}>
+              <Text style={[ws.chipTxt, q4 === isQ4 && ws.chipTxtActive]}>{isQ4 ? 'Q4 (Oct–Dec)' : 'Non-Q4 (Jan–Sep)'}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        <CalcBtn label="Calculate Storage Fees" onPress={() => setShow(true)} />
+      </AppCard>
+
+      {show && cubicFtPerUnit > 0 && u > 0 && (
+        <AppCard style={{ gap: 12 }}>
+          <Text style={ws.cardTitle}>Storage Estimate</Text>
+          <AccuracyBadge level="planning" />
+          <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+            <View style={[ab.badge, { backgroundColor: isOversize ? DS.warningBg : DS.successBg }]}>
+              <Text style={[ab.txt, { color: isOversize ? DS.warningText : DS.successText }]}>{tier} size</Text>
+            </View>
+            <Text style={ws.hint}>{cubicFtPerUnit.toFixed(4)} cu ft/unit</Text>
+          </View>
+          <View style={ws.heroRow}>
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text style={ws.heroLabel}>Monthly / unit</Text>
+              <Text style={[ws.heroValue, { color: DS.accent }]}>{symbol}{monthlyFeePerUnit.toFixed(4)}</Text>
+            </View>
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text style={ws.heroLabel}>Monthly total</Text>
+              <Text style={[ws.heroValue, { color: DS.textPrimary, fontSize: 22 }]}>{symbol}{monthlyFeeTotal.toFixed(2)}</Text>
+            </View>
+          </View>
+          {[
+            [`${mo.toFixed(0)}-month total`, `${symbol}${totalFeeForPeriod.toFixed(2)}`],
+            [`Rate (${q4 ? 'Q4' : 'non-Q4'})`, `${symbol}${monthlyRate.toFixed(2)}/cu ft/mo`],
+            ['Total cubic feet', `${totalCubicFt.toFixed(2)} cu ft`],
+          ].map(([lb, v]) => <Row key={lb} label={lb} value={v} />)}
+          {mo >= 10 && (
+            <View style={[ws.helperBox, { borderColor: DS.danger + '40', backgroundColor: DS.dangerBg }]}>
+              <Text style={[ws.helperTitle, { color: DS.dangerText }]}>⚠ Long-term storage risk</Text>
+              <Text style={ws.disclaimer}>
+                Units held 365+ days: {symbol}{ltFeePerUnit.toFixed(2)}/unit extra ({symbol}6.90/cu ft, min {symbol}0.15/unit).
+                For {u.toLocaleString()} units that's an additional {symbol}{ltFeeTotal.toFixed(2)} — before monthly fees.
+                Clear stock or create a removal order before 12 months.
+              </Text>
+            </View>
+          )}
+          <Text style={ws.hint}>Amazon US fee schedule (2024). Other marketplaces use different rates — check Seller Central.</Text>
+        </AppCard>
+      )}
+    </View>
+  );
+}
+
+// ─── 6. Cash Flow Timeline ───────────────────────────────────────────────────
+
+function CashFlowWorkspace() {
+  const { symbol } = useCurrency();
+  const pipeline   = usePipeline();
+  const [landedCost,     setLandedCost]     = useState('');
+  const [units,          setUnits]          = useState('');
+  const [netProfit,      setNetProfit]      = useState('');
+  const [monthlySales,   setMonthlySales]   = useState('');
+  const [launchCosts,    setLaunchCosts]    = useState('');
+  const [ppcMonthly,     setPpcMonthly]     = useState('');
+  const [storageMonthly, setStorageMonthly] = useState('');
+  const [show,           setShow]           = useState(false);
+  const [importedKeys,   setImportedKeys]   = useState<Set<string>>(new Set());
+
+  function needs(keys: string[]) {
+    return importedKeys.size > 0 && !keys.some(k => importedKeys.has(k));
+  }
+
+  const lc = n(landedCost); const u = n(units); const np = n(netProfit);
+  const ms = n(monthlySales); const launch = n(launchCosts);
+  const ppc = n(ppcMonthly); const store = n(storageMonthly);
+
+  const initialInvestment = lc * u + launch;
+  const monthlyIn  = ms * np;
+  const monthlyOut = ppc + store;
+  const monthlyCF  = monthlyIn - monthlyOut;
+
+  interface CFRow { month: number; monthlyCF: number; cumulative: number; unitsLeft: number; }
+
+  const timeline = useMemo<CFRow[]>(() => {
+    if (initialInvestment <= 0 || ms <= 0 || np <= 0) return [];
+    const rows: CFRow[] = [];
+    let cumulative = -initialInvestment;
+    let unitsLeft = u;
+    for (let m = 1; m <= 24; m++) {
+      const sold = Math.min(ms, unitsLeft);
+      const cf   = sold * np - ppc - store;
+      cumulative += cf;
+      unitsLeft   = Math.max(0, unitsLeft - sold);
+      rows.push({ month: m, monthlyCF: cf, cumulative, unitsLeft });
+      if (cumulative >= 0) break;
+      if (unitsLeft === 0 && cumulative < 0) break;
+    }
+    return rows;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialInvestment, u, ms, np, ppc, store]);
+
+  const roiMonth          = timeline.find(r => r.cumulative >= 0)?.month ?? null;
+  const cashPosiMonth     = timeline.find(r => r.monthlyCF > 0)?.month ?? null;
+  const peakOutlay        = initialInvestment > 0 ? initialInvestment : 0;
+
+  const pipelineSections = useMemo<PipelineSection[]>(() => {
+    const secs: PipelineSection[] = [];
+
+    const sf: PipelineField[] = [];
+    if (pipeline.selectedSupplier?.estimatedLandedCost)
+      sf.push({ key: 'landed_cost', label: 'Est. landed cost/unit', source: pipeline.selectedSupplier.platform ?? 'Sourcing', value: `${symbol}${pipeline.selectedSupplier.estimatedLandedCost.toFixed(2)}`, apply: () => setLandedCost(pipeline.selectedSupplier!.estimatedLandedCost!.toFixed(2)) });
+    else if (pipeline.selectedSupplier?.unitCost)
+      sf.push({ key: 'landed_cost', label: 'Supplier cost/unit', source: pipeline.selectedSupplier.platform ?? 'Sourcing', value: `${symbol}${pipeline.selectedSupplier.unitCost.toFixed(2)}`, apply: () => setLandedCost(pipeline.selectedSupplier!.unitCost.toFixed(2)) });
+    if (pipeline.selectedSupplier?.moq)
+      sf.push({ key: 'units', label: 'Units ordered (MOQ)', source: pipeline.selectedSupplier.platform ?? 'Sourcing', value: `${pipeline.selectedSupplier.moq.toLocaleString()} units`, apply: () => setUnits(String(pipeline.selectedSupplier!.moq)) });
+    if (sf.length) secs.push({ title: 'Supplier', icon: '⬡', fields: sf });
+
+    const cm: PipelineField[] = [];
+    if (pipeline.costModel?.netProfit)
+      cm.push({ key: 'net_profit', label: 'Net profit/unit', source: 'FBA Profit calc', value: `${symbol}${pipeline.costModel.netProfit.toFixed(2)}`, apply: () => setNetProfit(pipeline.costModel!.netProfit.toFixed(2)) });
+    if (!pipeline.selectedSupplier?.moq && pipeline.costModel?.unitsOrdered)
+      cm.push({ key: 'units', label: 'Units ordered', source: 'Cost model', value: `${pipeline.costModel.unitsOrdered.toLocaleString()} units`, apply: () => setUnits(String(pipeline.costModel!.unitsOrdered)) });
+    if (cm.length) secs.push({ title: 'Cost Model', icon: '◈', fields: cm });
+
+    const pf: PipelineField[] = [];
+    if (pipeline.activeProduct?.salesEstLow)
+      pf.push({ key: 'monthly_sales', label: 'Est. monthly sales (conservative)', source: 'Research', value: `${pipeline.activeProduct.salesEstLow.toLocaleString()} units/mo`, apply: () => setMonthlySales(String(pipeline.activeProduct!.salesEstLow)) });
+    if (pf.length) secs.push({ title: 'Research', icon: '◎', fields: pf });
+
+    return secs;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pipeline.selectedSupplier, pipeline.costModel, pipeline.activeProduct, symbol]);
+
+  return (
+    <View style={ws.wrap}>
+      <ImportChip sections={pipelineSections} onImport={setImportedKeys} />
+      <AppCard style={{ gap: 12 }}>
+        <Text style={ws.cardTitle}>Inputs</Text>
+        <Text style={ws.hint}>Not just when you break even in units — but when real cash returns to your account after every cost.</Text>
+        <Pair>
+          <Field label={`Landed cost/unit (${symbol})`} value={landedCost}   onChange={setLandedCost}   placeholder="7.20" needsInput={needs(['landed_cost'])} />
+          <Field label="Units ordered"                   value={units}        onChange={setUnits}        placeholder="500"  keyboard="number-pad" needsInput={needs(['units'])} />
+        </Pair>
+        <Pair>
+          <Field label={`Net profit/unit (${symbol})`}   value={netProfit}    onChange={setNetProfit}    placeholder="8.50" hint="From FBA Profit calc" needsInput={needs(['net_profit'])} />
+          <Field label="Monthly sales (units)"           value={monthlySales} onChange={setMonthlySales} placeholder="150"  keyboard="number-pad" needsInput={needs(['monthly_sales'])} />
+        </Pair>
+        <Pair>
+          <Field label={`Launch costs (${symbol})`}      value={launchCosts}    onChange={setLaunchCosts}    placeholder="2000" hint="Photography, listing, Vine…" />
+          <Field label={`Monthly PPC (${symbol})`}       value={ppcMonthly}     onChange={setPpcMonthly}     placeholder="500" />
+        </Pair>
+        <Field label={`Monthly storage fees (${symbol})`} value={storageMonthly} onChange={setStorageMonthly} placeholder="50" hint="From Storage Fees calculator" />
+        <CalcBtn label="Project Cash Flow" onPress={() => setShow(true)} />
+      </AppCard>
+
+      {show && initialInvestment > 0 && ms > 0 && np > 0 && (
+        <AppCard style={{ gap: 12 }}>
+          <Text style={ws.cardTitle}>Cash Flow Projection</Text>
+          <AccuracyBadge level="planning" />
+          <View style={ws.heroRow}>
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text style={ws.heroLabel}>Initial outlay</Text>
+              <Text style={[ws.heroValue, { color: DS.danger, fontSize: 22 }]}>{symbol}{initialInvestment.toFixed(0)}</Text>
+            </View>
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text style={ws.heroLabel}>Full ROI by</Text>
+              <Text style={[ws.heroValue, { color: roiMonth ? DS.success : DS.warning, fontSize: 22 }]}>
+                {roiMonth ? `Month ${roiMonth}` : '> 24 mo'}
+              </Text>
+            </View>
+          </View>
+          {[
+            ['Monthly cash flow',  monthlyCF >= 0 ? `+${symbol}${monthlyCF.toFixed(0)}` : `-${symbol}${Math.abs(monthlyCF).toFixed(0)}`],
+            ['Cash-flow positive', cashPosiMonth ? `Month ${cashPosiMonth}` : 'Not at this velocity'],
+            ['Peak cash at risk',  `${symbol}${peakOutlay.toFixed(0)}`],
+          ].map(([lb, v]) => <Row key={lb} label={lb} value={v} />)}
+
+          {timeline.length > 0 && (
+            <View style={{ gap: 0 }}>
+              <Text style={[ws.chipLabel, { marginTop: 4 }]}>MONTH-BY-MONTH</Text>
+              <View style={[cfw.row, { borderBottomWidth: 1.5, borderBottomColor: DS.border }]}>
+                {['Mo', 'Cash in', 'Cumulative', 'Stock left'].map(h => (
+                  <Text key={h} style={[cfw.col, cfw.hdr]}>{h}</Text>
+                ))}
+              </View>
+              {timeline.map(row => {
+                const positive = row.cumulative >= 0;
+                return (
+                  <View key={row.month} style={[cfw.row, positive && { backgroundColor: DS.successBg }]}>
+                    <Text style={[cfw.col, cfw.cell]}>{row.month}</Text>
+                    <Text style={[cfw.col, cfw.cell, { color: row.monthlyCF >= 0 ? DS.success : DS.danger }]}>
+                      {row.monthlyCF >= 0 ? '+' : ''}{symbol}{Math.abs(row.monthlyCF).toFixed(0)}
+                    </Text>
+                    <Text style={[cfw.col, cfw.cell, { color: positive ? DS.success : DS.danger, fontWeight: '700' }]}>
+                      {positive ? '+' : ''}{symbol}{Math.abs(row.cumulative).toFixed(0)}
+                    </Text>
+                    <Text style={[cfw.col, cfw.cell]}>{row.unitsLeft.toLocaleString()}</Text>
+                  </View>
+                );
+              })}
+            </View>
+          )}
+          <Text style={ws.hint}>Constant velocity assumed. Real launches accelerate slowly in months 1-2 — your actual ROI timeline may be slightly longer.</Text>
+        </AppCard>
+      )}
+    </View>
+  );
+}
+
+const cfw = StyleSheet.create({
+  row:  { flexDirection: 'row' as const, paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: DS.border },
+  col:  { flex: 1, fontSize: 11 },
+  hdr:  { fontWeight: '800', color: DS.textMuted, letterSpacing: 0.3 },
+  cell: { color: DS.textSecondary },
+});
+
+// ─── (old FreightWorkspace — removed, use Sourcing tab instead) ───────────────
 function FreightWorkspace() {
   const { fmt, marketplace } = useCurrency();
   const profile = getMarketplaceProfile(marketplace);
@@ -2441,6 +2958,297 @@ const fsc = StyleSheet.create({
   searchBtnTxt: { fontSize: 15, fontWeight: '800', color: '#fff', letterSpacing: -0.2 },
 });
 
+// ─── 6. Landed Cost Breakdown ────────────────────────────────────────────────
+
+function LandedCostWorkspace() {
+  const { symbol } = useCurrency();
+  const pipeline   = usePipeline();
+  const [supplierCost, setSupplierCost]  = useState('');
+  const [freight,      setFreight]       = useState('');
+  const [dutyPct,      setDutyPct]       = useState('');
+  const [packaging,    setPackaging]     = useState('');
+  const [prep,         setPrep]          = useState('');
+  const [moq,          setMoq]           = useState('');
+  const [show,         setShow]          = useState(false);
+  const [importedKeys, setImportedKeys]  = useState<Set<string>>(new Set());
+
+  function needs(keys: string[]) {
+    return importedKeys.size > 0 && !keys.some(k => importedKeys.has(k));
+  }
+
+  const sc  = n(supplierCost);
+  const fr  = n(freight);
+  const dp  = n(dutyPct);
+  const pkg = n(packaging);
+  const prp = n(prep);
+  const qty = n(moq) || 1;
+
+  const dutyAmt   = sc * (dp / 100);
+  const landed    = sc + fr + dutyAmt + pkg + prp;
+  const totalInv  = landed * qty;
+
+  const pipelineSections = useMemo<PipelineSection[]>(() => {
+    const secs: PipelineSection[] = [];
+    const sf: PipelineField[] = [];
+    if (pipeline.selectedSupplier?.unitCost)
+      sf.push({ key: 'supplier_cost', label: 'Supplier cost', source: pipeline.selectedSupplier.platform ?? 'Sourcing', value: `${symbol}${pipeline.selectedSupplier.unitCost.toFixed(2)}/unit`, apply: () => setSupplierCost(pipeline.selectedSupplier!.unitCost.toFixed(2)) });
+    if (pipeline.selectedSupplier?.moq)
+      sf.push({ key: 'moq', label: 'Order quantity (MOQ)', source: pipeline.selectedSupplier.platform ?? 'Sourcing', value: `${pipeline.selectedSupplier.moq.toLocaleString()} units`, apply: () => setMoq(String(pipeline.selectedSupplier!.moq)) });
+    if (sf.length) secs.push({ title: 'Supplier', icon: '⬡', fields: sf });
+    const ff: PipelineField[] = [];
+    if (pipeline.freightEstimate?.perUnitCost)
+      ff.push({ key: 'freight', label: 'Freight per unit', source: `${pipeline.freightEstimate.selectedMode.toUpperCase()} estimate`, value: `${symbol}${pipeline.freightEstimate.perUnitCost.toFixed(2)}/unit`, apply: () => setFreight(pipeline.freightEstimate!.perUnitCost.toFixed(2)) });
+    if (ff.length) secs.push({ title: 'Freight', icon: '🚢', fields: ff });
+    return secs;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pipeline.selectedSupplier, pipeline.freightEstimate, symbol]);
+
+  const breakdown = landed > 0 ? [
+    { label: 'Supplier cost',  amt: sc,      pct: sc / landed * 100 },
+    { label: 'Freight',        amt: fr,      pct: fr / landed * 100 },
+    { label: 'Import duties',  amt: dutyAmt, pct: dutyAmt / landed * 100 },
+    { label: 'Packaging',      amt: pkg,     pct: pkg / landed * 100 },
+    { label: 'Prep / labels',  amt: prp,     pct: prp / landed * 100 },
+  ].filter(b => b.amt > 0) : [];
+
+  const barColors = [DS.accent, DS.info, DS.warning, DS.success, DS.textMuted];
+
+  return (
+    <View style={ws.wrap}>
+      <ImportChip sections={pipelineSections} onImport={setImportedKeys} />
+      <AppCard style={{ gap: 12 }}>
+        <Text style={ws.cardTitle}>Inputs</Text>
+        <Text style={ws.hint}>Landed cost = what you actually pay per unit, including everything to get it to the FBA warehouse.</Text>
+        <Pair>
+          <Field label={`Supplier cost (${symbol})`} value={supplierCost} onChange={setSupplierCost} placeholder="4.50"
+            needsInput={needs(['supplier_cost'])} />
+          <Field label={`Freight / unit (${symbol})`} value={freight} onChange={setFreight} placeholder="2.10"
+            needsInput={needs(['freight'])} />
+        </Pair>
+        <Pair>
+          <Field label="Import duty (%)" value={dutyPct} onChange={setDutyPct} placeholder="6.5" />
+          <Field label={`Packaging (${symbol})`} value={packaging} onChange={setPackaging} placeholder="0.45" />
+        </Pair>
+        <Pair>
+          <Field label={`Prep / labels (${symbol})`} value={prep} onChange={setPrep} placeholder="0.30" />
+          <Field label="Units ordered" value={moq} onChange={setMoq} placeholder="500" keyboard="number-pad"
+            needsInput={needs(['moq'])} />
+        </Pair>
+        <CalcBtn label="Calculate Landed Cost" onPress={() => setShow(true)} />
+      </AppCard>
+
+      {show && sc > 0 && (
+        <AppCard style={{ gap: 12 }}>
+          <Text style={ws.cardTitle}>Landed Cost</Text>
+          <AccuracyBadge level="exact" />
+
+          {/* Hero */}
+          <View style={lc.heroRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={lc.heroLbl}>Per Unit</Text>
+              <Text style={lc.heroVal}>{symbol}{landed.toFixed(2)}</Text>
+            </View>
+            {qty > 1 && (
+              <View style={{ flex: 1 }}>
+                <Text style={lc.heroLbl}>Total Investment ({qty.toLocaleString()} units)</Text>
+                <Text style={[lc.heroVal, { color: DS.textPrimary }]}>{symbol}{totalInv.toFixed(0)}</Text>
+              </View>
+            )}
+          </View>
+
+          {/* Cost breakdown bars */}
+          {breakdown.length > 1 && (
+            <View style={{ gap: 8 }}>
+              <Text style={ws.chipLabel}>COST BREAKDOWN</Text>
+              {breakdown.map((b, i) => (
+                <View key={b.label} style={{ gap: 3 }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                    <Text style={lc.barLabel}>{b.label}</Text>
+                    <Text style={lc.barPct}>{symbol}{b.amt.toFixed(2)} · {b.pct.toFixed(0)}%</Text>
+                  </View>
+                  <View style={lc.barTrack}>
+                    <View style={[lc.barFill, { width: `${b.pct}%` as any, backgroundColor: barColors[i % barColors.length] }]} />
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {/* Max price to hit targets */}
+          <View style={{ gap: 4 }}>
+            <Text style={ws.chipLabel}>MINIMUM SELLING PRICE TO HIT TARGET MARGIN</Text>
+            {[
+              { label: '20% margin (FBA floor)', mult: 1 / 0.80 },
+              { label: '25% margin (comfortable)', mult: 1 / 0.75 },
+              { label: '30% margin (strong)', mult: 1 / 0.70 },
+            ].map(t => {
+              const totalCosts = landed + n(String(0)); // FBA fees unknown here
+              const minPrice = landed / (1 - (t.mult === 1/0.80 ? 0.20 : t.mult === 1/0.75 ? 0.25 : 0.30));
+              return (
+                <Row key={t.label} label={t.label} value={`${symbol}${minPrice.toFixed(2)} min`} />
+              );
+            })}
+          </View>
+          <Text style={ws.hint}>These don't include Amazon FBA fees or referral fee — add those in FBA Profit for your true minimum.</Text>
+        </AppCard>
+      )}
+    </View>
+  );
+}
+
+const lc = StyleSheet.create({
+  heroRow:  { flexDirection: 'row', gap: 16 },
+  heroLbl:  { fontSize: 11, fontWeight: '700', color: DS.textMuted, textTransform: 'uppercase' as const, letterSpacing: 0.4 },
+  heroVal:  { fontSize: 28, fontWeight: '900', color: DS.accent, letterSpacing: -0.5 },
+  barLabel: { fontSize: 12, color: DS.textSecondary, fontWeight: '600' },
+  barPct:   { fontSize: 12, color: DS.textMuted },
+  barTrack: { height: 7, backgroundColor: DS.border, borderRadius: 4, overflow: 'hidden' },
+  barFill:  { height: 7, borderRadius: 4 },
+});
+
+// ─── 7. Launch Capital Estimator ─────────────────────────────────────────────
+
+function CapitalEstimatorWorkspace() {
+  const { symbol } = useCurrency();
+  const pipeline   = usePipeline();
+
+  const [landedCost,    setLandedCost]    = useState('');
+  const [units,         setUnits]         = useState('');
+  const [ppcBudget,     setPpcBudget]     = useState('');
+  const [photography,   setPhotography]   = useState('400');
+  const [listingDesign, setListingDesign] = useState('300');
+  const [samples,       setSamples]       = useState('100');
+  const [vineUnits,     setVineUnits]     = useState('30');
+  const [miscBuffer,    setMiscBuffer]    = useState('10');
+  const [show,          setShow]          = useState(false);
+  const [importedKeys,  setImportedKeys]  = useState<Set<string>>(new Set());
+
+  function needs(keys: string[]) {
+    return importedKeys.size > 0 && !keys.some(k => importedKeys.has(k));
+  }
+
+  const lc_  = n(landedCost);
+  const qty  = n(units);
+  const ppc  = n(ppcBudget);
+  const photo= n(photography);
+  const list = n(listingDesign);
+  const samp = n(samples);
+  const vine = n(vineUnits) * 200; // $200/unit is Amazon Vine enrollment fee
+  const misc = n(miscBuffer);
+
+  const inventory    = lc_ * qty;
+  const launchFixed  = photo + list + samp + vine;
+  const subTotal     = inventory + ppc + launchFixed;
+  const bufferAmt    = subTotal * (misc / 100);
+  const totalCapital = subTotal + bufferAmt;
+  const perUnit      = qty > 0 ? totalCapital / qty : 0;
+
+  const pipelineSections = useMemo<PipelineSection[]>(() => {
+    const secs: PipelineSection[] = [];
+    const cm: PipelineField[] = [];
+    if (pipeline.costModel?.unitCost && pipeline.costModel?.freight) {
+      const est = pipeline.costModel.unitCost + pipeline.costModel.freight + (pipeline.costModel.duties ?? 0) + (pipeline.costModel.packaging ?? 0);
+      cm.push({ key: 'landed', label: 'Landed cost per unit', source: 'Saved cost model', value: `${symbol}${est.toFixed(2)}/unit`, apply: () => setLandedCost(est.toFixed(2)) });
+    }
+    if (cm.length) secs.push({ title: 'From cost model', icon: '💾', fields: cm });
+    const sf: PipelineField[] = [];
+    if (pipeline.selectedSupplier?.moq)
+      sf.push({ key: 'units', label: 'Units to order (MOQ)', source: pipeline.selectedSupplier.platform ?? 'Sourcing', value: `${pipeline.selectedSupplier.moq.toLocaleString()} units`, apply: () => setUnits(String(pipeline.selectedSupplier!.moq)) });
+    if (sf.length) secs.push({ title: 'Supplier', icon: '⬡', fields: sf });
+    const pf: PipelineField[] = [];
+    if (pipeline.activeProduct?.salesEstHigh && pipeline.activeProduct?.price) {
+      const monthly30day = Math.round(pipeline.activeProduct.salesEstHigh / 30 * pipeline.activeProduct.price * 0.30);
+      pf.push({ key: 'ppc', label: '30-day PPC budget (30% ACoS estimate)', source: 'Research sales estimate', value: `${symbol}${monthly30day}`, apply: () => setPpcBudget(String(monthly30day)) });
+    }
+    if (pf.length) secs.push({ title: 'Sales & PPC estimate', icon: '📣', fields: pf });
+    return secs;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pipeline.costModel, pipeline.selectedSupplier, pipeline.activeProduct, symbol]);
+
+  const lineItems = show && totalCapital > 0 ? [
+    { label: 'Inventory',           amt: inventory,   note: `${qty.toLocaleString()} units × ${symbol}${lc_.toFixed(2)}` },
+    { label: '90-day PPC budget',   amt: ppc,         note: 'Paid search launch spend' },
+    { label: 'Product photography', amt: photo,       note: 'Main + lifestyle + infographic shots' },
+    { label: 'Listing creation',    amt: list,        note: 'Copywriting + A+ content' },
+    { label: 'Samples',             amt: samp,        note: 'Pre-order QC + personal testing' },
+    { label: `Amazon Vine (${n(vineUnits).toFixed(0)} units)`, amt: vine, note: '$200/unit enrollment fee' },
+    { label: `Buffer (${misc}%)`,   amt: bufferAmt,   note: 'Unexpected costs, returns, storage' },
+  ].filter(l => l.amt > 0) : [];
+
+  return (
+    <View style={ws.wrap}>
+      <ImportChip sections={pipelineSections} onImport={setImportedKeys} />
+      <AppCard style={{ gap: 12 }}>
+        <Text style={ws.cardTitle}>Inputs</Text>
+        <Text style={ws.hint}>Map your full launch spend before committing — inventory is usually only 60-70% of what new sellers actually need.</Text>
+        <Pair>
+          <Field label={`Landed cost/unit (${symbol})`} value={landedCost} onChange={setLandedCost} placeholder="7.20" hint="From Landed Cost calculator"
+            needsInput={needs(['landed'])} />
+          <Field label="Units to order" value={units} onChange={setUnits} placeholder="500" keyboard="number-pad"
+            needsInput={needs(['units'])} />
+        </Pair>
+        <Field label={`90-day PPC budget (${symbol})`} value={ppcBudget} onChange={setPpcBudget} placeholder="1500" hint="Use PPC calculator for a precise number"
+          needsInput={needs(['ppc'])} />
+        <Pair>
+          <Field label={`Photography (${symbol})`} value={photography} onChange={setPhotography} placeholder="400" />
+          <Field label={`Listing / A+ (${symbol})`} value={listingDesign} onChange={setListingDesign} placeholder="300" />
+        </Pair>
+        <Pair>
+          <Field label={`Samples (${symbol})`} value={samples} onChange={setSamples} placeholder="100" />
+          <Field label="Vine units (# units)" value={vineUnits} onChange={setVineUnits} placeholder="30" keyboard="number-pad" hint="$200/unit Amazon fee" />
+        </Pair>
+        <Field label="Contingency buffer (%)" value={miscBuffer} onChange={setMiscBuffer} placeholder="10" hint="Covers returns, extra storage, surprises" />
+        <CalcBtn label="Calculate Launch Capital" onPress={() => setShow(true)} />
+      </AppCard>
+
+      {show && totalCapital > 0 && (
+        <AppCard style={{ gap: 12 }}>
+          <Text style={ws.cardTitle}>Launch Capital Required</Text>
+          <AccuracyBadge level="planning" />
+
+          <View style={cap.heroRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={lc.heroLbl}>Total Capital</Text>
+              <Text style={cap.heroVal}>{symbol}{totalCapital.toFixed(0)}</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={lc.heroLbl}>Capital Per Unit</Text>
+              <Text style={[cap.heroVal, { fontSize: 22, color: DS.textPrimary }]}>{symbol}{perUnit.toFixed(2)}</Text>
+            </View>
+          </View>
+
+          {lineItems.map(l => (
+            <View key={l.label} style={{ gap: 2 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Text style={cap.lineLabel}>{l.label}</Text>
+                <Text style={cap.lineAmt}>{symbol}{l.amt.toFixed(0)}</Text>
+              </View>
+              <Text style={cap.lineNote}>{l.note}</Text>
+            </View>
+          ))}
+          <View style={cap.divider} />
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+            <Text style={cap.totalLabel}>Total launch capital</Text>
+            <Text style={cap.totalAmt}>{symbol}{totalCapital.toFixed(0)}</Text>
+          </View>
+          <Text style={ws.hint}>Keep 20-30% more in reserve post-launch for restocking before your first payout cycle clears.</Text>
+        </AppCard>
+      )}
+    </View>
+  );
+}
+
+const cap = StyleSheet.create({
+  heroRow:    { flexDirection: 'row', gap: 16 },
+  heroVal:    { fontSize: 28, fontWeight: '900', color: DS.accent, letterSpacing: -0.5 },
+  lineLabel:  { fontSize: 13, color: DS.textSecondary, flex: 1 },
+  lineAmt:    { fontSize: 13, fontWeight: '700', color: DS.textPrimary },
+  lineNote:   { fontSize: 11, color: DS.textMuted },
+  divider:    { height: 1, backgroundColor: DS.border },
+  totalLabel: { fontSize: 14, fontWeight: '800', color: DS.textPrimary },
+  totalAmt:   { fontSize: 14, fontWeight: '900', color: DS.accent },
+});
+
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 function SavedHistoryCard({ item }: { item: FBASaved }) {
@@ -2588,11 +3396,14 @@ export default function ProfitLabScreen() {
   }, [pipeline.costModel?.savedAt]);
 
   const CALC_HELP: Record<CalcType, FeatureKey> = {
-    fba:      'calc_fba',
-    breakeven:'calc_breakeven',
-    ppc:      'calc_ppc',
-    freight:  'calc_freight',
-    duties:   'calc_duties',
+    fba:       'calc_fba',
+    landed:    'calc_fba',
+    capital:   'calc_fba',
+    breakeven: 'calc_breakeven',
+    ppc:       'calc_ppc',
+    storage:   'calc_fba',
+    cashflow:  'calc_fba',
+    duties:    'calc_duties',
   };
 
   return (
@@ -2611,11 +3422,6 @@ export default function ProfitLabScreen() {
         {/* Calculator selector */}
         <CalcSelector active={calcType} onSelect={handleSelect} />
 
-        {/* Calculator description */}
-        <View style={s.calcDesc}>
-          <Text style={s.calcDescText}>{activeCalc.summary}</Text>
-        </View>
-
         {/* Active workspace */}
         {calcType === 'fba' && (
           <FBAWorkspace
@@ -2629,9 +3435,12 @@ export default function ProfitLabScreen() {
             activeProductName={activeProduct?.name ?? ''}
           />
         )}
+        {calcType === 'landed'    && <LandedCostWorkspace />}
+        {calcType === 'capital'   && <CapitalEstimatorWorkspace />}
         {calcType === 'breakeven' && <BreakevenWorkspace />}
         {calcType === 'ppc'       && <PPCWorkspace />}
-        {calcType === 'freight'   && <FreightWorkspace />}
+        {calcType === 'storage'   && <StorageFeesWorkspace />}
+        {calcType === 'cashflow'  && <CashFlowWorkspace />}
         {calcType === 'duties'    && <DutiesWorkspace />}
 
         {/* Decision simulator — what-if analysis on financials */}
