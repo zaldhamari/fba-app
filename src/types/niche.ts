@@ -35,4 +35,9 @@ export interface NicheReport {
     can_afford: boolean;
     verdict: string;
   };
+  keyword_search_volume?: number | null;
+  keyword_competition?: number | null;
+  keyword_cpc?: number | null;
+  keyword_monthly_trend?: { year: number; month: number; search_volume: number }[];
+  volume_source?: string;
 }

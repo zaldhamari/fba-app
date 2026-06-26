@@ -1,8 +1,9 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TextInput,
-  TouchableOpacity, ActivityIndicator, Alert,
+  TouchableOpacity, Alert,
 } from 'react-native';
+import { AnimatedLoader } from '../components/AnimatedLoader';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import { OfflineBanner } from '../components/OfflineBanner';
@@ -24,9 +25,6 @@ import PaywallModal from '../components/PaywallModal';
 import { EstimateLabel } from '../components/EstimateLabel';
 import { DataSourceBanner, type DataSourceType } from '../components/DataSourceBanner';
 import { PipelineProgressBar } from '../components/PipelineProgressBar';
-import { ProductMarketCard } from './research/ProductCards';
-import { productToDisplay } from './research/productHelpers';
-import type { Product } from '../services/api';
 
 const WATCHLIST_KEY = 'siftly_niche_watchlist_v1';
 
@@ -90,6 +88,11 @@ type NicheReport = {
     rank?: number | null;
   }[];
   data_source?: string;
+  keyword_search_volume?: number | null;
+  keyword_competition?: number | null;
+  keyword_cpc?: number | null;
+  keyword_monthly_trend?: { year: number; month: number; search_volume: number }[];
+  volume_source?: string;
 };
 
 type SavedNiche = {
@@ -336,8 +339,19 @@ export default function NicheResearchScreen({ embedded = false, focusTrigger = 0
 
         {loading && (
           <View style={s.loadingWrap}>
-            <ActivityIndicator color={DS.accent} size="large" />
-            <Text style={s.loadingTxt}>Scanning the market…</Text>
+            <AnimatedLoader
+              color={DS.accent}
+              msPerStep={1300}
+              messages={[
+                'Scanning Amazon for this niche…',
+                'Pulling average prices…',
+                'Reading review counts & ratings…',
+                'Measuring competition density…',
+                'Finding where you can win…',
+                'Testing your budget fit…',
+                'Building your niche report…',
+              ]}
+            />
           </View>
         )}
 
@@ -384,6 +398,19 @@ export default function NicheResearchScreen({ embedded = false, focusTrigger = 0
                   <View style={[s.diffFill, { width: `${(report.verdict.score / 5) * 100}%` as any, backgroundColor: vc }]} />
                 </View>
               </View>
+
+              {/* Search volume banner */}
+              {report.keyword_search_volume != null && (
+                <View style={s.volBanner}>
+                  <Text style={s.volVal}>
+                    {report.keyword_search_volume.toLocaleString()}
+                  </Text>
+                  <Text style={s.volLbl}>monthly Amazon searches</Text>
+                  {report.keyword_cpc != null && (
+                    <Text style={s.volCpc}>${report.keyword_cpc.toFixed(2)} CPC</Text>
+                  )}
+                </View>
+              )}
 
               {/* Key market stats inline */}
               {report.market_snapshot && (
@@ -508,7 +535,7 @@ export default function NicheResearchScreen({ embedded = false, focusTrigger = 0
                   }}
                   activeOpacity={0.88}
                 >
-                  <Text style={s.handoffBtnAmazonTxt}>Find Products on Amazon →</Text>
+                  <Text style={s.handoffBtnAmazonTxt}>Scout Products on Amazon →</Text>
                   <Text style={s.handoffBtnHint}>What's selling in this niche?</Text>
                 </TouchableOpacity>
 
@@ -520,13 +547,13 @@ export default function NicheResearchScreen({ embedded = false, focusTrigger = 0
                   }}
                   activeOpacity={0.88}
                 >
-                  <Text style={s.handoffBtnReconTxt}>Run Teardown →</Text>
+                  <Text style={s.handoffBtnReconTxt}>Run Recon →</Text>
                   <Text style={s.handoffBtnHint}>What complaints can you exploit?</Text>
                 </TouchableOpacity>
               </View>
             </View>
 
-            {/* The Gap — full list below the verdict */}
+            {/* The Gap — full list below the verdict (items beyond the 3 shown inline) */}
             {report.the_gap?.length > 3 && (
               <View style={s.card}>
                 <Text style={s.cardTitle}>Full Gap Analysis</Text>
@@ -540,70 +567,42 @@ export default function NicheResearchScreen({ embedded = false, focusTrigger = 0
               </View>
             )}
 
-            {/* What's selling — always show top_products */}
-            {(report.top_products?.length ?? 0) > 0 && (
-              <View style={{ gap: 0 }}>
-                <View style={[s.card, { marginBottom: 0, borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }]}>
-                  <Text style={s.cardTitle}>What's Selling in This Niche</Text>
-                  <Text style={s.cardSub}>Top {report.top_products!.length} products from Amazon right now</Text>
+            {/* Products table — compact list, no full Amazon cards */}
+            {((report.top_products?.length ?? 0) > 0 || report.products_to_model?.length > 0) && (() => {
+              const list = (report.top_products?.length ?? 0) > 0 ? report.top_products! : report.products_to_model;
+              return (
+                <View style={s.card}>
+                  <Text style={s.cardTitle}>What's Selling ({list.length} products)</Text>
+                  <Text style={s.cardSub}>Tap "Scout Products on Amazon →" above to see full details in Research</Text>
+                  {list.map((p, i) => {
+                    const rev = p.review_count ?? 0;
+                    const compLabel = rev < 100 ? 'Low' : rev < 300 ? 'Med' : 'High';
+                    const compColor = rev < 100 ? DS.success : rev < 300 ? DS.warning : DS.danger;
+                    return (
+                      <View key={p.asin || i} style={s.productRow}>
+                        <View style={s.productRowRank}>
+                          <Text style={s.productRowRankTxt}>#{p.rank ?? i + 1}</Text>
+                        </View>
+                        <View style={{ flex: 1, gap: 2 }}>
+                          <Text style={s.productRowTitle} numberOfLines={1}>{p.title}</Text>
+                          <View style={s.productRowMeta}>
+                            {p.brand && <Text style={s.productRowBrand}>{p.brand}</Text>}
+                            <Text style={s.productRowMetaTxt}>{p.price != null ? `$${p.price}` : '—'}</Text>
+                            <Text style={s.productRowMetaTxt}>·</Text>
+                            <Text style={s.productRowMetaTxt}>{p.rating != null ? `${p.rating}★` : '—'}</Text>
+                            <Text style={s.productRowMetaTxt}>·</Text>
+                            <Text style={s.productRowMetaTxt}>{rev.toLocaleString()} rev</Text>
+                          </View>
+                        </View>
+                        <View style={[s.productRowComp, { backgroundColor: compColor + '18' }]}>
+                          <Text style={[s.productRowCompTxt, { color: compColor }]}>{compLabel}</Text>
+                        </View>
+                      </View>
+                    );
+                  })}
                 </View>
-                {report.top_products!.map((p, i) => {
-                  const comp: Product['competition'] = (p.review_count ?? 0) < 100 ? 'Low' : (p.review_count ?? 0) < 300 ? 'Medium' : 'High';
-                  const display = productToDisplay({
-                    asin:             p.asin,
-                    title:            p.title,
-                    price:            p.price,
-                    rating:           p.rating,
-                    review_count:     p.review_count,
-                    image:            p.image ?? '',
-                    url:              p.url,
-                    competition:      comp,
-                    opportunity:      comp === 'Low' ? 'Good' : comp === 'High' ? 'Saturated' : 'Moderate',
-                    source:           'dataforseo',
-                    brand:            p.brand ?? null,
-                    is_best_seller:   p.is_best_seller ?? false,
-                    is_amazon_choice: p.is_amazon_choice ?? false,
-                    bought_past_month: p.bought_past_month ?? null,
-                    category:         p.category ?? null,
-                    rank:             p.rank ?? null,
-                  });
-                  return <ProductMarketCard key={p.asin || i} item={display} />;
-                })}
-              </View>
-            )}
-
-            {/* Products to model — filtered low-comp subset */}
-            {report.products_to_model?.length > 0 && (
-              <View style={{ gap: 0 }}>
-                <View style={[s.card, { marginBottom: 0, borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }]}>
-                  <Text style={s.cardTitle}>Products to Model</Text>
-                  <Text style={s.cardSub}>Low-competition listings in your price range</Text>
-                  <FeatureExplainer text="Existing products to study and beat — not copy. Benchmark their price, reviews, and buyer complaints to design a better version." />
-                </View>
-                {report.products_to_model.map((p, i) => {
-                  const comp: Product['competition'] = (p.review_count ?? 0) < 100 ? 'Low' : (p.review_count ?? 0) < 300 ? 'Medium' : 'High';
-                  const display = productToDisplay({
-                    asin:             p.asin,
-                    title:            p.title,
-                    price:            p.price,
-                    rating:           p.rating,
-                    review_count:     p.review_count,
-                    image:            p.image ?? '',
-                    url:              p.url,
-                    competition:      comp,
-                    opportunity:      comp === 'Low' ? 'Good' : comp === 'High' ? 'Saturated' : 'Moderate',
-                    source:           'dataforseo',
-                    brand:            p.brand ?? null,
-                    is_best_seller:   p.is_best_seller ?? false,
-                    is_amazon_choice: p.is_amazon_choice ?? false,
-                    bought_past_month: p.bought_past_month ?? null,
-                    category:         p.category ?? null,
-                    rank:             p.rank ?? null,
-                  });
-                  return <ProductMarketCard key={p.asin || i} item={display} />;
-                })}
-              </View>
-            )}
+              );
+            })()}
           </>
         )}
 
@@ -801,6 +800,11 @@ const s = StyleSheet.create({
   diffFill:  { height: 6, borderRadius: 3 },
 
   // Inline market stats
+  volBanner:  { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: DS.accent + '12', borderRadius: DS.radiusChip, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1, borderColor: DS.accent + '30' },
+  volVal:     { fontSize: 20, fontWeight: '900', color: DS.accent, letterSpacing: -0.5 },
+  volLbl:     { flex: 1, fontSize: 12, color: DS.textSecondary },
+  volCpc:     { fontSize: 11, fontWeight: '700', color: DS.textMuted },
+
   vStatsRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: DS.bgCard + 'CC', borderRadius: DS.radiusChip, paddingVertical: 12, borderWidth: 1, borderColor: DS.border },
   vStat:     { flex: 1, alignItems: 'center', gap: 3 },
   vStatDiv:  { width: 1, height: 28, backgroundColor: DS.border },
@@ -824,6 +828,17 @@ const s = StyleSheet.create({
   affordInlineIcon: { fontSize: 14, fontWeight: '900', marginTop: 1 },
   affordInlineTxt:  { fontSize: 13, fontWeight: '800' },
   affordInlineSub:  { fontSize: 10, color: DS.textMuted, lineHeight: 14 },
+
+  // Compact product row (niche screen — no full Amazon cards)
+  productRow:        { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, borderTopWidth: 1, borderTopColor: DS.border },
+  productRowRank:    { width: 28, height: 28, borderRadius: 8, backgroundColor: DS.bgElevated, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  productRowRankTxt: { fontSize: 10, fontWeight: '800', color: DS.textMuted },
+  productRowTitle:   { fontSize: 12, fontWeight: '700', color: DS.textPrimary },
+  productRowMeta:    { flexDirection: 'row', gap: 4, flexWrap: 'wrap', alignItems: 'center' },
+  productRowBrand:   { fontSize: 10, fontWeight: '600', color: DS.accent, backgroundColor: DS.accentLight, borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1 },
+  productRowMetaTxt: { fontSize: 10, color: DS.textMuted },
+  productRowComp:    { borderRadius: DS.radiusBadge, paddingHorizontal: 8, paddingVertical: 3, flexShrink: 0 },
+  productRowCompTxt: { fontSize: 10, fontWeight: '800' },
 
   saveBtn: {
     borderWidth:     1,
