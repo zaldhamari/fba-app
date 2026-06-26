@@ -189,11 +189,12 @@ export interface FBAResult {
 }
 
 export interface BrandResult {
-  brand_name: string;
-  name_options: string[];
-  tagline: string;
-  style: string;
-  logo_svg: string;
+  brand_name:    string;
+  name_options:  string[];
+  tagline:       string;
+  style:         string;
+  logo_svg:      string;
+  quality_tier?: 'premium' | 'standard'; // set by backend — premium = Sonnet, standard = Haiku
   listing: {
     title: string;
     bullet_points: string[];
@@ -254,8 +255,9 @@ export const api = {
     tagline?:        string;
     target_audience?: string;
     brand_tone?:     string;
+    use_premium?:    boolean; // true → Sonnet (high quality); false → Haiku (standard)
   }) => {
-    const data = await postSlow<BrandResult>('/brand/create', { keywords: [], ...body });
+    const data = await postSlow<BrandResult>('/brand/create', { keywords: [], use_premium: true, ...body });
     validateCreateBrand(data);
     return data;
   },
@@ -294,6 +296,68 @@ export const api = {
 
   getSupplierEmail: (product: string, brand_name: string) =>
     post<{ subject: string; body: string; tips: string[] }>('/supplier/email', { product, brand_name }),
+
+  // ─── Supplier Intelligence ────────────────────────────────────────────────
+  analyzeSupplier: (body: {
+    product_name:     string;
+    platform:         string;
+    unit_cost:        number;
+    moq:              number;
+    selling_price?:   number;
+    lead_time_days?:  number;
+    country?:         string;
+    is_gold_supplier?: boolean;
+    trade_assurance?:  boolean;
+    recon_complaints?: string[];
+    marketplace?:     string;
+  }) =>
+    post<{
+      verdict:    'GO' | 'NEGOTIATE' | 'AVOID';
+      confidence: number;
+      summary:    string;
+      reasons:    string[];
+      risk:       string;
+      next_step:  string;
+      negotiation_tips: string[];
+      recon_alignment:  string | null;
+      signals: {
+        roi_pct:           number;
+        margin_pct:        number;
+        moq_risk:          string;
+        lead_time_risk:    string;
+        cashflow_stress:   string;
+        platform_trust:    number;
+        investment_usd:    number;
+        landed_cost_usd:   number;
+        rough_freight_usd: number;
+        fba_fee_est_usd:   number | null;
+      };
+    }>('/research/analyze-supplier', body),
+
+  freightIntel: (body: {
+    product_name:        string;
+    unit_cost:           number;
+    units?:              number;
+    weight_kg_per_unit?: number;
+    length_cm?:          number;
+    width_cm?:           number;
+    height_cm?:          number;
+    selling_price?:      number;
+    marketplace?:        string;
+  }) =>
+    post<{
+      product:         string;
+      marketplace:     string;
+      units:           number;
+      total_weight_kg: number;
+      total_cbm:       number;
+      recommended:     string;
+      fba_inbound_est: number;
+      prep_cost:       number;
+      modes:           Record<string, { mode: string; total_cost: number; cost_per_unit: number; transit_days: number; notes: string } | null>;
+      risk_signals:    { type: string; label: string; detail: string }[];
+      negotiation_note: string;
+    }>('/research/freight-intel', body),
 
   // ─── AI Copilot ────────────────────────────────────────────────────────────
   analyzeCopilot: async (body: {
@@ -531,6 +595,17 @@ export const api = {
     max_moq?: number;
   }) => {
     const data = await post<{ suppliers: Supplier[]; product: string }>('/research/suppliers-v2', body);
+    validateSearchSuppliers(data);
+    return data;
+  },
+
+  searchSuppliersV2Batch: async (body: {
+    keywords: string[];
+    marketplace?: string;
+    max_unit_price?: number;
+    max_moq?: number;
+  }) => {
+    const data = await post<{ suppliers: Supplier[] }>('/research/suppliers-v2/batch', body);
     validateSearchSuppliers(data);
     return data;
   },

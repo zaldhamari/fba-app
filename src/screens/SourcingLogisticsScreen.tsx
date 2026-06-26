@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
-  TouchableOpacity, ActivityIndicator, Alert, TextInput,
+  TouchableOpacity, Alert, TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -50,6 +50,7 @@ import PaywallModal from '../components/PaywallModal';
 import { SupplierVettingCard } from '../components/SupplierVettingCard';
 import { SupplierComparisonTool } from '../components/SupplierComparisonTool';
 import { SupplierMessageModal } from '../components/SupplierMessageModal';
+import { AnimatedLoader } from '../components/AnimatedLoader';
 
 
 // ── Supplier URL resolver ─────────────────────────────────────────────────────
@@ -99,7 +100,7 @@ function ReconSpecsCard({ insights }: { insights: PipelineReconInsights }) {
         <View style={{ flex: 1, gap: 2 }}>
           <Text style={rsc.title}>Product Specs to Ask Suppliers About</Text>
           <Text style={rsc.sub}>
-            {expanded ? `From Teardown on "${insights.sourceKeyword}"` : `${questions.length} questions ready — tap to view`}
+            {expanded ? `From Recon on "${insights.sourceKeyword}"` : `${questions.length} questions ready — tap to view`}
           </Text>
         </View>
         <Text style={rsc.chevron}>{expanded ? '▲' : '▼'}</Text>
@@ -885,17 +886,19 @@ export default function SourcingLogisticsScreen() {
   const [selectedId,   setSelectedId]   = useState<string | null>(null);
   const [compareIds,   setCompareIds]   = useState<Set<string>>(() => new Set());
   const [showCompare,  setShowCompare]  = useState(false);
-  const [analyzeModal,    setAnalyzeModal]    = useState(false);
-  const [analyzeResult,   setAnalyzeResult]   = useState<AnalyzeSupplierResult | null>(null);
-  const [supplierToolTab, setSupplierToolTab] = useState<'vet' | 'compare' | 'message'>('vet');
-  const [showMessageModal, setShowMessageModal] = useState(false);
-  const [analyzeError,    setAnalyzeError]    = useState('');
-  const [analyzeTargetId, setAnalyzeTargetId] = useState<string | null>(null);
+  const [analyzeModal,      setAnalyzeModal]      = useState(false);
+  const [analyzeResult,     setAnalyzeResult]     = useState<AnalyzeSupplierResult | null>(null);
+  const [analyzeLoading,    setAnalyzeLoading]    = useState(false);
+  const [analyzingSupplier, setAnalyzingSupplier] = useState<ScoredDisplay | null>(null);
+  const [supplierToolTab,   setSupplierToolTab]   = useState<'vet' | 'compare' | 'message'>('vet');
+  const [showMessageModal,  setShowMessageModal]  = useState(false);
+  const [analyzeError,      setAnalyzeError]      = useState('');
+  const [analyzeTargetId,   setAnalyzeTargetId]   = useState<string | null>(null);
   const [outreachEmail,     setOutreachEmail]     = useState<OutreachEmail | null>(null);
   const [outreachOpenId,    setOutreachOpenId]    = useState<string | null>(null);
   const [outreachLoadingId, setOutreachLoadingId] = useState<string | null>(null);
   const [outreachError,     setOutreachError]     = useState('');
-  const outreachQueue = useRef<ScoredDisplay | null>(null);
+  const outreachQueue  = useRef<ScoredDisplay | null>(null);
 
   // ── Freight state ─────────────────────────────────────────────────────────
   const [freightProduct,  setFreightProduct]  = useState('');
@@ -953,27 +956,16 @@ export default function SourcingLogisticsScreen() {
       const queries = buildSupplierQueries(query, null, tier);
       const priceParam = maxPrice ? parseFloat(maxPrice) : undefined;
       const moqParam   = maxMoq   ? parseInt(maxMoq)    : undefined;
-      // v2 variants only — v1 (api.searchSuppliers) was dropped: it never called a real
-      // supplier API, it generated platform deep-links with prices from a hardcoded
-      // category dictionary regardless of credentials. Mixing that into this list made
-      // fabricated and real (or honestly-stubbed) results indistinguishable.
-      const v2Calls = queries.map(q =>
-        api.searchSuppliersV2({ product: q, marketplace, max_unit_price: priceParam, max_moq: moqParam })
-          .then(r => r.suppliers ?? [])
-          .catch(() => [] as Supplier[])
-      );
-      const allResults = await Promise.all(v2Calls);
+      // Single batch call — server fans out to all keyword variants with asyncio.gather.
+      // Replaces N parallel HTTP round-trips with one, cutting latency proportionally.
+      const batchResult = await api.searchSuppliersV2Batch({
+        keywords:       queries,
+        marketplace,
+        max_unit_price: priceParam,
+        max_moq:        moqParam,
+      }).catch(() => ({ suppliers: [] as Supplier[] }));
       if (!isMountedRef.current) return;
-      const seenKeys = new Set<string>();
-      let allRaw: Supplier[] = [];
-      for (const batch of allResults) {
-        for (const s of batch) {
-          const key = ((s.supplier || '') + '|' + (s.url || '')).toLowerCase().trim();
-          if (!key || seenKeys.has(key)) continue;
-          seenKeys.add(key);
-          allRaw.push(s);
-        }
-      }
+      let allRaw: Supplier[] = batchResult.suppliers ?? [];
       if (allRaw.length === 0) throw new Error('No suppliers found. Try a different product name.');
       const { results: deduped, removed } = deduplicateSuppliers(allRaw);
       // If strict name-similarity dedup cut results below 3, fall back to URL-only dedup
@@ -1095,12 +1087,46 @@ export default function SourcingLogisticsScreen() {
     };
   }
 
-  function handleAnalyzeSupplier(item: ScoredDisplay) {
-    setAnalyzeResult(null); setAnalyzeError(''); setAnalyzeTargetId(item.id);
-    const result = buildLocalAnalysis(item);
-    setAnalyzeResult(result);
-    setSuppliers(prev => prev.map(s => s.id === item.id ? { ...s, grade: result.grade, trust: result.total_score / 10, finalScore: result.total_score } : s));
+  async function handleAnalyzeSupplier(item: ScoredDisplay) {
+    setAnalyzeResult(null);
+    setAnalyzeError('');
+    setAnalyzeTargetId(item.id);
+    setAnalyzingSupplier(item);
     setAnalyzeModal(true);
+    setAnalyzeLoading(true);
+
+    try {
+      const sellingPrice = pipeline.activeProduct?.price ?? undefined;
+      const result = await api.analyzeSupplier({
+        product_name:     pipeline.activeProduct?.title ?? product,
+        platform:         item.platform,
+        unit_cost:        item.priceUSD ?? 0,
+        moq:              item.moqNum,
+        selling_price:    sellingPrice,
+        lead_time_days:   undefined,
+        country:          item.country ?? undefined,
+        is_gold_supplier: item.badge === 'Gold Supplier',
+        trade_assurance:  false,
+        recon_complaints: pipeline.reconInsights?.complaints?.slice(0, 3) ?? [],
+        marketplace,
+      });
+      if (!isMountedRef.current) return;
+      setAnalyzeResult(result as any);
+    } catch {
+      if (!isMountedRef.current) return;
+      // API not wired yet — fall back to local scoring
+      const local = buildLocalAnalysis(item);
+      setAnalyzeResult(local);
+      setSuppliers(prev =>
+        prev.map(s =>
+          s.id === item.id
+            ? { ...s, grade: local.grade, trust: (local.total_score ?? 70) / 10, finalScore: local.total_score ?? 70 }
+            : s,
+        ),
+      );
+    } finally {
+      if (isMountedRef.current) setAnalyzeLoading(false);
+    }
   }
 
   async function handleGenerateOutreach(item: ScoredDisplay) {
@@ -1273,9 +1299,9 @@ export default function SourcingLogisticsScreen() {
       hint:  'Switch to the Freight tab to estimate shipping cost',
     },
     {
-      label: 'Teardown complete',
+      label: 'Recon complete',
       done:  !!pipeline.reconInsights,
-      hint:  'Run Teardown in the Research tab first',
+      hint:  'Run Recon in the Research tab first',
     },
     {
       label: 'Cost model saved',
@@ -1422,7 +1448,23 @@ export default function SourcingLogisticsScreen() {
         {/* Always-visible platform list — shown before search results load */}
         {!loading && suppliers.length === 0 && renderExploreSources()}
 
-        {loading && <View style={sc.loadingWrap}><ActivityIndicator color={DS.accent} size="large" /><Text style={sc.loadingTxt}>Finding suppliers…</Text></View>}
+        {loading && (
+          <View style={sc.loadingWrap}>
+            <AnimatedLoader
+              color={DS.accent}
+              msPerStep={1200}
+              messages={[
+                'Searching Alibaba listings…',
+                'Filtering by product match…',
+                'Scoring quality signals…',
+                'Checking MOQ & pricing…',
+                'Verifying supplier trust…',
+                'Ranking sourcing options…',
+                'Preparing your shortlist…',
+              ]}
+            />
+          </View>
+        )}
 
         {!!error && (
           <AppCard padding={14} style={{ alignItems: 'center', gap: 10 }}>
@@ -1624,8 +1666,25 @@ export default function SourcingLogisticsScreen() {
             <View style={fr.thirdField}><InputField label="Width" value={freightWidthCm} onChangeText={setFreightWidthCm} placeholder="15" keyboardType="numeric" containerStyle={{ flex: undefined }} /></View>
             <View style={fr.thirdField}><InputField label="Height" value={freightHeightCm} onChangeText={setFreightHeightCm} placeholder="10" keyboardType="numeric" containerStyle={{ flex: undefined }} /></View>
           </View>
-          <PrimaryButton label={freightLoading ? 'Calculating...' : 'Estimate Freight →'} onPress={handleFreightSearch} loading={freightLoading} disabled={!freightProduct.trim() || freightLoading} icon="✈" style={{ backgroundColor: DS.warning, shadowColor: DS.warning }} />
+          <PrimaryButton label={freightLoading ? 'Calculating...' : 'Estimate Freight →'} onPress={handleFreightSearch} loading={false} disabled={!freightProduct.trim() || freightLoading} icon="✈" style={{ backgroundColor: DS.warning, shadowColor: DS.warning }} />
         </AppCard>
+
+        {freightLoading && (
+          <View style={sc.loadingWrap}>
+            <AnimatedLoader
+              color={DS.warning}
+              msPerStep={1300}
+              messages={[
+                'Calculating freight routes…',
+                'Comparing air vs sea rates…',
+                'Estimating customs & duties…',
+                'Checking FBA inbound cost…',
+                'Sizing your shipment…',
+                'Building your cost model…',
+              ]}
+            />
+          </View>
+        )}
 
         {!!freightError && (
           <AppCard padding={14} style={{ alignItems: 'center', gap: 10 }}>
@@ -1984,9 +2043,9 @@ export default function SourcingLogisticsScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: DS.bgCanvas }}>
       <Toast message={toastMsg} visible={toastVisible} onHide={hideToast} type={toastType} />
-      <AnalyzeSupplierModal visible={analyzeModal} loading={false} result={analyzeResult} error={analyzeError} onClose={() => setAnalyzeModal(false)} />
+      <AnalyzeSupplierModal visible={analyzeModal} loading={analyzeLoading} result={analyzeResult} error={analyzeError} supplier={analyzingSupplier} onClose={() => { setAnalyzeModal(false); setAnalyzingSupplier(null); }} />
 
-      <CompareSuppliersModal visible={showCompare} items={compareItems} onClose={() => setShowCompare(false)} />
+      <CompareSuppliersModal visible={showCompare} items={compareItems} sellingPrice={pipeline.activeProduct?.price ?? undefined} onClose={() => setShowCompare(false)} />
       <PaywallModal visible={showPaywall} onClose={() => setShowPaywall(false)} featureContext="Supplier sourcing" />
       {!!pipeline.selectedSupplier && (
         <SupplierMessageModal
