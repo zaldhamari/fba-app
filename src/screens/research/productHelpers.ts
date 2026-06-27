@@ -34,7 +34,7 @@ export function productToDisplay(p: Product): ProductDisplay {
     : undefined;
 
   return {
-    id:              p.asin,
+    id:              p.asin || `gen-${(p.title ?? '').slice(0, 24).replace(/\s+/g, '-')}-${Math.round((p.price ?? 0) * 100)}`,
     name:            p.title,
     price:           p.price,
     rating:          p.rating,
