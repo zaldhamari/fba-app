@@ -25,12 +25,19 @@ export function productToDisplay(p: Product): ProductDisplay {
     ? estimateMonthlySales(p.review_count, comp, p.price)
     : null;
 
-  const revenueUSD = salesEst && p.price
-    ? Math.round(salesEst.mid * p.price)
+  // When review_count is null, use bought_past_month signal for revenue
+  const bpmRevenue = (!salesEst && p.bought_past_month && p.bought_past_month > 0 && p.price)
+    ? Math.round(p.bought_past_month * p.price)
     : null;
 
-  const ppcPressure = (p.review_count != null)
-    ? estimatePPCPressure(p.review_count, comp)
+  const revenueUSD = salesEst && p.price
+    ? Math.round(salesEst.mid * p.price)
+    : bpmRevenue;
+
+  // PPC pressure: use review_count if available, else infer from bought_past_month
+  const effectiveReviews = p.review_count ?? (p.bought_past_month ? Math.round(p.bought_past_month * 0.02) : null);
+  const ppcPressure = (effectiveReviews != null)
+    ? estimatePPCPressure(effectiveReviews, comp)
     : undefined;
 
   return {
