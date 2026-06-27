@@ -1324,30 +1324,22 @@ export default function ResearchWorkspaceScreen() {
       {/* ── Floating compare bar ─────────────────────────────── */}
       {(compareProductIds.size >= 1 && mode === 'market') && (
         <View style={cfb.wrap} pointerEvents="box-none">
-          {compareProductIds.size === 1 ? (
-            <View style={cfb.pillPending}>
-              <Text style={cfb.pillIcon}>⊞</Text>
-              <Text style={cfb.pillTextPending}>1 selected — add up to 2 more to compare</Text>
-              <TouchableOpacity onPress={() => setCompareProductIds(new Set())} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} accessibilityRole="button" accessibilityLabel="Clear selection">
-                <Text style={cfb.clearPending}>✕</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <TouchableOpacity style={cfb.pill} onPress={() => setShowCompareProducts(true)} activeOpacity={0.88} accessibilityRole="button">
-              <Text style={cfb.pillIcon}>⊞</Text>
-              <Text style={cfb.pillText}>Compare {compareProductIds.size} Products</Text>
-              <Text style={cfb.pillArrow}>→</Text>
-              <TouchableOpacity
-                style={cfb.clearBtn}
-                onPress={() => setCompareProductIds(new Set())}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                accessibilityRole="button"
-                accessibilityLabel="Clear comparison"
-              >
-                <Text style={cfb.clearText}>✕</Text>
-              </TouchableOpacity>
+          <TouchableOpacity style={cfb.pill} onPress={() => setShowCompareProducts(true)} activeOpacity={0.88} accessibilityRole="button">
+            <Text style={cfb.pillIcon}>⊞</Text>
+            <Text style={cfb.pillText}>
+              {compareProductIds.size === 1 ? 'Analyse 1 Product' : `Compare ${compareProductIds.size} Products`}
+            </Text>
+            <Text style={cfb.pillArrow}>→</Text>
+            <TouchableOpacity
+              style={cfb.clearBtn}
+              onPress={() => setCompareProductIds(new Set())}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel="Clear comparison"
+            >
+              <Text style={cfb.clearText}>✕</Text>
             </TouchableOpacity>
-          )}
+          </TouchableOpacity>
         </View>
       )}
     </SafeAreaView>
