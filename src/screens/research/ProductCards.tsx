@@ -648,6 +648,13 @@ export function CompareProductsModal({
                       <View style={prm.colImgFallback}><Text style={prm.colImgIcon}>🛒</Text></View>
                     )}
                     <Text style={prm.colTitle} numberOfLines={2}>{p.name}</Text>
+                    {(p as any).brand && <Text style={prm.colBrand} numberOfLines={1}>{(p as any).brand}</Text>}
+                    <View style={prm.colMetaRow}>
+                      {p.price != null && <Text style={prm.colMeta}>{fmt(p.price)}</Text>}
+                      {p.rating != null && <Text style={prm.colMeta}>{p.rating.toFixed(1)}★</Text>}
+                      {p.reviewCount != null && <Text style={prm.colMeta}>{p.reviewCount.toLocaleString()} rev</Text>}
+                      {(p as any).boughtPastMonth != null && <Text style={prm.colMeta}>{(p as any).boughtPastMonth.toLocaleString()}+ sold/mo</Text>}
+                    </View>
                     <View style={prm.colFooter}>
                       <View style={[prm.colBadge, { backgroundColor: bBg }]}>
                         <Text style={[prm.colBadgeTxt, { color: bColor }]}>{bLabel}</Text>
@@ -655,6 +662,11 @@ export function CompareProductsModal({
                       {isSel  && <Text style={prm.winTag}>SELECTED</Text>}
                       {!isSel && isAuto && <Text style={prm.aiTag}>AI PICK</Text>}
                     </View>
+                    {!!p.url && (
+                      <TouchableOpacity onPress={() => openURL(p.url)} activeOpacity={0.7} style={prm.colAmazonLink}>
+                        <Text style={prm.colAmazonLinkTxt}>↗ Amazon</Text>
+                      </TouchableOpacity>
+                    )}
                   </TouchableOpacity>
                 );
               })}
@@ -829,12 +841,17 @@ export const prm = StyleSheet.create({
   colImg:        { width: 44, height: 44, borderRadius: 8, backgroundColor: DS.bgElevated },
   colImgFallback:{ width: 44, height: 44, borderRadius: 8, backgroundColor: DS.bgElevated, alignItems: 'center', justifyContent: 'center' },
   colImgIcon:    { fontSize: 20, color: DS.textMuted },
-  colTitle:      { fontSize: 11, fontWeight: '700', color: DS.textPrimary, lineHeight: 15 },
-  colFooter:     { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 5 },
-  colBadge:      { borderRadius: DS.radiusBadge, paddingHorizontal: 7, paddingVertical: 3 },
-  colBadgeTxt:   { fontSize: 9, fontWeight: '800', letterSpacing: 0.5 },
-  winTag:        { fontSize: 9, fontWeight: '900', color: DS.accentDark, letterSpacing: 0.5 },
-  aiTag:         { fontSize: 9, fontWeight: '800', color: DS.accent, letterSpacing: 0.5 },
+  colTitle:       { fontSize: 11, fontWeight: '700', color: DS.textPrimary, lineHeight: 15 },
+  colBrand:       { fontSize: 9, fontWeight: '600', color: DS.accent, marginTop: 2 },
+  colMetaRow:     { flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginTop: 3 },
+  colMeta:        { fontSize: 9, color: DS.textSecondary },
+  colFooter:      { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 5, marginTop: 4 },
+  colBadge:       { borderRadius: DS.radiusBadge, paddingHorizontal: 7, paddingVertical: 3 },
+  colBadgeTxt:    { fontSize: 9, fontWeight: '800', letterSpacing: 0.5 },
+  colAmazonLink:  { marginTop: 6, paddingVertical: 5, borderRadius: 6, backgroundColor: DS.bgElevated, alignItems: 'center' },
+  colAmazonLinkTxt:{ fontSize: 10, fontWeight: '700', color: DS.accent },
+  winTag:         { fontSize: 9, fontWeight: '900', color: DS.accentDark, letterSpacing: 0.5 },
+  aiTag:          { fontSize: 9, fontWeight: '800', color: DS.accent, letterSpacing: 0.5 },
   tapHint:       { fontSize: 10, fontWeight: '600', color: DS.textMuted },
   supCountry:    { fontSize: 22 },
   platformBadge:    { backgroundColor: DS.accentLight, borderRadius: DS.radiusBadge, paddingHorizontal: 7, paddingVertical: 3 },
