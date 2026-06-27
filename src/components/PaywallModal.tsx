@@ -296,7 +296,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 6, paddingVertical: 2, alignSelf: 'flex-start',
     marginBottom: 4,
   },
-  popularText:     { fontSize: 8, fontWeight: '800', color: '#fff', letterSpacing: 0.5 },
+  popularText:     { fontSize: 8, fontWeight: '800', color: DS.bgCard, letterSpacing: 0.5 },
   tierName:        { fontSize: 13, fontWeight: '800', color: DS.textMuted },
   tierNameActive:  { color: DS.accent },
   tierPrice:       { fontSize: 22, fontWeight: '900', color: DS.textPrimary, letterSpacing: -0.5 },
@@ -315,7 +315,7 @@ const s = StyleSheet.create({
     paddingVertical: 16, alignItems: 'center', marginBottom: 8,
   },
   ctaDisabled: { opacity: 0.5 },
-  ctaText:     { fontSize: 15, fontWeight: '800', color: '#fff', letterSpacing: -0.2 },
+  ctaText:     { fontSize: 15, fontWeight: '800', color: DS.bgCard, letterSpacing: -0.2 },
   billing:     { fontSize: 11, color: DS.textMuted, textAlign: 'center', marginBottom: 8 },
   errorText:   { fontSize: 12, color: DS.danger, textAlign: 'center', marginBottom: 6 },
 

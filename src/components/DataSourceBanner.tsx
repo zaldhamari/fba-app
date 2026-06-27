@@ -13,7 +13,7 @@ interface DataSourceBannerProps {
 const CONFIG: Record<DataSourceType, { bg?: string; text: string; label: string; action?: string }> = {
   stub: {
     bg: DS.warning,
-    text: '#fff',
+    text: DS.bgCard,
     label: '⚠ SIMULATED DATA — Real market data not connected',
     action: 'Connect real data',
   },

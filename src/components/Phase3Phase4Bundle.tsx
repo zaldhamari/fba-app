@@ -496,7 +496,7 @@ const styles = StyleSheet.create({
   catCardOpen:  { borderColor: DS.accent, backgroundColor: DS.accent + '06' },
   catHeader:    { flexDirection: 'row', alignItems: 'center', gap: 10 },
   amazonFrame: {
-    backgroundColor: '#FFFFFF', borderRadius: DS.radiusCard,
+    backgroundColor: DS.bgCard, borderRadius: DS.radiusCard,
     borderWidth: 1, borderColor: '#DDD', padding: 16,
     marginVertical: DS.sectionGap,
   },

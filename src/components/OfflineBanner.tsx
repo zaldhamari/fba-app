@@ -18,5 +18,5 @@ const s = StyleSheet.create({
     paddingHorizontal: DS.pagePadding,
     alignItems: 'center',
   },
-  text: { fontSize: 12, fontWeight: '600', color: '#fff' },
+  text: { fontSize: 12, fontWeight: '600', color: DS.bgCard },
 });

@@ -10,8 +10,30 @@ import {
   validateAnalyzeProduct,
 } from '../lib/apiValidation';
 
-const BASE_URL = 'https://fba-backend-production-6c44.up.railway.app/api';
+const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://fba-backend-production-6c44.up.railway.app/api';
 const API_KEY  = process.env.EXPO_PUBLIC_API_KEY ?? '';
+
+// ── In-memory response cache (TTL: 5 min) ─────────────────────────────────────
+// Avoids re-fetching identical research queries when the user navigates back.
+const CACHE_TTL_MS = 5 * 60 * 1_000;
+interface CacheEntry { data: unknown; expiresAt: number; }
+const _apiCache = new Map<string, CacheEntry>();
+
+function cacheGet<T>(key: string): T | null {
+  const entry = _apiCache.get(key);
+  if (!entry) return null;
+  if (Date.now() > entry.expiresAt) { _apiCache.delete(key); return null; }
+  return entry.data as T;
+}
+function cacheSet(key: string, data: unknown): void {
+  _apiCache.set(key, { data, expiresAt: Date.now() + CACHE_TTL_MS });
+  // Evict oldest entries if cache grows too large
+  if (_apiCache.size > 100) {
+    const oldest = [..._apiCache.entries()].sort((a, b) => a[1].expiresAt - b[1].expiresAt)[0];
+    if (oldest) _apiCache.delete(oldest[0]);
+  }
+}
+export function clearApiCache(): void { _apiCache.clear(); }
 
 const REQUEST_TIMEOUT_MS       = 15_000;
 const SLOW_ENDPOINT_TIMEOUT_MS = 25_000;
@@ -112,29 +134,34 @@ function postSlow<T>(endpoint: string, body: object): Promise<T> {
   return post<T>(endpoint, body, SLOW_ENDPOINT_TIMEOUT_MS);
 }
 
-// Wakes Railway before a slow generation call. Fire-and-forget — we don't await
-// the health check; we just give it a head start so the server is warm by the
-// time the real request arrives.
-function warmServer(): void {
-  const controller = new AbortController();
-  setTimeout(() => controller.abort(), 5_000);
-  fetch(`${BASE_URL}/health`, {
-    method:  'GET',
-    headers: { 'X-API-Key': API_KEY },
-    signal:  controller.signal,
-  }).catch(() => {});
+// Wakes Railway before a slow generation call. Awaits the health check for up
+// to 60 s so the server is fully warm by the time the real request is sent.
+// Railway free-tier cold starts take 30-60 s; the old 800 ms fixed delay was
+// 40× too short and caused silent timeouts on first use.
+async function warmServer(): Promise<void> {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 60_000);
+    await fetch(`${BASE_URL}/health`, {
+      method:  'GET',
+      headers: { 'X-API-Key': API_KEY },
+      signal:  controller.signal,
+    });
+    clearTimeout(timer);
+  } catch {
+    // Server may still be booting — proceed anyway. The real request will
+    // either succeed (if the server finished starting) or surface a timeout.
+  }
 }
 
 // Brand generation: wake server first, then generate with generous timeout + 1 retry.
 async function postBrand<T>(endpoint: string, body: object): Promise<T> {
-  warmServer();
-  // Small delay so the wake ping has a chance to reach the server first
-  await new Promise(r => setTimeout(r, 800));
+  await warmServer();
   try {
     return await post<T>(endpoint, body, BRAND_TIMEOUT_MS);
   } catch (err: any) {
-    // On timeout or network error, retry once — server should now be warm
-    if (err?.name === 'AbortError' || err?.message?.includes('timeout') || err?.message?.includes('network')) {
+    // On timeout or network error, retry once — server is now warm
+    if (err?.message?.includes('timeout') || err?.message?.includes('network')) {
       return await post<T>(endpoint, body, BRAND_TIMEOUT_MS);
     }
     throw err;
@@ -239,14 +266,22 @@ export const api = {
     post<{ asin: string; title: string | null; category: string | null; url: string; source: string; error?: string }>('/research/product', { input }),
 
   searchAmazon: async (keyword: string, marketplace = 'US', category = 'all') => {
+    const cacheKey = `amazon:${keyword}:${marketplace}:${category}`;
+    const cached = cacheGet<{ products: Product[]; trends: TrendData; keyword: string }>(cacheKey);
+    if (cached) return cached;
     const data = await post<{ products: Product[]; trends: TrendData; keyword: string }>('/research/amazon', { keyword, category, marketplace }, SLOW_ENDPOINT_TIMEOUT_MS);
     validateSearchAmazon(data);
+    cacheSet(cacheKey, data);
     return data;
   },
 
   searchSuppliers: async (product: string, marketplace = 'US', max_price?: number) => {
+    const cacheKey = `suppliers:${product}:${marketplace}:${max_price ?? ''}`;
+    const cached = cacheGet<{ suppliers: Supplier[]; product: string }>(cacheKey);
+    if (cached) return cached;
     const data = await post<{ suppliers: Supplier[]; product: string }>('/research/suppliers', { product, max_price, marketplace });
     validateSearchSuppliers(data);
+    cacheSet(cacheKey, data);
     return data;
   },
 
@@ -292,15 +327,28 @@ export const api = {
     return data;
   },
 
-  researchKeywords: (product: string) =>
-    post<{
+  researchKeywords: async (product: string) => {
+    const cacheKey = `keywords:${product}`;
+    const cached = cacheGet<{
       keywords: { keyword: string; competition: string; type: string }[];
       head_terms: string[];
       long_tail: string[];
       total_found: number;
       seo_score: number;
       top_ppc: string[];
-    }>('/research/keywords', { product }),
+    }>(cacheKey);
+    if (cached) return cached;
+    const data = await post<{
+      keywords: { keyword: string; competition: string; type: string }[];
+      head_terms: string[];
+      long_tail: string[];
+      total_found: number;
+      seo_score: number;
+      top_ppc: string[];
+    }>('/research/keywords', { product });
+    cacheSet(cacheKey, data);
+    return data;
+  },
 
   createLabel: async (body: {
     brand_name:        string;
@@ -321,6 +369,26 @@ export const api = {
   }) => {
     const data = await postBrand<{ label_svg: string; insert_svg: string }>('/brand/label', body);
     validateCreateLabel(data);
+    return data;
+  },
+
+  // Generates only the packaging insert without touching the label.
+  // Use this instead of createLabel when the user only wants the insert —
+  // it avoids regenerating (and potentially overwriting) an existing label.
+  createInsert: async (body: {
+    brand_name:       string;
+    product_name:     string;
+    weight?:          string;
+    style?:           string;
+    brand_direction?: string;
+    color_palette?:   string;
+    font_style?:      string;
+    packaging_type?:  string;
+    tagline?:         string;
+    support_url?:     string;
+    qr_text?:         string;
+  }) => {
+    const data = await postBrand<{ insert_svg: string }>('/brand/insert', body);
     return data;
   },
 
@@ -572,6 +640,9 @@ export const api = {
     max_top_seller_reviews?: number;
     budget?: number;
   }) => {
+    const nicheKey = `niche:${body.keyword}:${body.marketplace ?? 'US'}:${body.price_min ?? ''}:${body.price_max ?? ''}`;
+    const nicheHit = cacheGet<any>(nicheKey);
+    if (nicheHit) return nicheHit;
     const data = await post<{
       keyword: string;
       marketplace: string;
@@ -614,6 +685,7 @@ export const api = {
       data_source?: string;
     }>('/research/niche', body, NICHE_TIMEOUT_MS);
     validateSearchNiche(data);
+    cacheSet(nicheKey, data);
     return data;
   },
 

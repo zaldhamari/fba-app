@@ -52,7 +52,7 @@ const styles = StyleSheet.create({
     height: 6,
     borderLeftWidth: 2,
     borderBottomWidth: 2,
-    borderColor: '#FFFFFF',
+    borderColor: DS.bgCard,
     transform: [{ rotate: '-45deg' }, { translateY: -1 }],
   },
 });

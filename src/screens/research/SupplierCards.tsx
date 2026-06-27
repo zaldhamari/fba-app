@@ -260,8 +260,8 @@ const sc = StyleSheet.create({
   // Lock In CTA — mirrors "Find Suppliers →" in Research
   lockInBtn:        { backgroundColor: DS.accent, borderRadius: DS.radiusButton, paddingVertical: 13, alignItems: 'center' as const },
   lockInBtnSelected:{ backgroundColor: DS.success },
-  lockInTxt:        { fontSize: 13, fontWeight: '800' as const, color: '#fff', letterSpacing: -0.2 },
-  lockInTxtSelected:{ color: '#fff' },
+  lockInTxt:        { fontSize: 13, fontWeight: '800' as const, color: DS.bgCard, letterSpacing: -0.2 },
+  lockInTxtSelected:{ color: DS.bgCard },
   feasBtn:          { borderRadius: 10, paddingVertical: 7, alignItems: 'center' as const, backgroundColor: DS.accentLight, borderWidth: 1, borderColor: DS.accent + '44' },
   feasBtnSaved:     { backgroundColor: DS.bgSubtle, borderColor: DS.border },
   feasTxt:          { fontSize: 11, fontWeight: '700' as const, color: DS.accent },
@@ -533,5 +533,5 @@ const oe = StyleSheet.create({
   copyBtn:      { flex: 1, borderRadius: 12, paddingVertical: 13, alignItems: 'center', borderWidth: 1, borderColor: DS.border, backgroundColor: DS.bgSubtle },
   copyTxt:      { fontSize: 13, fontWeight: '700', color: DS.textSecondary },
   messageBtn:   { flex: 1, borderRadius: 12, paddingVertical: 13, alignItems: 'center', backgroundColor: DS.accent },
-  messageTxt:   { fontSize: 13, fontWeight: '700', color: '#fff' },
+  messageTxt:   { fontSize: 13, fontWeight: '700', color: DS.bgCard },
 });

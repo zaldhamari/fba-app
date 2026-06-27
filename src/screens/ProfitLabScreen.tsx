@@ -58,11 +58,11 @@ type CalcType =
 const CALCS: {
   id: CalcType; abbr: string; color: string; name: string; desc: string; badge?: string; summary: string;
 }[] = [
-  { id: 'fba',       abbr: 'P&L',  color: '#2563EB', name: 'FBA Profit',      desc: 'Full unit economics',    badge: 'Start here', summary: 'Calculate your net profit, margin %, and ROI per unit after all Amazon fees. Use your landed cost as product cost — never the raw supplier quote.' },
+  { id: 'fba',       abbr: 'P&L',  color: DS.accent, name: 'FBA Profit',      desc: 'Full unit economics',    badge: 'Start here', summary: 'Calculate your net profit, margin %, and ROI per unit after all Amazon fees. Use your landed cost as product cost — never the raw supplier quote.' },
   { id: 'landed',    abbr: 'LC',   color: '#0891B2', name: 'Landed Cost',      desc: 'True cost to warehouse',                     summary: 'Breaks down your true per-unit cost: supplier price + freight + duties + packaging. Run this first — the landed cost number flows into FBA Profit and Break-even.' },
-  { id: 'capital',   abbr: '$$$',  color: '#B45309', name: 'Launch Capital',   desc: 'Total budget needed',    badge: 'New',        summary: 'Estimates your full launch budget: inventory × landed cost + 90-day PPC + photography + listing + Vine + shipping to FBA + buffer. Know your cash need before you commit.' },
-  { id: 'breakeven', abbr: 'BE',   color: '#059669', name: 'Break-even',       desc: 'Units to recover costs',                     summary: 'Shows how many units you need to sell to recover your total investment. Enter a conservative launch velocity — 30-50% of what the top competitor sells.' },
-  { id: 'ppc',       abbr: 'PPC',  color: '#D97706', name: 'PPC / ACoS',       desc: 'Ad spend calculator',   badge: 'Popular',    summary: 'Calculates your break-even ACoS and recommended launch ad budget. Run this before setting your PPC spend — enter the result into Launch Capital.' },
+  { id: 'capital',   abbr: '$$$',  color: DS.gold, name: 'Launch Capital',   desc: 'Total budget needed',    badge: 'New',        summary: 'Estimates your full launch budget: inventory × landed cost + 90-day PPC + photography + listing + Vine + shipping to FBA + buffer. Know your cash need before you commit.' },
+  { id: 'breakeven', abbr: 'BE',   color: DS.successText, name: 'Break-even',       desc: 'Units to recover costs',                     summary: 'Shows how many units you need to sell to recover your total investment. Enter a conservative launch velocity — 30-50% of what the top competitor sells.' },
+  { id: 'ppc',       abbr: 'PPC',  color: DS.warningText, name: 'PPC / ACoS',       desc: 'Ad spend calculator',   badge: 'Popular',    summary: 'Calculates your break-even ACoS and recommended launch ad budget. Run this before setting your PPC spend — enter the result into Launch Capital.' },
   { id: 'storage',   abbr: 'STR',  color: '#7C3AED', name: 'Storage Fees',     desc: 'FBA storage costs',                          summary: 'Calculates monthly and long-term FBA storage fees by unit size tier. Essential for Q4 planning — long-term fees spike dramatically after 365 days and destroy margins on slow-moving inventory.' },
   { id: 'cashflow',  abbr: 'CF',   color: '#0F766E', name: 'Cash Flow',        desc: 'Months to full ROI',                         summary: 'Projects your monthly cash position from launch to full ROI recovery. Shows when you turn cash-flow positive, how much capital is tied up each month, and flags if you need a restock before you break even.' },
   { id: 'duties',    abbr: 'TAX',  color: '#BE185D', name: 'Duties & VAT',     desc: 'Import tax estimate',                        summary: 'Estimates import duty and VAT by country and HS tariff code. Take the duty % result and enter it into Feasibility Check and Landed Cost.' },
@@ -139,7 +139,7 @@ const cb = StyleSheet.create({
     backgroundColor: DS.accent, borderRadius: DS.radiusButton,
     paddingVertical: 14, alignItems: 'center', marginTop: 4,
   },
-  txt: { fontSize: 15, fontWeight: '800', color: '#fff', letterSpacing: -0.2 },
+  txt: { fontSize: 15, fontWeight: '800', color: DS.bgCard, letterSpacing: -0.2 },
 });
 
 // ─── Accuracy Badge ───────────────────────────────────────────────────────────
@@ -225,8 +225,8 @@ function CalcSelector({ active, onSelect }: { active: CalcType; onSelect: (id: C
               activeOpacity={0.75}
             >
               {/* Icon block */}
-              <View style={[sel.iconBlock, { backgroundColor: isActive ? '#fff' + '22' : c.color + '15' }]}>
-                <Text style={[sel.abbr, { color: isActive ? '#fff' : c.color }]}>{c.abbr}</Text>
+              <View style={[sel.iconBlock, { backgroundColor: isActive ? DS.bgCard + '22' : c.color + '15' }]}>
+                <Text style={[sel.abbr, { color: isActive ? DS.bgCard : c.color }]}>{c.abbr}</Text>
               </View>
 
               {/* Text */}
@@ -292,19 +292,19 @@ const sel = StyleSheet.create({
   },
 
   name:        { fontSize: 12, fontWeight: '800', color: DS.textPrimary, letterSpacing: -0.1 },
-  nameActive:  { color: '#fff' },
+  nameActive:  { color: DS.bgCard },
   desc:        { fontSize: 10, color: DS.textMuted, fontWeight: '500' },
   descActive:  { color: 'rgba(255,255,255,0.75)' },
 
   badge:        { position: 'absolute' as const, top: 6, right: 6, borderRadius: DS.radiusBadge, paddingHorizontal: 5, paddingVertical: 2, backgroundColor: DS.border },
   badgeActive:  { backgroundColor: 'rgba(255,255,255,0.25)' },
-  badgeNew:     { backgroundColor: '#059669' + '20' },
-  badgePopular: { backgroundColor: '#D97706' + '20' },
+  badgeNew:     { backgroundColor: DS.successText + '20' },
+  badgePopular: { backgroundColor: DS.warningText + '20' },
   badgeStart:   { backgroundColor: DS.accent + '15' },
   badgeTxt:     { fontSize: 8, fontWeight: '900', color: DS.textMuted, letterSpacing: 0.3 },
-  badgeTxtActive:   { color: '#fff' },
-  badgeTxtNew:      { color: '#059669' },
-  badgeTxtPopular:  { color: '#D97706' },
+  badgeTxtActive:   { color: DS.bgCard },
+  badgeTxtNew:      { color: DS.successText },
+  badgeTxtPopular:  { color: DS.warningText },
   badgeTxtStart:    { color: DS.accent },
 
   descCard:  { flexDirection: 'row' as const, alignItems: 'flex-start' as const, gap: 8, borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10 },
@@ -1621,7 +1621,7 @@ const cmp = StyleSheet.create({
   body:        { padding: 20, gap: 0, paddingBottom: 16 },
   footer:      { padding: 20, borderTopWidth: 1, borderTopColor: DS.border, backgroundColor: DS.bgCard },
   doneBtn:     { backgroundColor: DS.accent, borderRadius: 14, paddingVertical: 14, alignItems: 'center' },
-  doneTxt:     { fontSize: 15, fontWeight: '800', color: '#fff' },
+  doneTxt:     { fontSize: 15, fontWeight: '800', color: DS.bgCard },
   disclaimer:  { fontSize: 11, color: DS.textMuted, lineHeight: 16, fontStyle: 'italic', marginTop: 16 },
 
   row:         { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: DS.border },
@@ -2746,7 +2746,7 @@ const ws = StyleSheet.create({
   toggleRow:     { flexDirection: 'row', alignItems: 'center', gap: 10 },
   toggleBox:     { width: 20, height: 20, borderWidth: 1.5, borderColor: DS.border, borderRadius: 4, alignItems: 'center', justifyContent: 'center', backgroundColor: DS.bgSubtle },
   toggleBoxActive: { backgroundColor: DS.accent, borderColor: DS.accent },
-  toggleCheck:   { fontSize: 12, fontWeight: '900', color: '#fff' },
+  toggleCheck:   { fontSize: 12, fontWeight: '900', color: DS.bgCard },
   toggleTxt:     { fontSize: 13, fontWeight: '600', color: DS.textSecondary, flex: 1 },
 
   // Collapsible section headers
@@ -2780,7 +2780,7 @@ const lp = StyleSheet.create({
   badge:        { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, flexShrink: 0 },
   badgeTxt:     { fontSize: 10, fontWeight: '800' },
   loadBtn:      { backgroundColor: DS.accent, borderRadius: DS.radiusButton, paddingVertical: 12, alignItems: 'center' },
-  loadBtnTxt:   { fontSize: 14, fontWeight: '800', color: '#fff', letterSpacing: -0.2 },
+  loadBtnTxt:   { fontSize: 14, fontWeight: '800', color: DS.bgCard, letterSpacing: -0.2 },
 });
 
 // RFQ styles
@@ -2795,7 +2795,7 @@ const rfq = StyleSheet.create({
     backgroundColor: DS.info, borderRadius: DS.radiusButton,
     paddingVertical: 12, alignItems: 'center',
   },
-  mailBtnTxt: { fontSize: 14, fontWeight: '800', color: '#fff', letterSpacing: -0.2 },
+  mailBtnTxt: { fontSize: 14, fontWeight: '800', color: DS.bgCard, letterSpacing: -0.2 },
 });
 
 // Freight Company Search styles
@@ -2863,7 +2863,7 @@ const fc2 = StyleSheet.create({
     backgroundColor: DS.accent, borderColor: DS.accent,
   },
   selectBtnTxt:      { fontSize: 13, fontWeight: '700', color: DS.accent },
-  selectBtnTxtSaved: { color: '#fff' },
+  selectBtnTxtSaved: { color: DS.bgCard },
 
   estBadge:    { backgroundColor: DS.warningBg, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
   estBadgeTxt: { fontSize: 8, fontWeight: '800', color: DS.warningText, letterSpacing: 1.5 },
@@ -2878,7 +2878,7 @@ const fc2 = StyleSheet.create({
     backgroundColor: DS.accent, borderRadius: DS.radiusButton,
     paddingVertical: 12, alignItems: 'center',
   },
-  compareSelectedTxt: { fontSize: 14, fontWeight: '800', color: '#fff', letterSpacing: -0.2 },
+  compareSelectedTxt: { fontSize: 14, fontWeight: '800', color: DS.bgCard, letterSpacing: -0.2 },
 
   actionRow:      { flexDirection: 'row', gap: 8 },
   actionBtn: {
@@ -2933,8 +2933,8 @@ const fsc = StyleSheet.create({
     shadowOpacity: 0.25, shadowRadius: 4, elevation: 3,
   },
   segTxt:        { fontSize: 12, fontWeight: '700', color: DS.textSecondary },
-  segTxtActive:  { color: '#fff', fontWeight: '800' },
-  segCheck:      { fontSize: 10, color: '#fff', fontWeight: '900' },
+  segTxtActive:  { color: DS.bgCard, fontWeight: '800' },
+  segCheck:      { fontSize: 10, color: DS.bgCard, fontWeight: '900' },
   segModeIcon:   { fontSize: 14 },
 
   cbmPill: {
@@ -2955,7 +2955,7 @@ const fsc = StyleSheet.create({
     backgroundColor: DS.bgSubtle, shadowOpacity: 0,
     elevation: 0, borderWidth: 1, borderColor: DS.border,
   },
-  searchBtnTxt: { fontSize: 15, fontWeight: '800', color: '#fff', letterSpacing: -0.2 },
+  searchBtnTxt: { fontSize: 15, fontWeight: '800', color: DS.bgCard, letterSpacing: -0.2 },
 });
 
 // ─── 6. Landed Cost Breakdown ────────────────────────────────────────────────
@@ -3506,5 +3506,5 @@ const fc = StyleSheet.create({
   title:  { fontSize: 17, fontWeight: '900', color: DS.textPrimary, letterSpacing: -0.5 },
   sub:    { fontSize: 12, color: DS.textSecondary, lineHeight: 17 },
   cta:    { backgroundColor: DS.accent, borderRadius: DS.radiusButton, paddingVertical: 10, paddingHorizontal: 16, alignSelf: 'flex-start', marginTop: 4 },
-  ctaTxt: { fontSize: 13, fontWeight: '800', color: '#fff', letterSpacing: -0.2 },
+  ctaTxt: { fontSize: 13, fontWeight: '800', color: DS.bgCard, letterSpacing: -0.2 },
 });

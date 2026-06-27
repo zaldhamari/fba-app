@@ -120,7 +120,7 @@ const seg = StyleSheet.create({
     paddingHorizontal: 12, paddingVertical: 9,
   },
   label:       { fontSize: 12, fontWeight: '700', color: DS.textSecondary },
-  labelActive: { color: '#fff' },
+  labelActive: { color: DS.bgCard },
 });
 
 // ── Mode description strip ────────────────────────────────────────────────────
@@ -317,7 +317,7 @@ export function AskAIPanel({
           activeOpacity={0.8}
         >
           {loading
-            ? <ActivityIndicator size="small" color="#fff" />
+            ? <ActivityIndicator size="small" color={DS.bgCard} />
             : <Text style={aai.sendTxt}>↑</Text>}
         </TouchableOpacity>
       </View>
@@ -338,7 +338,7 @@ const aai = StyleSheet.create({
   input:            { flex: 1, backgroundColor: DS.bgSubtle, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, fontSize: 13, color: DS.textPrimary, borderWidth: 1, borderColor: DS.border },
   sendBtn:          { backgroundColor: DS.accent, borderRadius: 12, width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   sendBtnDisabled:  { opacity: 0.4 },
-  sendTxt:          { fontSize: 18, fontWeight: '700', color: '#fff' },
+  sendTxt:          { fontSize: 18, fontWeight: '700', color: DS.bgCard },
   error:            { fontSize: 12, color: DS.danger },
   answerBox:        { backgroundColor: DS.bgSubtle, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: DS.border },
   answerTxt:        { fontSize: 13, color: DS.textPrimary, lineHeight: 20 },
@@ -727,8 +727,8 @@ export const am = StyleSheet.create({
   verdictCard: { borderRadius: DS.radiusCard, borderWidth: 1.5, padding: DS.cardPadding, gap: 12 },
   verdictTop:  { flexDirection: 'row', alignItems: 'center', gap: 14 },
   verdictBadge:{ borderRadius: DS.radiusButton, paddingHorizontal: 16, paddingVertical: 12, alignItems: 'center', gap: 2, minWidth: 72 },
-  verdictIcon: { fontSize: 20, color: '#fff', fontWeight: '900' },
-  verdictWord: { fontSize: 11, color: '#fff', fontWeight: '900', letterSpacing: 1 },
+  verdictIcon: { fontSize: 20, color: DS.bgCard, fontWeight: '900' },
+  verdictWord: { fontSize: 11, color: DS.bgCard, fontWeight: '900', letterSpacing: 1 },
   confidenceLabel: { fontSize: 11, fontWeight: '700', color: DS.textSecondary },
   confBar:     { height: 6, backgroundColor: DS.bgElevated, borderRadius: 3 },
   confFill:    { height: 6, borderRadius: 3 },

@@ -33,6 +33,30 @@ import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import { OfflineBanner } from '../components/OfflineBanner';
 import { CompleteBrandKitBuilder } from '../components/CompleteBrandKitBuilder';
 
+// ── Brand result cache (AsyncStorage, 7-day TTL) ─────────────────────────────
+const BRAND_CACHE_PREFIX = 'brand_cache_v1:';
+const BRAND_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1_000;
+
+function brandCacheKey(brandName: string, style: string, colorPalette: string): string {
+  return BRAND_CACHE_PREFIX + [brandName, style, colorPalette].map(s => s.trim().toLowerCase()).join('|');
+}
+
+async function getBrandCache<T>(key: string): Promise<T | null> {
+  try {
+    const raw = await AsyncStorage.getItem(key);
+    if (!raw) return null;
+    const { data, expiresAt } = JSON.parse(raw);
+    if (Date.now() > expiresAt) { AsyncStorage.removeItem(key).catch(() => {}); return null; }
+    return data as T;
+  } catch { return null; }
+}
+
+async function setBrandCache(key: string, data: unknown): Promise<void> {
+  try {
+    await AsyncStorage.setItem(key, JSON.stringify({ data, expiresAt: Date.now() + BRAND_CACHE_TTL_MS }));
+  } catch { /* best-effort */ }
+}
+
 // ── SVG helpers ───────────────────────────────────────────────────────────────
 
 function isValidSvg(s: string): boolean {
@@ -64,7 +88,7 @@ async function saveToHistory(entry: BrandHistoryEntry) {
     const raw = await AsyncStorage.getItem(STORAGE_KEYS.brandHistory);
     const list: BrandHistoryEntry[] = (raw ? safeParseJSON<BrandHistoryEntry[]>(raw) : null) ?? [];
     list.unshift(entry);
-    await AsyncStorage.setItem(STORAGE_KEYS.brandHistory, JSON.stringify(list.slice(0, 6)));
+    await AsyncStorage.setItem(STORAGE_KEYS.brandHistory, JSON.stringify(list.slice(0, 20)));
   } catch { /* best-effort */ }
 }
 
@@ -646,7 +670,7 @@ function LogoMakerTab({
                       onPress={() => onSelectName?.(n)}
                       activeOpacity={0.75}
                     >
-                      <Text style={{ fontSize: 12, fontWeight: '700', color: isActive ? '#fff' : styleOpt.color }}>{n}</Text>
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: isActive ? DS.bgCard : styleOpt.color }}>{n}</Text>
                     </TouchableOpacity>
                   );
                 })}
@@ -894,7 +918,7 @@ const lg = StyleSheet.create({
     alignItems: 'center',
   },
   bandText: {
-    color: '#fff', fontSize: 10, fontWeight: '900', letterSpacing: 3,
+    color: DS.bgCard, fontSize: 10, fontWeight: '900', letterSpacing: 3,
   },
   body: {
     padding: 16, gap: 10,
@@ -1576,14 +1600,14 @@ const bw = StyleSheet.create({
   recBadgeTxt:  { fontSize: 9, fontWeight: '800', color: DS.success },
   nextBtn:      { backgroundColor: DS.accent, borderRadius: DS.radiusButton, paddingVertical: 12, alignItems: 'center' },
   nextBtnOff:   { backgroundColor: DS.bgElevated },
-  nextBtnTxt:   { fontSize: 13, fontWeight: '800', color: '#fff' },
+  nextBtnTxt:   { fontSize: 13, fontWeight: '800', color: DS.bgCard },
   btnRow:       { flexDirection: 'row', gap: 8, alignItems: 'center' },
   backBtn:      { borderWidth: 1, borderColor: DS.border, borderRadius: DS.radiusButton, paddingVertical: 12, paddingHorizontal: 16, alignItems: 'center' },
   backBtnTxt:   { fontSize: 13, fontWeight: '700', color: DS.textSecondary },
   // Preview
   preview:      { borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: DS.border, backgroundColor: DS.bgCard },
   pvBand:       { paddingVertical: 10, paddingHorizontal: 16, alignItems: 'center' },
-  pvBrandName:  { fontSize: 11, fontWeight: '900', color: '#fff', letterSpacing: 2 },
+  pvBrandName:  { fontSize: 11, fontWeight: '900', color: DS.bgCard, letterSpacing: 2 },
   pvBarcodeArea:{ alignItems: 'center', paddingVertical: 14, paddingHorizontal: 20, gap: 6 },
   pvLines:      { flexDirection: 'row', alignItems: 'flex-end', height: 46 },
   pvBar:        { height: '100%', backgroundColor: DS.textPrimary },
@@ -1706,7 +1730,7 @@ const lw = StyleSheet.create({
   expandBtnTxt:{ fontSize: 12, fontWeight: '700', color: DS.accent },
   fields:     { gap: 12 },
   saveBtn:    { backgroundColor: DS.accent, borderRadius: DS.radiusButton, paddingVertical: 13, alignItems: 'center' },
-  saveBtnTxt: { fontSize: 13, fontWeight: '800', color: '#fff' },
+  saveBtnTxt: { fontSize: 13, fontWeight: '800', color: DS.bgCard },
 });
 
 // ── Packaging Mockup ──────────────────────────────────────────────────────────
@@ -1794,7 +1818,7 @@ const pmc = StyleSheet.create({
   bottleBody: { width: 96, minHeight: 154, borderRadius: 16, backgroundColor: DS.bgCard, borderWidth: 2, alignItems: 'center', overflow: 'hidden', shadowColor: DS.textPrimary, shadowOpacity: 0.1, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 4 },
   bottleLabel:{ width: '85%', marginTop: 10, borderRadius: 8, overflow: 'hidden', borderWidth: 1 },
   bottleBand: { paddingVertical: 4, alignItems: 'center' },
-  bottleBandTxt: { fontSize: 7, fontWeight: '900', color: '#fff', letterSpacing: 1.5 },
+  bottleBandTxt: { fontSize: 7, fontWeight: '900', color: DS.bgCard, letterSpacing: 1.5 },
   bottleLabelBody: { padding: 6, gap: 2 },
   bottleProd: { fontSize: 9, fontWeight: '800', color: DS.textPrimary },
   bottleTag:  { fontSize: 7, color: DS.textMuted },
@@ -1810,7 +1834,7 @@ const pmc = StyleSheet.create({
   pouchNet:   { fontSize: 7, color: DS.textMuted },
   boxFront:   { width: 110, borderRadius: 8, overflow: 'hidden', backgroundColor: DS.bgCard, borderWidth: 2, shadowColor: DS.textPrimary, shadowOpacity: 0.1, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 4 },
   boxTop:     { paddingVertical: 6, paddingHorizontal: 10, alignItems: 'center' },
-  boxBrand:   { fontSize: 7, fontWeight: '900', color: '#fff', letterSpacing: 1.5 },
+  boxBrand:   { fontSize: 7, fontWeight: '900', color: DS.bgCard, letterSpacing: 1.5 },
   boxBody:    { alignItems: 'center', paddingVertical: 10, gap: 7 },
   boxIconWrap:{ width: 42, height: 42, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   boxProd:    { fontSize: 10, fontWeight: '800', color: DS.textPrimary },
@@ -2075,7 +2099,7 @@ const bss = StyleSheet.create({
   numDone:      { backgroundColor: DS.accent, borderColor: DS.accent },
   numLocked:    { backgroundColor: DS.bgSubtle, borderColor: DS.border },
   numTxt:       { fontSize: 13, fontWeight: '800', color: DS.textMuted },
-  numTxtActive: { color: '#fff' },
+  numTxtActive: { color: DS.bgCard },
   title:        { fontSize: 15, fontWeight: '800', color: DS.textPrimary, letterSpacing: -0.3 },
   titleLocked:  { color: DS.textMuted },
   sub:          { fontSize: 12, color: DS.textMuted, lineHeight: 17 },
@@ -2091,7 +2115,7 @@ function StepContinueBtn({ label, onPress, variant = 'primary' }: { label: strin
       onPress={onPress}
       activeOpacity={0.85}
     >
-      <Text style={{ fontSize: 14, fontWeight: '900', color: '#fff', letterSpacing: -0.2 }}>{label}</Text>
+      <Text style={{ fontSize: 14, fontWeight: '900', color: DS.bgCard, letterSpacing: -0.2 }}>{label}</Text>
     </TouchableOpacity>
   );
 }
@@ -2176,7 +2200,7 @@ const bp = StyleSheet.create({
   btnTxt:       { fontSize: 13, fontWeight: '800', color: DS.accent },
   btnSavedTxt:  { color: DS.success },
   btnLaunch:    { backgroundColor: DS.accent, borderColor: DS.accent },
-  btnLaunchTxt: { fontSize: 14, fontWeight: '900', color: '#fff', letterSpacing: -0.2 },
+  btnLaunchTxt: { fontSize: 14, fontWeight: '900', color: DS.bgCard, letterSpacing: -0.2 },
 });
 
 // ── Shared AI draft badge (applied to all generated SVG asset previews) ───────
@@ -2232,10 +2256,10 @@ type ToolId = 'logo' | 'label' | 'insert' | 'barcode' | 'listing';
 const TOOLS: {
   id: ToolId; icon: string; color: string; name: string; desc: string;
 }[] = [
-  { id: 'logo',    icon: '✦', color: '#2563EB', name: 'Logo',     desc: 'AI-generated SVG logo'    },
+  { id: 'logo',    icon: '✦', color: DS.accent, name: 'Logo',     desc: 'AI-generated SVG logo'    },
   { id: 'label',   icon: '≡', color: '#0891B2', name: 'Label',    desc: 'Product packaging label'  },
-  { id: 'insert',  icon: '◻', color: '#059669', name: 'Insert',   desc: 'Thank-you card for box'   },
-  { id: 'barcode', icon: '▣', color: '#B45309', name: 'Barcode',  desc: 'GS1 UPC & FNSKU setup'    },
+  { id: 'insert',  icon: '◻', color: DS.successText, name: 'Insert',   desc: 'Thank-you card for box'   },
+  { id: 'barcode', icon: '▣', color: DS.gold, name: 'Barcode',  desc: 'GS1 UPC & FNSKU setup'    },
   { id: 'listing', icon: '📝', color: '#7C3AED', name: 'Listing',  desc: 'Amazon title & bullets'   },
 ];
 
@@ -2285,7 +2309,7 @@ function ToolSelector({
               activeOpacity={0.75}
             >
               <View style={[tsl.iconBlock, { backgroundColor: isActive ? 'rgba(255,255,255,0.2)' : tool.color + '18' }]}>
-                <Text style={[tsl.icon, { color: isActive ? '#fff' : tool.color }]}>{tool.icon}</Text>
+                <Text style={[tsl.icon, { color: isActive ? DS.bgCard : tool.color }]}>{tool.icon}</Text>
               </View>
               <View style={{ flex: 1, gap: 2 }}>
                 <Text style={[tsl.name, isActive && tsl.nameActive]} numberOfLines={1}>{tool.name}</Text>
@@ -2337,14 +2361,14 @@ const tsl = StyleSheet.create({
   icon: { fontSize: 20 },
 
   name:       { fontSize: 13, fontWeight: '800', color: DS.textPrimary, letterSpacing: -0.1 },
-  nameActive: { color: '#fff' },
+  nameActive: { color: DS.bgCard },
   desc:       { fontSize: 11, color: DS.textMuted, fontWeight: '500' },
   descActive: { color: 'rgba(255,255,255,0.75)' },
 
   doneBadge:      { borderRadius: DS.radiusBadge, paddingHorizontal: 6, paddingVertical: 2, backgroundColor: DS.success + '20' },
   doneBadgeActive:{ backgroundColor: 'rgba(255,255,255,0.25)' },
   doneTxt:        { fontSize: 9, fontWeight: '900', color: DS.success },
-  doneTxtActive:  { color: '#fff' },
+  doneTxtActive:  { color: DS.bgCard },
 
   descCard:  { flexDirection: 'row', alignItems: 'flex-start', gap: 8, borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10 },
   descDot:   { width: 6, height: 6, borderRadius: 3, marginTop: 5, flexShrink: 0 },
@@ -2428,7 +2452,7 @@ const bsu = StyleSheet.create({
   chevron:    { fontSize: 10, color: DS.textMuted, fontWeight: '700' },
   body:       { gap: DS.sectionGap, paddingHorizontal: DS.cardPadding, paddingBottom: DS.cardPadding, borderTopWidth: 1, borderTopColor: DS.border },
   doneBtn:    { backgroundColor: DS.accent, borderRadius: DS.radiusButton, paddingVertical: 11, alignItems: 'center' },
-  doneBtnTxt: { fontSize: 13, fontWeight: '800', color: '#fff' },
+  doneBtnTxt: { fontSize: 13, fontWeight: '800', color: DS.bgCard },
 });
 
 // ── Step Progress Bar (steps mode) ───────────────────────────────────────────
@@ -2483,7 +2507,7 @@ const spb = StyleSheet.create({
   dotActive:   { backgroundColor: DS.accent, borderColor: DS.accent },
   dotDone:     { backgroundColor: DS.accent, borderColor: DS.accent },
   dotTxt:      { fontSize: 9, fontWeight: '900', color: DS.textMuted },
-  dotTxtActive:{ color: '#fff' },
+  dotTxtActive:{ color: DS.bgCard },
   lbl:         { fontSize: 8, fontWeight: '500', color: DS.textMuted, textAlign: 'center' },
   lblActive:   { color: DS.accent, fontWeight: '800' },
   lblDone:     { color: DS.textSecondary, fontWeight: '700' },
@@ -2611,7 +2635,7 @@ function BrandReportCard({
         onPress={onLaunch}
         activeOpacity={0.85}
       >
-        <Text style={{ fontSize: 15, fontWeight: '900', color: '#fff', letterSpacing: -0.3 }}>Save Brand & Open Launch Decision →</Text>
+        <Text style={{ fontSize: 15, fontWeight: '900', color: DS.bgCard, letterSpacing: -0.3 }}>Save Brand & Open Launch Decision →</Text>
       </TouchableOpacity>
     </AppCard>
   );
@@ -2771,6 +2795,16 @@ export default function BrandStudioScreen() {
     setActiveConceptIdx(0);
     const dir = BRAND_DIRECTIONS.find(d => d.id === selectedDirection);
     try {
+      // Check cache first — skip expensive AI call if we generated this brand recently
+      const cKey = brandCacheKey(inputs.brandName, inputs.style, inputs.colorPalette);
+      const cached = await getBrandCache<BrandResult>(cKey);
+      if (cached) {
+        setBrandResult(cached);
+        setDirectionChanged(false);
+        setSelectedLogoName(undefined);
+        setBrandLoading(false);
+        return;
+      }
       const result = await api.createBrand({
         product_type:    (pipeline.activeProduct?.title ?? pipeline.activeNiche?.keyword ?? inputs.brandName) || 'product',
         style:           inputs.style.toLowerCase(),
@@ -2789,6 +2823,7 @@ export default function BrandStudioScreen() {
       setBrandResult(result);
       setDirectionChanged(false);
       setSelectedLogoName(undefined);
+      setBrandCache(cKey, result).catch(() => {});
       if (result.logo_svg) {
         const entry: BrandHistoryEntry = { brandName: inputs.brandName, style: inputs.style, assetType: 'logo', svg: result.logo_svg, createdAt: new Date().toISOString() };
         saveToHistory(entry).then(() => AsyncStorage.getItem(STORAGE_KEYS.brandHistory).then(r => r && setHistory(JSON.parse(r))));
@@ -2863,7 +2898,10 @@ export default function BrandStudioScreen() {
     setLabelError('');
     const dir = BRAND_DIRECTIONS.find(d => d.id === selectedDirection);
     try {
-      const result = await api.createLabel({
+      // Use the dedicated /brand/insert endpoint so we only generate the insert.
+      // Previously called api.createLabel() which regenerated both label AND insert,
+      // potentially overwriting a finished label and wasting a generation credit.
+      const result = await api.createInsert({
         brand_name:      inputs.brandName || 'Brand',
         product_name:    labelFields?.['productName'] || inputs.brandName || 'Product',
         weight:          labelFields?.['netWeight'] || '0.5kg',
@@ -2873,17 +2911,13 @@ export default function BrandStudioScreen() {
         font_style:      inputs.fontStyle,
         packaging_type:  packagingType,
         tagline:         inputs.tagline || undefined,
-        ingredients:     labelFields?.['ingredients'] || undefined,
-        warnings:        labelFields?.['warnings'] || undefined,
-        directions:      labelFields?.['directions'] || undefined,
         support_url:     labelFields?.['supportUrl'] || undefined,
         qr_text:         labelFields?.['qrText'] || undefined,
-        manufacturer:    labelFields?.['manufacturerText'] || undefined,
       });
       await increment('brands');
-      // Preserve existing label_svg if already generated — only update insert
+      // Always preserve the existing label_svg — only the insert changes
       setLabelResult(prev => ({
-        label_svg:  prev?.label_svg  || result.label_svg,
+        label_svg:  prev?.label_svg ?? '',
         insert_svg: result.insert_svg,
       }));
       if (result.insert_svg) {
@@ -3168,7 +3202,7 @@ export default function BrandStudioScreen() {
                       onPress={() => setActiveTool('logo')}
                       activeOpacity={0.85}
                     >
-                      <Text style={{ fontSize: 13, fontWeight: '800', color: '#fff' }}>Go to Logo →</Text>
+                      <Text style={{ fontSize: 13, fontWeight: '800', color: DS.bgCard }}>Go to Logo →</Text>
                     </TouchableOpacity>
                   </AppCard>
                 )}
@@ -3500,7 +3534,7 @@ export default function BrandStudioScreen() {
                     onPress={() => setBrandStep(2)}
                     activeOpacity={0.85}
                   >
-                    <Text style={{ fontSize: 12, fontWeight: '800', color: '#fff' }}>Go to Logo →</Text>
+                    <Text style={{ fontSize: 12, fontWeight: '800', color: DS.bgCard }}>Go to Logo →</Text>
                   </TouchableOpacity>
                 </AppCard>
               )}
@@ -3671,7 +3705,7 @@ const bs = StyleSheet.create({
     textAlign:  'center',
   },
   modeBtnTxtActive: {
-    color: '#FFFFFF',
+    color: DS.bgCard,
   },
   modeBtnSub: {
     fontSize:   9,

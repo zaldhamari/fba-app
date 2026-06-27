@@ -717,7 +717,7 @@ const s = StyleSheet.create({
     alignItems:      'center',
     justifyContent:  'center',
   },
-  searchBtnTxt: { fontSize: 18, color: '#fff', fontWeight: '800' },
+  searchBtnTxt: { fontSize: 18, color: DS.bgCard, fontWeight: '800' },
 
   filterToggle:    { alignSelf: 'flex-start' },
   filterToggleTxt: { fontSize: 11, color: DS.accent, fontWeight: '700' },
@@ -768,7 +768,7 @@ const s = StyleSheet.create({
   howTitle:  { fontSize: 9, fontWeight: '800', color: DS.textMuted, letterSpacing: 2 },
   howRow:    { flexDirection: 'row', alignItems: 'center', gap: 12 },
   howStep:   { width: 24, height: 24, borderRadius: 12, backgroundColor: DS.accent, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  howNum:    { fontSize: 12, fontWeight: '900', color: '#fff' },
+  howNum:    { fontSize: 12, fontWeight: '900', color: DS.bgCard },
   howTxt:    { fontSize: 13, color: DS.textSecondary, flex: 1, lineHeight: 18 },
 
   loadingWrap: { alignItems: 'center', gap: 12, paddingVertical: 32 },
@@ -776,7 +776,7 @@ const s = StyleSheet.create({
   errorWrap:   { alignItems: 'center', gap: 10 },
   errorTxt:    { fontSize: 13, color: DS.danger, textAlign: 'center' },
   retryBtn:    { paddingHorizontal: 20, paddingVertical: 9, borderRadius: DS.radiusButton, backgroundColor: DS.accent },
-  retryBtnTxt: { fontSize: 13, fontWeight: '700', color: '#fff' },
+  retryBtnTxt: { fontSize: 13, fontWeight: '700', color: DS.bgCard },
 
   verdictCard: {
     borderRadius:  DS.radiusCard,
@@ -858,8 +858,8 @@ const s = StyleSheet.create({
   },
   handoffBtnAmazon:    { backgroundColor: DS.accent },
   handoffBtnRecon:     { backgroundColor: DS.accent },
-  handoffBtnAmazonTxt: { fontSize: 14, fontWeight: '900', color: '#fff', letterSpacing: -0.2 },
-  handoffBtnReconTxt:  { fontSize: 14, fontWeight: '900', color: '#fff', letterSpacing: -0.2 },
+  handoffBtnAmazonTxt: { fontSize: 14, fontWeight: '900', color: DS.bgCard, letterSpacing: -0.2 },
+  handoffBtnReconTxt:  { fontSize: 14, fontWeight: '900', color: DS.bgCard, letterSpacing: -0.2 },
   handoffBtnHint:      { fontSize: 11, color: 'rgba(255,255,255,0.72)', fontWeight: '500' },
 
   card: {

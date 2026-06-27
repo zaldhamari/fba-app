@@ -481,6 +481,6 @@ const styles = StyleSheet.create({
     color: DS.textSecondary,
   },
   phase4TabTextActive: {
-    color: '#FFFFFF',
+    color: DS.bgCard,
   },
 });

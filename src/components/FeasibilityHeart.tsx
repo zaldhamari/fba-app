@@ -114,6 +114,10 @@ export default function FeasibilityHeart({ type, label, data, size = 22 }: Props
             keyExtractor={e => e.asin}
             contentContainerStyle={m.list}
             ItemSeparatorComponent={() => <View style={m.sep} />}
+            initialNumToRender={8}
+            maxToRenderPerBatch={8}
+            windowSize={5}
+            removeClippedSubviews={true}
             renderItem={({ item }) => {
               const verdict = item.analysis?.verdict;
               const vc = verdict === 'LAUNCH' ? DS.success : verdict === 'TEST' ? DS.warning : DS.danger;

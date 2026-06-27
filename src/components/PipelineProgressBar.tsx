@@ -123,7 +123,7 @@ const s = StyleSheet.create({
   launchDot:      { borderColor: DS.textMuted },
   launchDotReady: { backgroundColor: DS.success, borderColor: DS.success },
   dotIcon:        { fontSize: 9, color: DS.textMuted, fontWeight: '700' },
-  dotIconDone:    { color: '#fff' },
+  dotIconDone:    { color: DS.bgCard },
   label:          { fontSize: 8, fontWeight: '600', color: DS.textMuted, letterSpacing: 0.3, textAlign: 'center' },
   labelDone:      { color: DS.accent, fontWeight: '800' },
   bottomRow:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
@@ -140,5 +140,5 @@ const s = StyleSheet.create({
   },
   decisionBtnReady:    { backgroundColor: DS.success, borderColor: DS.success },
   decisionBtnTxt:      { fontSize: 10, fontWeight: '800', color: DS.accent },
-  decisionBtnTxtReady: { color: '#fff' },
+  decisionBtnTxtReady: { color: DS.bgCard },
 });

@@ -109,7 +109,7 @@ const m = StyleSheet.create({
 
   footer:       { padding: 20, borderTopWidth: 1, borderTopColor: DS.border, backgroundColor: DS.bgCard },
   gotItBtn:     { backgroundColor: DS.accent, borderRadius: DS.radiusButton, paddingVertical: 15, alignItems: 'center' },
-  gotItTxt:     { fontSize: 15, fontWeight: '800', color: '#fff' },
+  gotItTxt:     { fontSize: 15, fontWeight: '800', color: DS.bgCard },
 });
 
 // ─── Self-contained Help Button ───────────────────────────────────────────────
@@ -148,7 +148,7 @@ export function HelpButton({ featureKey, size = 'md' }: HelpButtonProps) {
 const b = StyleSheet.create({
   btn:    { width: 28, height: 28, borderRadius: 14, backgroundColor: DS.accent, alignItems: 'center', justifyContent: 'center' },
   btnSm:  { width: 22, height: 22, borderRadius: 11 },
-  glyph:  { fontSize: 13, fontWeight: '900', color: '#fff' },
+  glyph:  { fontSize: 13, fontWeight: '900', color: DS.bgCard },
   glyphSm:{ fontSize: 11 },
 });
 

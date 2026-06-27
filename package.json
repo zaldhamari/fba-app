@@ -7,7 +7,8 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "lint": "eslint \"src/**/*.{ts,tsx}\"",
-    "test": "node tests/pure-logic.test.cjs",
+    "test": "node tests/pure-logic.test.cjs && node tests/logic-extended.test.cjs",
+    "test:backend": "node tests/backend-api.test.cjs",
     "check": "tsc --noEmit && npm run lint && npm test",
     "postinstall": "patch-package"
   },

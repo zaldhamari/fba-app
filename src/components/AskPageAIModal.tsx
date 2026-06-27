@@ -144,7 +144,7 @@ export function AskPageAIModal({ featureKey, size = 'md' }: AskPageAIModalProps)
 const ap = StyleSheet.create({
   btn:   { width: 28, height: 28, borderRadius: 14, backgroundColor: DS.accent, alignItems: 'center', justifyContent: 'center' },
   btnSm: { width: 22, height: 22, borderRadius: 11 },
-  glyph: { fontSize: 13, fontWeight: '900', color: '#fff' },
+  glyph: { fontSize: 13, fontWeight: '900', color: DS.bgCard },
   glyphSm: { fontSize: 11 },
 
   safe: { flex: 1, backgroundColor: DS.bgCanvas },
@@ -167,7 +167,7 @@ const ap = StyleSheet.create({
   inputRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
   input:    { flex: 1, minHeight: 44, maxHeight: 88, borderRadius: DS.radiusInput, borderWidth: 1, borderColor: DS.border, paddingHorizontal: 14, paddingTop: 12, fontSize: 14, color: DS.textPrimary, backgroundColor: DS.bgCard },
   sendBtn:  { width: 44, height: 44, borderRadius: DS.radiusInput, backgroundColor: DS.accent, alignItems: 'center', justifyContent: 'center' },
-  sendBtnText: { color: '#fff', fontSize: 20, fontWeight: '700', marginTop: -2 },
+  sendBtnText: { color: DS.bgCard, fontSize: 20, fontWeight: '700', marginTop: -2 },
 
   loadingWrap: { alignItems: 'center', marginTop: 24 },
   errorText:   { color: DS.danger, fontSize: 14, textAlign: 'center', marginTop: 12 },

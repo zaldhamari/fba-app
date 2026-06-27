@@ -33,6 +33,7 @@ import { IntelligenceSummaryBanner } from '../components/IntelligenceSummaryBann
 import { FBAGlossaryModal } from '../components/FBAGlossaryModal';
 import type { TabParamList } from '../navigation/tabTypes';
 import type { WinnerEntry } from '../types/builder';
+import { SkeletonProductCard } from '../components/ds/LoadingSkeleton';
 import { EstimateLabel } from '../components/EstimateLabel';
 
 type Nav = BottomTabNavigationProp<TabParamList>;
@@ -197,9 +198,11 @@ function AnalyzeProductModal({ visible, onClose }: { visible: boolean; onClose: 
       {/* Loading */}
       {loading && (
         <View style={ap.loadingWrap}>
-          <ActivityIndicator color={DS.accent} size="large" />
           <Text style={ap.loadingMsg}>{AP_LOADING_MSGS[loadMsg]}</Text>
           <Text style={ap.loadingQuery}>"{query}"</Text>
+          {[0, 1, 2].map(i => (
+            <SkeletonProductCard key={i} style={i > 0 ? { marginTop: 10 } : undefined} />
+          ))}
         </View>
       )}
 
@@ -321,7 +324,7 @@ const ap = StyleSheet.create({
   input:            { flex: 1, borderRadius: DS.radiusInput, borderWidth: 1.5, borderColor: DS.border, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: DS.textPrimary, backgroundColor: DS.bgCard },
   searchBtn:        { width: 48, borderRadius: DS.radiusInput, backgroundColor: DS.accent, alignItems: 'center', justifyContent: 'center' },
   searchBtnDisabled:{ opacity: 0.45 },
-  searchBtnText:    { color: '#fff', fontWeight: '700', fontSize: 18 },
+  searchBtnText:    { color: DS.bgCard, fontWeight: '700', fontSize: 18 },
   // Idle state
   idleWrap:         { gap: 14, marginTop: 4, paddingBottom: 8 },
   idleLabel:        { fontSize: 11, fontWeight: '700', color: DS.textMuted, letterSpacing: 0.5, textTransform: 'uppercase' },
@@ -332,7 +335,7 @@ const ap = StyleSheet.create({
   idleHintIcon:     { fontSize: 18, marginTop: 1 },
   idleHintText:     { flex: 1, fontSize: 12, color: DS.accent, lineHeight: 18 },
   // Loading state
-  loadingWrap:      { alignItems: 'center', gap: 12, paddingVertical: 48 },
+  loadingWrap:      { gap: 12, paddingVertical: 16 },
   loadingMsg:       { fontSize: 15, fontWeight: '600', color: DS.textPrimary },
   loadingQuery:     { fontSize: 13, color: DS.textMuted, fontStyle: 'italic' },
   // Error state
@@ -663,7 +666,7 @@ const fo = StyleSheet.create({
   // Tabs
   tabs:          { flexDirection: 'row', backgroundColor: DS.bgCanvas, borderRadius: 10, padding: 3, marginTop: 16, borderWidth: 1, borderColor: DS.border },
   tab:           { flex: 1, paddingVertical: 9, borderRadius: 8, alignItems: 'center' },
-  tabActive:     { backgroundColor: '#fff', shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 4, shadowOffset: { width: 0, height: 1 }, elevation: 2 },
+  tabActive:     { backgroundColor: DS.bgCard, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 4, shadowOffset: { width: 0, height: 1 }, elevation: 2 },
   tabText:       { fontSize: 13, fontWeight: '600', color: DS.textMuted },
   tabTextActive: { color: DS.accent, fontWeight: '700' },
   // Profile strip
@@ -675,7 +678,7 @@ const fo = StyleSheet.create({
   emptyTitle:    { fontSize: 17, fontWeight: '700', color: DS.textPrimary, textAlign: 'center' },
   emptySub:      { fontSize: 13, color: DS.textMuted, textAlign: 'center', lineHeight: 19 },
   generateBtn:   { backgroundColor: DS.accent, borderRadius: 12, paddingVertical: 14, paddingHorizontal: 28, marginTop: 4 },
-  generateBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  generateBtnText: { color: DS.bgCard, fontWeight: '700', fontSize: 14 },
   // Loading
   loadingState:  { alignItems: 'center', gap: 10, paddingVertical: 32 },
   loadingText:   { fontSize: 13, color: DS.textMuted },
@@ -860,7 +863,7 @@ const aq = StyleSheet.create({
   inputRow:    { flexDirection: 'row', gap: 8, marginTop: 4 },
   input:       { flex: 1, minHeight: 44, maxHeight: 88, borderRadius: 10, borderWidth: 1, borderColor: DS.border, paddingHorizontal: 14, paddingTop: 12, fontSize: 14, color: DS.textPrimary, backgroundColor: DS.bgCard },
   sendBtn:     { width: 44, height: 44, borderRadius: 10, backgroundColor: DS.accent, alignItems: 'center', justifyContent: 'center' },
-  sendBtnText: { color: '#fff', fontSize: 20, fontWeight: '700', marginTop: -2 },
+  sendBtnText: { color: DS.bgCard, fontSize: 20, fontWeight: '700', marginTop: -2 },
   errorText:   { color: DS.danger, fontSize: 14, textAlign: 'center', marginTop: 12 },
   answerCard:  { backgroundColor: DS.accentLight, borderRadius: 12, padding: 14 },
   answerLabel: { fontSize: 11, fontWeight: '700', color: DS.accent, letterSpacing: 0.5, marginBottom: 6 },
@@ -1346,7 +1349,7 @@ function LaunchReportModal({ visible, onClose }: { visible: boolean; onClose: ()
           <View style={rp.actions}>
             <TouchableOpacity style={rp.actionBtn} onPress={handleDownloadPDF} activeOpacity={0.8} disabled={!!busy}>
               {busy === 'pdf'
-                ? <ActivityIndicator color="#fff" size="small" />
+                ? <ActivityIndicator color={DS.bgCard} size="small" />
                 : <><Text style={rp.actionIcon}>📄</Text><Text style={rp.actionLabel}>Download PDF</Text></>
               }
             </TouchableOpacity>
@@ -1481,7 +1484,7 @@ const rp = StyleSheet.create({
   actionBtnSecondary:  { backgroundColor: DS.bgCard, borderWidth: 1, borderColor: DS.border },
   actionBtnSaved:      { backgroundColor: DS.accent + '18', borderWidth: 1, borderColor: DS.accent + '44' },
   actionIcon:          { fontSize: 14 },
-  actionLabel:         { fontSize: 12, fontWeight: '800', color: '#fff' },
+  actionLabel:         { fontSize: 12, fontWeight: '800', color: DS.bgCard },
   section:             { backgroundColor: DS.bgCard, borderRadius: DS.radiusCard, borderWidth: 1, borderColor: DS.border, overflow: 'hidden' },
   sectionTitle:        { fontSize: 12, fontWeight: '800', color: DS.textMuted, letterSpacing: 0.8, textTransform: 'uppercase', paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: DS.border },
   row:                 { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingHorizontal: 16, paddingVertical: 10, borderTopWidth: 1, borderTopColor: DS.border },
@@ -1784,8 +1787,8 @@ const lp = StyleSheet.create({
   dotDone:        { backgroundColor: DS.accent },
   dotActive:      { backgroundColor: DS.accent + '33', borderWidth: 2, borderColor: DS.accent },
   dotUpcoming:    { backgroundColor: DS.border },
-  dotCheck:       { fontSize: 11, fontWeight: '900', color: '#fff' },
-  dotNum:         { fontSize: 10, fontWeight: '800', color: '#fff' },
+  dotCheck:       { fontSize: 11, fontWeight: '900', color: DS.bgCard },
+  dotNum:         { fontSize: 10, fontWeight: '800', color: DS.bgCard },
   hereText:       { fontSize: 11, fontWeight: '900', color: DS.accent, letterSpacing: 0.4 },
   phaseHeader:    { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, paddingHorizontal: DS.cardPadding },
   phaseIconWrap:  { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
@@ -1811,7 +1814,7 @@ const lp = StyleSheet.create({
   ctaRow:         { flexDirection: 'row', gap: 10, margin: DS.cardPadding, marginTop: 4 },
   cta:            { backgroundColor: DS.accent, borderRadius: DS.radiusButton, paddingVertical: 15, alignItems: 'center' },
   ctaReport:      { backgroundColor: DS.accent + 'CC' },
-  ctaText:        { fontSize: 13, fontWeight: '800', color: '#fff', letterSpacing: -0.2 },
+  ctaText:        { fontSize: 13, fontWeight: '800', color: DS.bgCard, letterSpacing: -0.2 },
 });
 
 // ─── Pipeline Context Banner ──────────────────────────────────────────────────

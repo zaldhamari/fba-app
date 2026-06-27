@@ -364,7 +364,7 @@ const s = StyleSheet.create({
     flexShrink: 0,
   },
   optCheckSel:  { backgroundColor: DS.accent, borderColor: DS.accent },
-  optCheckTick: { fontSize: 12, fontWeight: '900', color: '#fff' },
+  optCheckTick: { fontSize: 12, fontWeight: '900', color: DS.bgCard },
 
   optInfo:     { flex: 1, gap: 2 },
   optLabel:    { fontSize: 15, fontWeight: '700', color: DS.textPrimary },
@@ -377,7 +377,7 @@ const s = StyleSheet.create({
   footer:        { paddingHorizontal: 24, paddingBottom: 32, paddingTop: 12, gap: 12 },
   nextBtn:       { backgroundColor: DS.accent, borderRadius: DS.radiusButton, paddingVertical: 16, alignItems: 'center' },
   nextBtnDisabled:{ opacity: 0.35 },
-  nextTxt:       { fontSize: 16, fontWeight: '800', color: '#fff', letterSpacing: -0.3 },
+  nextTxt:       { fontSize: 16, fontWeight: '800', color: DS.bgCard, letterSpacing: -0.3 },
 
   settingsList: { borderTopWidth: 1, borderTopColor: DS.border, paddingTop: 8, gap: 2 },
   settingRow:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, paddingHorizontal: DS.pagePadding },

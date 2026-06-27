@@ -5,6 +5,7 @@
 
 import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView, Text, Alert } from 'react-native';
+import * as Sharing from 'expo-sharing';
 import { DS } from '../theme/ds';
 import { AppCard } from './ds/AppCard';
 import { SectionHeader } from './ds/SectionHeader';
@@ -21,15 +22,40 @@ interface BrandGuidelinesExporterProps {
 export function BrandGuidelinesExporter({ kit, onExported }: BrandGuidelinesExporterProps) {
   const { generateBrandGuidelines, loading, error } = useBrandingSystem();
   const [pdfGenerated, setPdfGenerated] = useState(false);
+  const [pdfUri, setPdfUri] = useState<string | null>(null);
+  const [sharing, setSharing] = useState(false);
 
   const handleGenerateGuide = async () => {
     try {
-      const pdf = await generateBrandGuidelines(kit);
+      // generateBrandGuidelines now returns a local file URI (not base64).
+      // No Buffer.from() is used anywhere — FileSystem writes the file directly.
+      const uri = await generateBrandGuidelines(kit);
+      setPdfUri(uri);
       setPdfGenerated(true);
-      onExported?.(pdf);
-      Alert.alert('✓ Success', 'Brand guidelines PDF generated!');
+      onExported?.(uri);
+      Alert.alert('✓ Success', 'Brand guidelines PDF generated! Tap Download to share.');
     } catch (err) {
       Alert.alert('Error', error || 'Failed to generate guidelines');
+    }
+  };
+
+  const handleDownload = async () => {
+    if (!pdfUri) return;
+    try {
+      setSharing(true);
+      const canShare = await Sharing.isAvailableAsync();
+      if (!canShare) {
+        Alert.alert('Sharing unavailable', 'File sharing is not supported on this device.');
+        return;
+      }
+      await Sharing.shareAsync(pdfUri, {
+        mimeType: 'application/pdf',
+        dialogTitle: 'Share Brand Guidelines PDF',
+      });
+    } catch (err: any) {
+      Alert.alert('Share failed', err?.message || 'Could not share the PDF. Please try again.');
+    } finally {
+      setSharing(false);
     }
   };
 
@@ -162,10 +188,9 @@ export function BrandGuidelinesExporter({ kit, onExported }: BrandGuidelinesExpo
           />
           {pdfGenerated && (
             <SecondaryButton
-              label="Download PDF"
-              onPress={() => {
-                /* TODO: Download PDF */
-              }}
+              label={sharing ? 'Opening share sheet...' : 'Download / Share PDF'}
+              onPress={handleDownload}
+              disabled={sharing || !pdfUri}
             />
           )}
         </View>

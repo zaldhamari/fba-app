@@ -4,6 +4,7 @@ import * as Sharing from 'expo-sharing';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator, TextInput, Modal, KeyboardAvoidingView, Platform,
 } from 'react-native';
+import { SkeletonDashboard } from '../components/ds/LoadingSkeleton';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { DS } from '../theme/ds';
@@ -743,10 +744,9 @@ export default function LaunchDecisionScreen() {
   if (!pipeline.loaded) {
     return (
       <SafeAreaView style={s.safe} edges={['top']}>
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
-          <ActivityIndicator size="large" color={DS.accent} />
-          <Text style={{ color: DS.textMuted, fontSize: 14 }}>Loading your pipeline...</Text>
-        </View>
+        <ScrollView contentContainerStyle={{ padding: 16 }}>
+          <SkeletonDashboard />
+        </ScrollView>
       </SafeAreaView>
     );
   }
@@ -1554,7 +1554,7 @@ const s = StyleSheet.create({
     paddingVertical: 12,
     alignItems:      'center',
   },
-  quickCTATxt: { fontSize: 13, fontWeight: '800', color: '#FFFFFF' },
+  quickCTATxt: { fontSize: 13, fontWeight: '800', color: DS.bgCard },
 
   // ── Action Centre ─────────────────────────────────────────────────────────
   actionCard: {
@@ -1710,5 +1710,5 @@ const qes = StyleSheet.create({
   cancelBtn: { flex: 1, paddingVertical: 13, borderRadius: DS.radiusButton, backgroundColor: DS.bgElevated, alignItems: 'center' as const },
   cancelTxt: { fontSize: 14, fontWeight: '700', color: DS.textSecondary },
   saveBtn:   { flex: 2, paddingVertical: 13, borderRadius: DS.radiusButton, backgroundColor: DS.accent, alignItems: 'center' as const },
-  saveTxt:   { fontSize: 14, fontWeight: '800', color: '#FFFFFF' },
+  saveTxt:   { fontSize: 14, fontWeight: '800', color: DS.bgCard },
 });

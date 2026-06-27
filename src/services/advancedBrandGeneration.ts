@@ -41,97 +41,60 @@ export async function generateAdvancedLogos(
     .map(w => w[0])
     .join('');
 
-  const variations: LogoVariation[] = [];
+  // Run all 5 logo variants in parallel — previously they were sequential which
+  // caused up to 375s worst-case wait (5 × 75s timeout). With Promise.all the
+  // worst case drops to a single 75s window. Each function has its own fallback
+  // SVG so a single failure does not block the rest.
+  const [iconSvg, wordmarkSvg, badgeSvg, combinedSvg, monochromeSvg] = await Promise.all([
+    generateIconMark(initials, brandName, primaryColor, accentColor, story),
+    generateWordmark(brandName, story.tagline ?? '', primaryColor, typography, story),
+    generateBadge(initials, brandName, primaryColor, accentColor, story),
+    generateCombinedLockup(initials, brandName, story.tagline ?? '', primaryColor, accentColor, story),
+    generateMonochromeLogo(initials, brandName, neutralColor, story),
+  ]);
 
-  // ── 1. ICON MARK ──────────────────────────────────────────────────────────
-  // Abstract geometric symbol based on brand personality
-  const iconSvg = await generateIconMark(
-    initials,
-    brandName,
-    primaryColor,
-    accentColor,
-    story,
-  );
-  variations.push({
-    type: 'icon',
-    svg: iconSvg,
-    name: 'Icon Mark',
-    usage: 'Standalone symbol for favicon, app icon, social profiles',
-    minSize: '64px × 64px',
-    bestFor: 'Small spaces, digital platforms, quick recognition',
-  });
-
-  // ── 2. WORDMARK ───────────────────────────────────────────────────────────
-  // Premium typography-based logo
-  const wordmarkSvg = await generateWordmark(
-    brandName,
-    story.tagline ?? '',
-    primaryColor,
-    typography,
-    story,
-  );
-  variations.push({
-    type: 'wordmark',
-    svg: wordmarkSvg,
-    name: 'Wordmark',
-    usage: 'Text-only branding for headers, titles, marketing',
-    minSize: '120px width',
-    bestFor: 'Websites, social media headers, printed materials',
-  });
-
-  // ── 3. BADGE ──────────────────────────────────────────────────────────────
-  // Icon + text in circular badge format
-  const badgeSvg = await generateBadge(
-    initials,
-    brandName,
-    primaryColor,
-    accentColor,
-    story,
-  );
-  variations.push({
-    type: 'badge',
-    svg: badgeSvg,
-    name: 'Badge Logo',
-    usage: 'Icon + text combined for packaging, labels, certifications',
-    minSize: '100px × 100px',
-    bestFor: 'Product packaging, labels, email signatures',
-  });
-
-  // ── 4. COMBINED LOCKUP ────────────────────────────────────────────────────
-  // Horizontal layout with icon + wordmark side by side
-  const combinedSvg = await generateCombinedLockup(
-    initials,
-    brandName,
-    story.tagline ?? '',
-    primaryColor,
-    accentColor,
-    story,
-  );
-  variations.push({
-    type: 'combined',
-    svg: combinedSvg,
-    name: 'Combined Lockup',
-    usage: 'Full horizontal layout for websites, advertisements',
-    minSize: '200px width',
-    bestFor: 'Website headers, business cards, advertisements',
-  });
-
-  // ── 5. MONOCHROME ─────────────────────────────────────────────────────────
-  // Single color black version for printing
-  const monochromeSvg = await generateMonochromeLogo(
-    initials,
-    brandName,
-    neutralColor,
-    story,
-  );
-  variations.push({
-    type: 'monochrome',
-    svg: monochromeSvg,
-    name: 'Monochrome',
-    usage: 'Black & white version for printing, embossing, limitations',
-    minSize: '100px × 100px',
-    bestFor: 'Print production, embroidery, single-color applications',
-  });
+  const variations: LogoVariation[] = [
+    {
+      type: 'icon',
+      svg: iconSvg,
+      name: 'Icon Mark',
+      usage: 'Standalone symbol for favicon, app icon, social profiles',
+      minSize: '64px × 64px',
+      bestFor: 'Small spaces, digital platforms, quick recognition',
+    },
+    {
+      type: 'wordmark',
+      svg: wordmarkSvg,
+      name: 'Wordmark',
+      usage: 'Text-only branding for headers, titles, marketing',
+      minSize: '120px width',
+      bestFor: 'Websites, social media headers, printed materials',
+    },
+    {
+      type: 'badge',
+      svg: badgeSvg,
+      name: 'Badge Logo',
+      usage: 'Icon + text combined for packaging, labels, certifications',
+      minSize: '100px × 100px',
+      bestFor: 'Product packaging, labels, email signatures',
+    },
+    {
+      type: 'combined',
+      svg: combinedSvg,
+      name: 'Combined Lockup',
+      usage: 'Full horizontal layout for websites, advertisements',
+      minSize: '200px width',
+      bestFor: 'Website headers, business cards, advertisements',
+    },
+    {
+      type: 'monochrome',
+      svg: monochromeSvg,
+      name: 'Monochrome',
+      usage: 'Black & white version for printing, embossing, limitations',
+      minSize: '100px × 100px',
+      bestFor: 'Print production, embroidery, single-color applications',
+    },
+  ];
 
   return variations;
 }

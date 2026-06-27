@@ -374,7 +374,7 @@ const pmc = StyleSheet.create({
   // Primary button
   amazonBtn:        { backgroundColor: '#FF9900', borderRadius: 12, paddingVertical: 10, alignItems: 'center' as const },
   amazonBtnDisabled:{ backgroundColor: DS.bgSubtle, borderWidth: 1, borderColor: DS.border },
-  amazonTxt:        { fontSize: 13, fontWeight: '800', color: '#fff', letterSpacing: -0.2 },
+  amazonTxt:        { fontSize: 13, fontWeight: '800', color: DS.bgCard, letterSpacing: -0.2 },
   amazonTxtDisabled:{ color: DS.textMuted },
   // Actions row
   actionsRow:       { flexDirection: 'row', gap: 6 },
@@ -392,8 +392,8 @@ const pmc = StyleSheet.create({
   // Pipeline CTA
   pipelineBtn:      { borderRadius: DS.radiusButton, paddingVertical: 12, alignItems: 'center' as const, backgroundColor: DS.accent, borderWidth: 0 },
   pipelineBtnActive:{ backgroundColor: DS.accent },
-  pipelineTxt:      { fontSize: 13, fontWeight: '800' as const, color: '#fff', letterSpacing: -0.2 },
-  pipelineTxtActive:{ color: '#fff' },
+  pipelineTxt:      { fontSize: 13, fontWeight: '800' as const, color: DS.bgCard, letterSpacing: -0.2 },
+  pipelineTxtActive:{ color: DS.bgCard },
 });
 
 // ── Premium Compare products modal ───────────────────────────────────────────
@@ -743,7 +743,7 @@ export const prm = StyleSheet.create({
     backgroundColor: DS.accent, borderRadius: DS.radiusBadge,
     paddingHorizontal: 12, paddingVertical: 5,
   },
-  heroChipTxt: { fontSize: 11, fontWeight: '800', color: '#fff', letterSpacing: 0.3 },
+  heroChipTxt: { fontSize: 11, fontWeight: '800', color: DS.bgCard, letterSpacing: 0.3 },
 
   // AI Recommendation card
   recCard: {
@@ -804,11 +804,11 @@ export const prm = StyleSheet.create({
     backgroundColor: DS.accent, borderRadius: DS.radiusButton,
     paddingVertical: 11, alignItems: 'center',
   },
-  saveWinTxt: { fontSize: 13, fontWeight: '800', color: '#fff', letterSpacing: -0.2 },
+  saveWinTxt: { fontSize: 13, fontWeight: '800', color: DS.bgCard, letterSpacing: -0.2 },
 
   // View on Amazon secondary button
   viewAmazonBtn: { backgroundColor: '#FF9900', borderRadius: DS.radiusButton, paddingVertical: 10, alignItems: 'center' as const },
-  viewAmazonTxt: { fontSize: 13, fontWeight: '800', color: '#fff', letterSpacing: -0.2 },
+  viewAmazonTxt: { fontSize: 13, fontWeight: '800', color: DS.bgCard, letterSpacing: -0.2 },
 
   // Section eyebrow
   secEye: { fontSize: 9, fontWeight: '800', color: DS.textMuted, letterSpacing: 2, textTransform: 'uppercase' },
@@ -857,7 +857,7 @@ export const prm = StyleSheet.create({
     shadowColor: DS.accent, shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.28, shadowRadius: 10, elevation: 5,
   },
-  actionPrimaryTxt:{ fontSize: 15, fontWeight: '800', color: '#fff', letterSpacing: -0.3 },
+  actionPrimaryTxt:{ fontSize: 15, fontWeight: '800', color: DS.bgCard, letterSpacing: -0.3 },
   actionGhost:     { backgroundColor: DS.bgSubtle, borderRadius: DS.radiusButton, paddingVertical: 13, alignItems: 'center', borderWidth: 1, borderColor: DS.border },
   actionGhostTxt:  { fontSize: 14, fontWeight: '700', color: DS.textSecondary },
 });

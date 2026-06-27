@@ -44,5 +44,5 @@ const s = StyleSheet.create({
     zIndex: 9999,
     elevation: 10,
   },
-  text: { color: '#fff', fontSize: 13, fontWeight: '600' },
+  text: { color: DS.bgCard, fontSize: 13, fontWeight: '600' },
 });

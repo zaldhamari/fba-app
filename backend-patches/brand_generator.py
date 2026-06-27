@@ -345,3 +345,68 @@ async def create_label(body: CreateLabelRequest):
         "label_svg":  label_svg,
         "insert_svg": insert_svg,
     }
+
+
+# ─── Brand asset generation (used by Brand Identity / AdvancedLogoGenerator) ──
+
+class AssetRequest(BaseModel):
+    prompt: str
+    type: str  # logo_icon | wordmark | badge | combined_lockup | monochrome | label_*
+
+
+@router.post("/asset")
+async def generate_brand_asset(body: AssetRequest):
+    """
+    Generic SVG asset generator used by the Brand Identity tab.
+    The frontend constructs a detailed prompt and sends it with a type hint.
+    Returns a single SVG string.
+    """
+    try:
+        svg = chat_creative(LOGO_SYSTEM, body.prompt, max_tokens=6000)
+        svg = re.sub(r"```[a-z]*\n?", "", svg).strip()
+        return {"svg": svg}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Asset generation failed: {e}")
+
+
+# ─── Insert-only endpoint (avoids regenerating label when only insert needed) ─
+
+class CreateInsertRequest(BaseModel):
+    brand_name:       str
+    product_name:     str
+    weight:           str = "0.5kg"
+    style:            str = "premium"
+    brand_direction:  Optional[str] = None
+    color_palette:    str = "blue"
+    font_style:       Optional[str] = None
+    packaging_type:   str = "standard"
+    tagline:          Optional[str] = None
+    support_url:      Optional[str] = None
+    qr_text:          Optional[str] = None
+
+
+@router.post("/insert")
+async def create_insert(body: CreateInsertRequest):
+    """
+    Generates only the packaging insert SVG without touching the label.
+    Called by Quick Tools → Insert and Make Assets → Insert step.
+    """
+    palette = _palette(body.color_palette)
+
+    insert_prompt = (
+        f"Brand: {body.brand_name}\n"
+        f"Product: {body.product_name}\n"
+        f"Style: {body.style}\n"
+        f"Colours — primary: {palette['primary']}, text: {palette['text']}\n"
+        + (f"QR text: {body.qr_text}\n" if body.qr_text else "")
+        + (f"Support: {body.support_url}\n" if body.support_url else "")
+        + "\nGenerate a warm packaging insert SVG asking for a review."
+    )
+
+    try:
+        insert_svg = chat_creative(INSERT_SYSTEM, insert_prompt, max_tokens=4000)
+        insert_svg = re.sub(r"```[a-z]*\n?", "", insert_svg).strip()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Insert generation failed: {e}")
+
+    return {"insert_svg": insert_svg}

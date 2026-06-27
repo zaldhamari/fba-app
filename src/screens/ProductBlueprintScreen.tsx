@@ -512,7 +512,7 @@ const s = StyleSheet.create({
     alignItems:      'center',
     marginBottom:    8,
   },
-  launchpadBannerTxt: { fontSize: 14, fontWeight: '900', color: '#fff', letterSpacing: -0.2 },
+  launchpadBannerTxt: { fontSize: 14, fontWeight: '900', color: DS.bgCard, letterSpacing: -0.2 },
 
   pipelineLabel: {
     flexDirection: 'row',

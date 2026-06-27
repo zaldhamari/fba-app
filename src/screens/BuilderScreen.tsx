@@ -4,6 +4,7 @@ import {
   SafeAreaView, ActivityIndicator, Alert, TextInput,
 } from 'react-native';
 import { DS } from '../components/ds';
+import { SkeletonCard, SkeletonDashboard } from '../components/ds/LoadingSkeleton';
 import { useBuilderSession } from '../hooks/useBuilderSession';
 import { useSellerProfile } from '../hooks/useSellerProfile';
 import { api } from '../services/api';
@@ -76,7 +77,7 @@ function Btn({ label, onPress, color = DS.accent, loading = false, disabled = fa
       activeOpacity={0.8}
     >
       {loading
-        ? <ActivityIndicator color={outline ? color : '#fff'} size="small" />
+        ? <ActivityIndicator color={outline ? color : DS.bgCard} size="small" />
         : <Text style={[btn.label, outline && { color }]}>{label}</Text>}
     </TouchableOpacity>
   );
@@ -84,7 +85,7 @@ function Btn({ label, onPress, color = DS.accent, loading = false, disabled = fa
 
 const btn = StyleSheet.create({
   base:    { borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
-  label:   { fontSize: 15, fontWeight: '800', color: '#fff', letterSpacing: -0.3 },
+  label:   { fontSize: 15, fontWeight: '800', color: DS.bgCard, letterSpacing: -0.3 },
   disabled:{ opacity: 0.4 },
 });
 
@@ -215,7 +216,7 @@ function StageDiscovery({ session, onComplete }: {
               <Text style={[stg.resultTitle, isSel && { color: DS.info }]} numberOfLines={2}>{p.title}</Text>
               {isSel && (
                 <View style={{ backgroundColor: DS.info, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
-                  <Text style={{ fontSize: 10, fontWeight: '900', color: '#fff' }}>✓ Selected</Text>
+                  <Text style={{ fontSize: 10, fontWeight: '900', color: DS.bgCard }}>✓ Selected</Text>
                 </View>
               )}
             </View>
@@ -288,9 +289,9 @@ function StageAnalysis({ session, onComplete }: {
   }
 
   if (loading) return (
-    <View style={{ alignItems: 'center', paddingVertical: 32, gap: 12 }}>
-      <ActivityIndicator color={DS.accent} size="large" />
-      <Text style={{ color: DS.textSecondary, fontSize: 13 }}>Running AI analysis...</Text>
+    <View style={{ paddingVertical: 16, gap: 10 }}>
+      <SkeletonCard />
+      <SkeletonCard />
     </View>
   );
 
@@ -636,7 +637,7 @@ function StageFreight({ session, onComplete }: {
               <Text style={[stg.resultTitle, isSel && { color: DS.warning }]}>{m.mode}</Text>
               {key === result.recommended && (
                 <View style={{ backgroundColor: DS.warning, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
-                  <Text style={{ fontSize: 9, fontWeight: '900', color: '#fff' }}>BEST</Text>
+                  <Text style={{ fontSize: 9, fontWeight: '900', color: DS.bgCard }}>BEST</Text>
                 </View>
               )}
             </View>
@@ -857,7 +858,7 @@ const brd = StyleSheet.create({
   heading:      { fontSize: 17, fontWeight: '800', color: DS.textPrimary, letterSpacing: -0.3 },
   body:         { fontSize: 13, color: DS.textSecondary, lineHeight: 20 },
   primaryBtn:   { backgroundColor: DS.accent, borderRadius: DS.radiusButton, paddingVertical: 14, alignItems: 'center', marginTop: 4 },
-  primaryBtnTxt:{ fontSize: 15, fontWeight: '700', color: '#fff' },
+  primaryBtnTxt:{ fontSize: 15, fontWeight: '700', color: DS.bgCard },
   skipBtn:      { alignItems: 'center', paddingVertical: 8 },
   skipBtnTxt:   { fontSize: 13, color: DS.textMuted, fontWeight: '500' },
 });
@@ -1222,7 +1223,7 @@ const lb = StyleSheet.create({
   body:        { fontSize: 12, color: DS.textSecondary, lineHeight: 18 },
   actions:     { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
   btnPrimary:  { backgroundColor: DS.accent, borderRadius: DS.radiusButton, paddingHorizontal: 14, paddingVertical: 9 },
-  btnPrimaryTxt: { fontSize: 12, fontWeight: '800', color: '#fff' },
+  btnPrimaryTxt: { fontSize: 12, fontWeight: '800', color: DS.bgCard },
   btnSecondary:  { backgroundColor: 'transparent', borderRadius: DS.radiusButton, paddingHorizontal: 14, paddingVertical: 9, borderWidth: 1.5, borderColor: DS.border },
   btnSecondaryTxt: { fontSize: 12, fontWeight: '700', color: DS.textSecondary },
 });
@@ -1307,7 +1308,9 @@ export default function BuilderScreen() {
   if (!loaded) {
     return (
       <SafeAreaView style={bs.safe}>
-        <ActivityIndicator style={{ flex: 1 }} color={DS.accent} />
+        <ScrollView contentContainerStyle={{ padding: 16 }}>
+          <SkeletonDashboard />
+        </ScrollView>
       </SafeAreaView>
     );
   }
@@ -1476,7 +1479,7 @@ const stg = StyleSheet.create({
   eyebrow: { fontSize: 9, fontWeight: '800', letterSpacing: 1.5, textTransform: 'uppercase', color: DS.textMuted },
 
   searchBtn:    { width: 48, height: 48, backgroundColor: DS.accent, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  searchBtnTxt: { fontSize: 18, color: '#fff', fontWeight: '700' },
+  searchBtnTxt: { fontSize: 18, color: DS.bgCard, fontWeight: '700' },
 
   resultCard:    { borderRadius: 16, borderWidth: 1.5, borderColor: DS.border, backgroundColor: DS.bgCard, padding: 14, gap: 4 },
   resultCardSel: { borderColor: DS.accent },
@@ -1519,7 +1522,7 @@ const stg = StyleSheet.create({
   missionTitle: { fontSize: 22, fontWeight: '900', color: DS.textPrimary, textAlign: 'center', letterSpacing: -0.6 },
 
   publishBtn:    { backgroundColor: DS.warningText, borderRadius: 14, paddingVertical: 18, alignItems: 'center', width: '100%' },
-  publishBtnTxt: { fontSize: 16, fontWeight: '900', color: '#fff', letterSpacing: -0.3 },
+  publishBtnTxt: { fontSize: 16, fontWeight: '900', color: DS.bgCard, letterSpacing: -0.3 },
 });
 
 // ── Screen-level styles ───────────────────────────────────────────────────────
@@ -1568,7 +1571,7 @@ const bs = StyleSheet.create({
   stepIcon:     { fontSize: 16 },
 
   startBtn:     { alignSelf: 'stretch', backgroundColor: DS.accent, borderRadius: 16, paddingVertical: 18, alignItems: 'center' },
-  startBtnTxt:  { fontSize: 16, fontWeight: '900', color: '#fff', letterSpacing: -0.3 },
+  startBtnTxt:  { fontSize: 16, fontWeight: '900', color: DS.bgCard, letterSpacing: -0.3 },
 
   blueprintCard: {
     alignSelf:        'stretch',

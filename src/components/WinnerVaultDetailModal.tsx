@@ -391,7 +391,7 @@ export function WinnerVaultDetailModal({ entry, onClose }: Props) {
             activeOpacity={0.85}
           >
             {exporting ? (
-              <ActivityIndicator color="#fff" size="small" />
+              <ActivityIndicator color={DS.bgCard} size="small" />
             ) : (
               <Text style={d.exportBtnText}>⬇  Export Report</Text>
             )}
@@ -478,5 +478,5 @@ const d = StyleSheet.create({
     }),
   },
   exportBtnDisabled: { opacity: 0.6 },
-  exportBtnText:     { color: '#fff', fontSize: 15, fontWeight: '800', letterSpacing: 0.3 },
+  exportBtnText:     { color: DS.bgCard, fontSize: 15, fontWeight: '800', letterSpacing: 0.3 },
 });

@@ -1168,7 +1168,7 @@ export default function ResearchWorkspaceScreen() {
               marginTop: DS.sectionGap,
             }}
           >
-            <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 14 }}>🚀 Get Launch Pack</Text>
+            <Text style={{ color: DS.bgCard, fontWeight: '700', fontSize: 14 }}>🚀 Get Launch Pack</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -1418,8 +1418,8 @@ const ri = StyleSheet.create({
   saveInsightsSub:       { fontSize: 12, color: DS.textSecondary, lineHeight: 17 },
   saveInsightsBtn:       { backgroundColor: DS.accent, borderRadius: DS.radiusButton, paddingVertical: 13, alignItems: 'center' },
   saveInsightsBtnSaved:  { backgroundColor: DS.success },
-  saveInsightsBtnTxt:    { fontSize: 13, fontWeight: '800', color: '#fff', letterSpacing: -0.1 },
-  saveInsightsBtnSavedTxt: { color: '#fff' },
+  saveInsightsBtnTxt:    { fontSize: 13, fontWeight: '800', color: DS.bgCard, letterSpacing: -0.1 },
+  saveInsightsBtnSavedTxt: { color: DS.bgCard },
 });
 
 // ── Shared tab styles ─────────────────────────────────────────────────────────
@@ -1434,7 +1434,7 @@ const xt = StyleSheet.create({
   errTxt:      { fontSize: 13, color: DS.dangerText, textAlign: 'center' },
   retryBtn:         { backgroundColor: DS.dangerText, borderRadius: 8, paddingHorizontal: 20, paddingVertical: 8 },
   retryBtnDisabled: { backgroundColor: DS.textMuted },
-  retryTxt:         { fontSize: 13, fontWeight: '700', color: '#fff' },
+  retryTxt:         { fontSize: 13, fontWeight: '700', color: DS.bgCard },
   suppSearch:  { padding: 12 },
   compareBanner: {
     backgroundColor: DS.accentLight, borderRadius: 14, borderWidth: 1.5, borderColor: DS.accent,
@@ -1450,11 +1450,11 @@ const cfb = StyleSheet.create({
   pill:         { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: DS.accent, borderRadius: 28, paddingVertical: 13, paddingLeft: 18, paddingRight: 12, shadowColor: DS.textPrimary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 12, elevation: 10 },
   pillPending:  { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: DS.bgCard, borderRadius: 28, paddingVertical: 12, paddingLeft: 16, paddingRight: 14, borderWidth: 1.5, borderColor: DS.border, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 6 },
   pillIcon:     { fontSize: 15 },
-  pillText:     { flex: 1, fontSize: 14, fontWeight: '800', color: '#fff', letterSpacing: -0.3 },
+  pillText:     { flex: 1, fontSize: 14, fontWeight: '800', color: DS.bgCard, letterSpacing: -0.3 },
   pillTextPending: { flex: 1, fontSize: 13, fontWeight: '600', color: DS.textSecondary },
-  pillArrow:    { fontSize: 16, fontWeight: '800', color: '#fff' },
+  pillArrow:    { fontSize: 16, fontWeight: '800', color: DS.bgCard },
   clearBtn:     { width: 26, height: 26, borderRadius: 13, backgroundColor: 'rgba(255,255,255,0.25)', alignItems: 'center', justifyContent: 'center' },
-  clearText:    { fontSize: 12, fontWeight: '700', color: '#fff' },
+  clearText:    { fontSize: 12, fontWeight: '700', color: DS.bgCard },
   clearPending: { fontSize: 13, fontWeight: '600', color: DS.textMuted, paddingHorizontal: 4 },
 });
 
@@ -1464,7 +1464,7 @@ const fl = StyleSheet.create({
   title:            { fontSize: 14, fontWeight: '800', color: DS.textPrimary, letterSpacing: -0.3 },
   sub:              { fontSize: 12, color: DS.textSecondary, lineHeight: 18 },
   btn:              { backgroundColor: DS.accent, borderRadius: 12, paddingVertical: 12, alignItems: 'center' as const, shadowColor: DS.accent, shadowOpacity: 0.25, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
-  btnTxt:           { fontSize: 13, fontWeight: '900', color: '#fff', letterSpacing: -0.2 },
+  btnTxt:           { fontSize: 13, fontWeight: '900', color: DS.bgCard, letterSpacing: -0.2 },
 });
 
 const pd = StyleSheet.create({

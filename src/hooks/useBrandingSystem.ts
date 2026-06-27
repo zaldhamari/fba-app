@@ -5,8 +5,10 @@
  */
 
 import { useState, useCallback } from 'react';
+import { DS } from '../theme/ds';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STORAGE_KEYS } from '../constants/storage';
+import { api } from '../services/api';
 import {
   generateBrandGuidelinesPDF,
   generateCompleteExportPackage,
@@ -381,13 +383,41 @@ export function useBrandingSystem() {
 // ════════════════════════════════════════════════════════════════════════════
 
 async function generateElevatorPitch(story: Partial<BrandStory>): Promise<string> {
-  // TODO: Call Claude API
-  return `${story.brandName} is a ${story.mission} brand that ${story.uniqueValue}.`;
+  try {
+    const res = await api.askAI(
+      `Write a punchy 2-sentence elevator pitch for this Amazon FBA brand. Return ONLY the pitch text — no labels, no quotes, no preamble.`,
+      {
+        brand_name:    story.brandName,
+        mission:       story.mission,
+        unique_value:  story.uniqueValue,
+        brand_promise: story.brandPromise,
+        origin:        story.origin,
+        target_customer: story.customerPersona?.name,
+      },
+    );
+    return res.answer?.trim() || `${story.brandName} — ${story.mission}. ${story.uniqueValue}.`;
+  } catch {
+    return `${story.brandName} — ${story.mission}. ${story.uniqueValue}.`;
+  }
 }
 
 async function generatePositioningStatement(story: Partial<BrandStory>): Promise<string> {
-  // TODO: Call Claude API
-  return `For ${story.customerPersona?.name || 'customers'}, ${story.brandName} is the brand that ${story.brandPromise}.`;
+  try {
+    const res = await api.askAI(
+      `Write a single positioning statement for this brand using the format: "For [target customer], [brand name] is the [category] brand that [key benefit] because [reason to believe]." Return ONLY the statement — no labels, no quotes, no preamble.`,
+      {
+        brand_name:      story.brandName,
+        target_customer: story.customerPersona?.name || 'value-conscious shoppers',
+        pain_points:     story.customerPersona?.painPoints?.join(', '),
+        unique_value:    story.uniqueValue,
+        brand_promise:   story.brandPromise,
+        mission:         story.mission,
+      },
+    );
+    return res.answer?.trim() || `For ${story.customerPersona?.name || 'customers'}, ${story.brandName} is the brand that ${story.brandPromise}.`;
+  } catch {
+    return `For ${story.customerPersona?.name || 'customers'}, ${story.brandName} is the brand that ${story.brandPromise}.`;
+  }
 }
 
 async function generateColorSystem(primaryColor: string): Promise<ColorPalette> {
@@ -402,16 +432,16 @@ async function generateColorSystem(primaryColor: string): Promise<ColorPalette> 
       shades: [],
     },
     neutrals: {
-      white: '#FFFFFF',
+      white: DS.bgCard,
       light: '#F5F5F5',
       gray: '#999999',
       darkGray: '#333333',
       black: '#000000',
     },
     semantics: {
-      success: '#10B981',
-      warning: '#F59E0B',
-      danger: '#EF4444',
+      success: DS.success,
+      warning: DS.warning,
+      danger: DS.danger,
       info: '#3B82F6',
     },
     usage: {
@@ -499,9 +529,9 @@ function createMockupSVG(logo: string, label: string, packageType: string, view:
         <feDropShadow dx="2" dy="2" stdDeviation="3" flood-opacity="0.3"/>
       </filter>
     </defs>
-    <rect width="${width}" height="${height}" fill="#F5F7FF"/>
+    <rect width="${width}" height="${height}" fill=DS.bgCanvas/>
     <g transform="translate(20, 50)" filter="url(#shadow)">
-      <rect width="360" height="500" rx="8" fill="white" stroke="#E6ECFF" stroke-width="1"/>
+      <rect width="360" height="500" rx="8" fill="white" stroke=DS.border stroke-width="1"/>
       <g transform="translate(30, 30)">
         ${logo.replace(/<svg[^>]*>|<\/svg>/g, '')}
       </g>
@@ -579,11 +609,11 @@ function createAmazonMobilePreview(logo: string, label: string, title: string, b
   return `<svg width="375" height="667" viewBox="0 0 375 667" xmlns="http://www.w3.org/2000/svg">
     <rect width="375" height="667" fill="white"/>
     <g transform="translate(0, 60)">
-      <rect width="375" height="300" fill="#F5F7FF"/>
+      <rect width="375" height="300" fill=DS.bgCanvas/>
       <g transform="translate(50, 50)">${label.replace(/<svg[^>]*>|<\/svg>/g, '')}</g>
     </g>
-    <text x="20" y="380" font-size="18" font-weight="bold" fill="#0D1B4B">${title}</text>
-    <text x="20" y="410" font-size="12" fill="#5C6B8A">★★★★★ 124 reviews</text>
+    <text x="20" y="380" font-size="18" font-weight="bold" fill=DS.textPrimary>${title}</text>
+    <text x="20" y="410" font-size="12" fill=DS.textSecondary>★★★★★ 124 reviews</text>
     ${bullets.map((b, i) => `<text x="35" y="${430 + i * 25}" font-size="12" fill="#333">• ${b}</text>`).join('')}
     <rect x="20" y="${480 + bullets.length * 25}" width="335" height="50" rx="4" fill="#FF9900"/>
     <text x="187.5" y="${510 + bullets.length * 25}" text-anchor="middle" font-size="16" font-weight="bold" fill="white">Add to Cart</text>
@@ -594,12 +624,12 @@ function createAmazonDesktopPreview(logo: string, label: string, title: string, 
   return `<svg width="1200" height="800" viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
     <rect width="1200" height="800" fill="white"/>
     <g transform="translate(50, 100)">
-      <rect width="400" height="500" fill="#F5F7FF" rx="4"/>
+      <rect width="400" height="500" fill=DS.bgCanvas rx="4"/>
       <g transform="translate(50, 50)">${label.replace(/<svg[^>]*>|<\/svg>/g, '')}</g>
     </g>
     <g transform="translate(500, 100)">
-      <text x="0" y="30" font-size="24" font-weight="bold" fill="#0D1B4B">${title}</text>
-      <text x="0" y="60" font-size="14" fill="#5C6B8A">★★★★★ 124 reviews</text>
+      <text x="0" y="30" font-size="24" font-weight="bold" fill=DS.textPrimary>${title}</text>
+      <text x="0" y="60" font-size="14" fill=DS.textSecondary>★★★★★ 124 reviews</text>
       <text x="0" y="100" font-size="20" font-weight="bold" fill="#FF9900">$29.99</text>
       ${bullets.map((b, i) => `<text x="0" y="${140 + i * 25}" font-size="14" fill="#333">✓ ${b}</text>`).join('')}
       <rect x="0" y="${500}" width="300" height="60" rx="4" fill="#FF9900"/>

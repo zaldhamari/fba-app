@@ -586,7 +586,7 @@ const h = StyleSheet.create({
     backgroundColor: DS.accent, borderRadius: DS.radiusButton,
     paddingVertical: 12, alignItems: 'center' as const, marginTop: 4,
   },
-  upgradeTxt:    { fontSize: 14, fontWeight: '800', color: '#fff', letterSpacing: -0.2 },
+  upgradeTxt:    { fontSize: 14, fontWeight: '800', color: DS.bgCard, letterSpacing: -0.2 },
   refreshBtn: {
     borderRadius: DS.radiusButton, paddingVertical: 9, alignItems: 'center' as const,
     borderWidth: 1, borderColor: DS.border, backgroundColor: DS.bgSubtle,

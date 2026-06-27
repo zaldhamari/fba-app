@@ -21,7 +21,7 @@ interface ColorSystemBuilderProps {
 export function ColorSystemBuilder({ onPaletteGenerated }: ColorSystemBuilderProps) {
   const { generateColorPalette, loading, error } = useBrandingSystem();
 
-  const [primaryColor, setPrimaryColor] = useState('#2563EB');
+  const [primaryColor, setPrimaryColor] = useState<string>(DS.accent);
   const [palette, setPalette] = useState<ColorPalette | null>(null);
 
   const handleGeneratePalette = async () => {
@@ -71,10 +71,10 @@ export function ColorSystemBuilder({ onPaletteGenerated }: ColorSystemBuilderPro
           <Text style={styles.sectionLabel}>Quick Select</Text>
           <View style={styles.quickColors}>
             {[
-              { name: 'Blue', hex: '#2563EB' },
-              { name: 'Green', hex: '#10B981' },
+              { name: 'Blue', hex: DS.accent },
+              { name: 'Green', hex: DS.success },
               { name: 'Purple', hex: '#7C3AED' },
-              { name: 'Orange', hex: '#F59E0B' },
+              { name: 'Orange', hex: DS.warning },
               { name: 'Pink', hex: '#EC4899' },
               { name: 'Teal', hex: '#14B8A6' },
             ].map(color => (
@@ -272,12 +272,12 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   quickColorButtonActive: {
-    borderColor: '#FFFFFF',
+    borderColor: DS.bgCard,
   },
   quickColorLabel: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: DS.bgCard,
   },
   shadeGroup: {
     marginVertical: DS.cardGap,

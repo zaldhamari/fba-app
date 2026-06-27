@@ -63,5 +63,5 @@ const s = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: DS.accent,
   },
-  btnTxt: { fontSize: 14, fontWeight: '600', color: '#fff' },
+  btnTxt: { fontSize: 14, fontWeight: '600', color: DS.bgCard },
 });

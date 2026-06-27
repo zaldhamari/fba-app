@@ -142,7 +142,7 @@ const aim = StyleSheet.create({
   tipLabel: { fontSize: 9, fontWeight: '800', color: DS.accent, letterSpacing: 2 },
   tipBody:  { fontSize: 13, color: DS.textSecondary, lineHeight: 20 },
   btn:      { backgroundColor: DS.accent, borderRadius: 14, paddingVertical: 15, alignItems: 'center' },
-  btnText:  { fontSize: 15, fontWeight: '800', color: '#fff' },
+  btnText:  { fontSize: 15, fontWeight: '800', color: DS.bgCard },
 });
 
 // ─── Hero progress card ────────────────────────────────────────────────────────
@@ -321,9 +321,9 @@ function StageChips({
             activeOpacity={0.75}
           >
             <Text style={sc.chipIcon}>{stage.icon}</Text>
-            <Text style={[sc.chipLabel, isActive && { color: '#fff' }]}>{stage.label}</Text>
+            <Text style={[sc.chipLabel, isActive && { color: DS.bgCard }]}>{stage.label}</Text>
             <View style={[sc.chipPct, isActive && { backgroundColor: 'rgba(255,255,255,0.25)' }]}>
-              <Text style={[sc.chipPctText, isActive && { color: '#fff' }]}>
+              <Text style={[sc.chipPctText, isActive && { color: DS.bgCard }]}>
                 {done}/{total}
               </Text>
             </View>
@@ -519,7 +519,7 @@ const tl = StyleSheet.create({
     backgroundColor: DS.bgCard, alignItems: 'center', justifyContent: 'center',
     marginTop: 1, flexShrink: 0,
   },
-  checkmark: { fontSize: 11, color: '#fff', fontWeight: '900' },
+  checkmark: { fontSize: 11, color: DS.bgCard, fontWeight: '900' },
   taskText:  { fontSize: 13, color: DS.textSecondary, lineHeight: 20 },
   autoPipelineLbl: { fontSize: 10, color: DS.success, fontWeight: '600', marginTop: 2 },
 
@@ -557,7 +557,7 @@ function MilestonesCard({ checked }: { checked: Set<string> }) {
               {/* Connector line */}
               <View style={ms.connectorCol}>
                 <View style={[ms.dot, done && { backgroundColor: DS.accent, borderColor: DS.accent }]}>
-                  {done && <Text style={{ fontSize: 9, color: '#fff', fontWeight: '900' }}>✓</Text>}
+                  {done && <Text style={{ fontSize: 9, color: DS.bgCard, fontWeight: '900' }}>✓</Text>}
                 </View>
                 {!isLast && <View style={[ms.line, done && { backgroundColor: DS.accent }]} />}
               </View>
@@ -994,7 +994,7 @@ const ps = StyleSheet.create({
   title:         { fontSize: 14, fontWeight: '800', color: DS.textPrimary, letterSpacing: -0.2 },
   sub:           { fontSize: 11, color: DS.textMuted },
   launchBtn:     { backgroundColor: DS.accent, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 },
-  launchBtnTxt:  { fontSize: 11, fontWeight: '800', color: '#fff' },
+  launchBtnTxt:  { fontSize: 11, fontWeight: '800', color: DS.bgCard },
   barTrack:      { height: 5, backgroundColor: DS.bgElevated, borderRadius: 3, overflow: 'hidden' },
   barFill:       { height: 5, borderRadius: 3 },
   critSummary:   { backgroundColor: DS.danger + '0E', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7, borderWidth: 1, borderColor: DS.danger + '25' },
@@ -1191,9 +1191,9 @@ const s = StyleSheet.create({
     shadowOpacity: 0.18, shadowRadius: 12, elevation: 8,
   },
   celebIcon:  { fontSize: 22 },
-  celebTitle: { fontSize: 14, fontWeight: '900', color: '#fff', letterSpacing: -0.3 },
+  celebTitle: { fontSize: 14, fontWeight: '900', color: DS.bgCard, letterSpacing: -0.3 },
   celebSub:   { fontSize: 11, color: 'rgba(255,255,255,0.85)', marginTop: 1 },
-  celebCheck: { fontSize: 22, color: '#fff', fontWeight: '900' },
+  celebCheck: { fontSize: 22, color: DS.bgCard, fontWeight: '900' },
 
   header: {
     paddingHorizontal: DS.pagePadding,
