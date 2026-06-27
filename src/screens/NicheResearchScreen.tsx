@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TextInput,
-  TouchableOpacity, Alert,
+  TouchableOpacity, Alert, Image,
 } from 'react-native';
 import { AnimatedLoader } from '../components/AnimatedLoader';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -580,22 +580,25 @@ export default function NicheResearchScreen({ embedded = false, focusTrigger = 0
                     const compColor = rev < 100 ? DS.success : rev < 300 ? DS.warning : DS.danger;
                     return (
                       <View key={p.asin || i} style={s.productRow}>
-                        <View style={s.productRowRank}>
-                          <Text style={s.productRowRankTxt}>#{p.rank ?? i + 1}</Text>
-                        </View>
-                        <View style={{ flex: 1, gap: 2 }}>
-                          <Text style={s.productRowTitle} numberOfLines={1}>{p.title}</Text>
+                        {p.image ? (
+                          <Image source={{ uri: p.image }} style={s.productRowImg} />
+                        ) : (
+                          <View style={[s.productRowImg, s.productRowImgPlaceholder]}>
+                            <Text style={{ fontSize: 18 }}>📦</Text>
+                          </View>
+                        )}
+                        <View style={{ flex: 1, gap: 3 }}>
+                          <Text style={s.productRowTitle} numberOfLines={2}>{p.title}</Text>
                           <View style={s.productRowMeta}>
-                            {p.brand && <Text style={s.productRowBrand}>{p.brand}</Text>}
-                            <Text style={s.productRowMetaTxt}>{p.price != null ? `$${p.price}` : '—'}</Text>
+                            <Text style={s.productRowMetaTxt}>{p.price != null ? `${p.price}` : '—'}</Text>
                             <Text style={s.productRowMetaTxt}>·</Text>
                             <Text style={s.productRowMetaTxt}>{p.rating != null ? `${p.rating}★` : '—'}</Text>
                             <Text style={s.productRowMetaTxt}>·</Text>
-                            <Text style={s.productRowMetaTxt}>{rev.toLocaleString()} rev</Text>
+                            <Text style={s.productRowMetaTxt}>{rev > 0 ? `${rev.toLocaleString()} rev` : 'new'}</Text>
                           </View>
-                        </View>
-                        <View style={[s.productRowComp, { backgroundColor: compColor + '18' }]}>
-                          <Text style={[s.productRowCompTxt, { color: compColor }]}>{compLabel}</Text>
+                          <View style={[s.productRowComp, { alignSelf: 'flex-start', backgroundColor: compColor + '18' }]}>
+                            <Text style={[s.productRowCompTxt, { color: compColor }]}>{compLabel} competition</Text>
+                          </View>
                         </View>
                       </View>
                     );
@@ -830,15 +833,15 @@ const s = StyleSheet.create({
   affordInlineSub:  { fontSize: 10, color: DS.textMuted, lineHeight: 14 },
 
   // Compact product row (niche screen — no full Amazon cards)
-  productRow:        { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, borderTopWidth: 1, borderTopColor: DS.border },
-  productRowRank:    { width: 28, height: 28, borderRadius: 8, backgroundColor: DS.bgElevated, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  productRowRankTxt: { fontSize: 10, fontWeight: '800', color: DS.textMuted },
-  productRowTitle:   { fontSize: 12, fontWeight: '700', color: DS.textPrimary },
-  productRowMeta:    { flexDirection: 'row', gap: 4, flexWrap: 'wrap', alignItems: 'center' },
-  productRowBrand:   { fontSize: 10, fontWeight: '600', color: DS.accent, backgroundColor: DS.accentLight, borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1 },
-  productRowMetaTxt: { fontSize: 10, color: DS.textMuted },
-  productRowComp:    { borderRadius: DS.radiusBadge, paddingHorizontal: 8, paddingVertical: 3, flexShrink: 0 },
-  productRowCompTxt: { fontSize: 10, fontWeight: '800' },
+  productRow:              { flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingVertical: 10, borderTopWidth: 1, borderTopColor: DS.border },
+  productRowImg:           { width: 60, height: 60, borderRadius: 8, flexShrink: 0, resizeMode: 'cover' },
+  productRowImgPlaceholder:{ backgroundColor: DS.bgElevated, alignItems: 'center', justifyContent: 'center' },
+  productRowTitle:         { fontSize: 12, fontWeight: '700', color: DS.textPrimary, lineHeight: 17 },
+  productRowMeta:          { flexDirection: 'row', gap: 4, flexWrap: 'wrap', alignItems: 'center' },
+  productRowBrand:         { fontSize: 10, fontWeight: '600', color: DS.accent, backgroundColor: DS.accentLight, borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1 },
+  productRowMetaTxt:       { fontSize: 11, color: DS.textMuted },
+  productRowComp:          { borderRadius: DS.radiusBadge, paddingHorizontal: 8, paddingVertical: 3 },
+  productRowCompTxt:       { fontSize: 10, fontWeight: '800' },
 
   saveBtn: {
     borderWidth:     1,
