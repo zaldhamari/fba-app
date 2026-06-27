@@ -1,6 +1,7 @@
 import React, { useMemo, useEffect, useState } from 'react';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
+import { generateAndShareReport } from '../services/launchReportService';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator, TextInput, Modal, KeyboardAvoidingView, Platform,
 } from 'react-native';
@@ -640,52 +641,24 @@ export default function LaunchDecisionScreen() {
     if (exporting) return;
     setExporting(true);
     try {
-      const raw    = await pipeline.exportPipeline();
-      const parsed = JSON.parse(raw);
-      const lines: string[] = [
-        `SIFTLY — LAUNCH SUMMARY`,
-        `Exported: ${new Date().toLocaleString()}`,
-        ``,
-        `PRODUCT`,
-        `  Title:       ${parsed.activeProduct?.title ?? '—'}`,
-        `  ASIN:        ${parsed.activeProduct?.asin  ?? '—'}`,
-        `  Price:       $${parsed.activeProduct?.price ?? '—'}`,
-        `  Reviews:     ${parsed.activeProduct?.reviews ?? '—'}`,
-        `  Competition: ${parsed.activeProduct?.competition ?? '—'}`,
-        ``,
-        `SUPPLIER`,
-        `  Name:     ${parsed.selectedSupplier?.name     ?? '—'}`,
-        `  Platform: ${parsed.selectedSupplier?.platform ?? '—'}`,
-        `  Unit Cost: $${parsed.selectedSupplier?.unitCost ?? '—'}`,
-        `  MOQ:      ${parsed.selectedSupplier?.moq ?? '—'} units`,
-        ``,
-        `COST MODEL`,
-        `  Selling Price:  $${parsed.costModel?.sellingPrice  ?? '—'}`,
-        `  Net Profit:     $${parsed.costModel?.netProfit      ?? '—'}`,
-        `  Margin:         ${parsed.costModel?.marginPct != null ? parsed.costModel.marginPct.toFixed(1) + '%' : '—'}`,
-        `  ROI:            ${parsed.costModel?.roiPct     != null ? parsed.costModel.roiPct.toFixed(1)     + '%' : '—'}`,
-        `  Units Ordered:  ${parsed.costModel?.unitsOrdered   ?? '—'}`,
-        `  Total Investment: $${parsed.costModel?.totalInvestment ?? '—'}`,
-        ``,
-        `NICHE`,
-        `  Keyword:   ${parsed.activeNiche?.keyword     ?? '—'}`,
-        `  Verdict:   ${parsed.activeNiche?.verdictLabel ?? '—'}`,
-        `  Score:     ${parsed.activeNiche?.score        ?? '—'}`,
-        ``,
-        `BRAND`,
-        `  Brand Name:    ${parsed.brandData?.brandName    ?? '—'}`,
-        `  Tagline:       ${parsed.brandData?.tagline       ?? '—'}`,
-        `  Product Title: ${parsed.brandData?.productTitle  ?? '—'}`,
-      ];
-      const text = lines.join('\n');
-      const uri  = FileSystem.cacheDirectory + 'siftly-launch-summary.txt';
-      await FileSystem.writeAsStringAsync(uri, text, { encoding: FileSystem.EncodingType.UTF8 });
-      const canShare = await Sharing.isAvailableAsync();
-      if (canShare) {
-        await Sharing.shareAsync(uri, { mimeType: 'text/plain', dialogTitle: 'Export Launch Summary' });
-      }
+      await generateAndShareReport({
+        niche:    activeNiche,
+        product:  activeProduct,
+        supplier: selectedSupplier,
+        cost:     costModel,
+        brand:    brandData,
+        recon:    reconInsights,
+        verdict:  result.verdict,
+        score:    result.score,
+        strengths:    result.strengths,
+        risks:        result.risks,
+        actions:      result.actions,
+        improvements: result.improvements,
+        factors:      result.factors,
+        stages:       result.stages,
+      });
     } catch (e: any) {
-      Alert.alert('Export Failed', e?.message ?? 'Could not export the summary. Please try again.');
+      Alert.alert('Export Failed', e?.message ?? 'Could not generate the report. Please try again.');
     } finally { setExporting(false); }
   }
 
@@ -1382,9 +1355,16 @@ export default function LaunchDecisionScreen() {
           )}
 
           {/* Export launch summary */}
-          <TouchableOpacity style={s.exportBtn} activeOpacity={0.75} onPress={handleExport} disabled={exporting}>
-            <Text style={s.exportBtnTxt}>{exporting ? 'Exporting…' : 'Export Launch Summary'}</Text>
+          <TouchableOpacity style={s.reportBtn} activeOpacity={0.82} onPress={handleExport} disabled={exporting}>
+            {exporting
+              ? <ActivityIndicator color={DS.bgCard} size="small" />
+              : <>
+                  <Text style={s.reportBtnIcon}>📄</Text>
+                  <Text style={s.reportBtnTxt}>Generate Full Decision Report</Text>
+                  <Text style={s.reportBtnArrow}>↗</Text>
+                </>}
           </TouchableOpacity>
+          <Text style={s.reportHint}>Opens as HTML — open in browser and print to PDF</Text>
         </View>
 
         {/* Decision simulator — what-if analysis before committing */}
@@ -1625,6 +1605,27 @@ const s = StyleSheet.create({
   },
   exportBtnTxt: { fontSize: 12, fontWeight: '700', color: DS.textSecondary },
 
+
+  // ── Full Report CTA ────────────────────────────────────────────────────────
+  reportBtn: {
+    flexDirection:   'row',
+    alignItems:      'center',
+    justifyContent:  'center',
+    gap:             8,
+    paddingVertical: 15,
+    paddingHorizontal: 20,
+    backgroundColor: DS.accent,
+    borderRadius:    DS.radiusButton,
+    shadowColor:     DS.accent,
+    shadowOffset:    { width: 0, height: 4 },
+    shadowOpacity:   0.3,
+    shadowRadius:    12,
+    elevation:       6,
+  },
+  reportBtnIcon:  { fontSize: 16 },
+  reportBtnTxt:   { fontSize: 14, fontWeight: '800', color: DS.bgCard, letterSpacing: -0.2 },
+  reportBtnArrow: { fontSize: 14, fontWeight: '800', color: DS.bgCard + 'cc' },
+  reportHint:     { fontSize: 10, color: DS.textMuted, textAlign: 'center', marginTop: 6, fontStyle: 'italic' },
   resetBtn: {
     alignItems:      'center',
     paddingVertical: 14,
