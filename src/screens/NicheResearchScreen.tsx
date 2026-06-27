@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TextInput,
-  TouchableOpacity, Alert, Image,
+  TouchableOpacity, Alert, Image, Linking,
 } from 'react-native';
 import { AnimatedLoader } from '../components/AnimatedLoader';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -576,6 +576,7 @@ export default function NicheResearchScreen({ embedded = false, focusTrigger = 0
                   <Text style={s.cardSub}>Tap "Scout Products on Amazon →" above to see full details in Research</Text>
                   {list.map((p, i) => {
                     const rev = p.review_count ?? 0;
+                    const bpm = p.bought_past_month;
                     const compLabel = rev < 100 ? 'Low' : rev < 300 ? 'Med' : 'High';
                     const compColor = rev < 100 ? DS.success : rev < 300 ? DS.warning : DS.danger;
                     return (
@@ -587,23 +588,32 @@ export default function NicheResearchScreen({ embedded = false, focusTrigger = 0
                             <Text style={{ fontSize: 18 }}>📦</Text>
                           </View>
                         )}
-                        <View style={{ flex: 1, gap: 3 }}>
+                        <View style={{ flex: 1, gap: 4 }}>
                           <Text style={s.productRowTitle} numberOfLines={2}>{p.title}</Text>
+                          {p.brand && <Text style={s.productRowBrand}>{p.brand}</Text>}
                           <View style={s.productRowMeta}>
-                            <Text style={s.productRowMetaTxt}>{p.price != null ? `${p.price}` : '—'}</Text>
+                            <Text style={s.productRowMetaTxt}>{p.price != null ? `$${p.price}` : '—'}</Text>
                             <Text style={s.productRowMetaTxt}>·</Text>
                             <Text style={s.productRowMetaTxt}>{p.rating != null ? `${p.rating}★` : '—'}</Text>
-                            <Text style={s.productRowMetaTxt}>·</Text>
-                            <Text style={s.productRowMetaTxt}>{rev > 0 ? `${rev.toLocaleString()} rev` : 'new'}</Text>
+                            {rev > 0 && <><Text style={s.productRowMetaTxt}>·</Text><Text style={s.productRowMetaTxt}>{rev.toLocaleString()} rev</Text></>}
+                            {bpm != null && bpm > 0 && <><Text style={s.productRowMetaTxt}>·</Text><Text style={[s.productRowMetaTxt, { color: DS.success }]}>{bpm.toLocaleString()}+ sold/mo</Text></>}
                           </View>
-                          <View style={[s.productRowComp, { alignSelf: 'flex-start', backgroundColor: compColor + '18' }]}>
-                            <Text style={[s.productRowCompTxt, { color: compColor }]}>{compLabel} competition</Text>
+                          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 5 }}>
+                            <View style={[s.productRowComp, { backgroundColor: compColor + '18' }]}>
+                              <Text style={[s.productRowCompTxt, { color: compColor }]}>{compLabel}</Text>
+                            </View>
+                            {p.is_best_seller && <View style={[s.productRowComp, { backgroundColor: DS.warning + '20' }]}><Text style={[s.productRowCompTxt, { color: DS.warningText ?? DS.warning }]}>Best Seller</Text></View>}
+                            {p.is_amazon_choice && <View style={[s.productRowComp, { backgroundColor: DS.accent + '18' }]}><Text style={[s.productRowCompTxt, { color: DS.accent }]}>Amz Choice</Text></View>}
                           </View>
+                          {!!p.url && (
+                            <TouchableOpacity onPress={() => Linking.openURL(p.url)} activeOpacity={0.7}>
+                              <Text style={s.productRowLink}>↗ View on Amazon</Text>
+                            </TouchableOpacity>
+                          )}
                         </View>
                       </View>
                     );
-                  })}
-                </View>
+                  })}                </View>
               );
             })()}
           </>
@@ -842,6 +852,8 @@ const s = StyleSheet.create({
   productRowMetaTxt:       { fontSize: 11, color: DS.textMuted },
   productRowComp:          { borderRadius: DS.radiusBadge, paddingHorizontal: 8, paddingVertical: 3 },
   productRowCompTxt:       { fontSize: 10, fontWeight: '800' },
+  productRowBrand:         { fontSize: 9, fontWeight: '600', color: DS.accent },
+  productRowLink:          { fontSize: 11, fontWeight: '700', color: DS.accent, marginTop: 2 },
 
   saveBtn: {
     borderWidth:     1,
