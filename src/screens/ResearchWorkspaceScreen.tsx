@@ -201,7 +201,11 @@ export default function ResearchWorkspaceScreen() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useFocusEffect(useCallback(() => {
+  // Handle autoSearch / autoRecon params coming in from Niche or Decision screen.
+  // Plain useEffect (not useFocusEffect) so it fires the moment route.params changes,
+  // regardless of which tab is active — avoids the re-run / stale-closure issues of
+  // useFocusEffect + useCallback with searchQuery in the dep array.
+  useEffect(() => {
     const params = route.params as { autoSearch?: string; autoRecon?: string } | undefined;
     if (params?.autoRecon) {
       const q = params.autoRecon as string;
@@ -215,11 +219,18 @@ export default function ResearchWorkspaceScreen() {
       setSearchQuery(q);
       setMode('market');
       setPendingAutoSearch(q);
-    } else if (!prefilled.current && pipeline.activeNiche?.keyword && !searchQuery) {
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [route.params]);
+
+  // One-time prefill from pipeline when Research tab first gains focus with no query yet.
+  useFocusEffect(useCallback(() => {
+    if (!prefilled.current && pipeline.activeNiche?.keyword && !searchQuery) {
       setSearchQuery(pipeline.activeNiche.keyword);
       prefilled.current = true;
     }
-  }, [route.params, pipeline.activeNiche, searchQuery, navigation]));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pipeline.activeNiche?.keyword]));
 
   const addRecentMarket = useCallback((q: string) => {
     setRecentMarket(prev => {
