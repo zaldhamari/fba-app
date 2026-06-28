@@ -520,8 +520,12 @@ export default function ResearchWorkspaceScreen() {
         isASIN(q) ||
         /amazon\.(com|co\.uk|de|ca|co\.jp|com\.au|in|fr|es|it)/i.test(q);
 
+      let resolvedAsin: string | undefined;
+
       if (isAsinOrUrl) {
         const lookup = await api.lookupProduct(q);
+        // Extract ASIN — prefer from lookup response, fall back to raw input if it's already an ASIN
+        resolvedAsin = (lookup.asin as string | undefined) || (isASIN(q) ? q.toUpperCase() : undefined);
         if (lookup.title && lookup.source === 'scraped') {
           name = lookup.title;
           cat  = lookup.category ?? 'General';
@@ -533,7 +537,7 @@ export default function ResearchWorkspaceScreen() {
 
       setRevProductName(name);
       setRevCategory(cat);
-      const result = await api.analyzeReviews(name, cat, []);
+      const result = await api.analyzeReviews(name, cat, [], resolvedAsin);
       setRevResult(result);
       AsyncStorage.setItem(
         STORAGE_KEYS.reviewIntelligence,
