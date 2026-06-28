@@ -11,7 +11,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { safeParseJSON } from '../utils/safeJSON';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { DS } from '../components/ds';
-import { api } from '../services/api';
+import { api, prewarmServer } from '../services/api';
 import { AppHeader } from '../components/AppHeader';
 import { useCurrency } from '../context/CurrencyContext';
 import { useSellerProfile } from '../hooks/useSellerProfile';
@@ -146,6 +146,9 @@ export default function NicheResearchScreen({ embedded = false, focusTrigger = 0
   const { can, increment } = useSubscription();
 
   const searchInputRef  = useRef<TextInput>(null);
+
+  // Pre-warm Railway on screen mount so the server is hot before the user taps Search
+  useEffect(() => { prewarmServer(); }, []);
 
   useEffect(() => {
     if (!focusTrigger) return;
