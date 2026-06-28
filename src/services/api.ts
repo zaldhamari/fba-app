@@ -513,7 +513,7 @@ export const api = {
   },
 
   // ─── Review Analyzer ───────────────────────────────────────────────────────
-  analyzeReviews: async (product_name: string, category: string, sample_reviews?: string[]) => {
+  analyzeReviews: async (product_name: string, category: string, sample_reviews?: string[], asin?: string, marketplace?: string) => {
     const data = await post<{
       top_complaints: string[];
       opportunities: string[];
@@ -522,7 +522,8 @@ export const api = {
       recommended_improvements: string[];
       bundling_ideas: string[];
       source: string;
-    }>('/ai/reviews', { product_name, category, sample_reviews: sample_reviews || [] });
+      review_count?: number;
+    }>('/ai/reviews', { product_name, category, sample_reviews: sample_reviews || [], asin, marketplace: marketplace || 'US' });
     validateAnalyzeReviews(data);
     return data;
   },
