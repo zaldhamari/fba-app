@@ -7,7 +7,7 @@ import { DS } from '../components/ds';
 import { SkeletonCard, SkeletonDashboard } from '../components/ds/LoadingSkeleton';
 import { useBuilderSession } from '../hooks/useBuilderSession';
 import { useSellerProfile } from '../hooks/useSellerProfile';
-import { api } from '../services/api';
+import { api, prewarmServer } from '../services/api';
 import type {
   BuilderSession, BuilderStage,
   DiscoveryData, AnalysisData, SupplierData,
@@ -267,7 +267,7 @@ function StageAnalysis({ session, onComplete }: {
   const [result,   setResult]   = useState<any | null>(null);
   const [error,    setError]    = useState('');
 
-  useEffect(() => { if (product) runAnalysis(); }, []);
+  useEffect(() => { prewarmServer(); if (product) runAnalysis(); }, []);
 
   async function runAnalysis() {
     if (!product) return;
