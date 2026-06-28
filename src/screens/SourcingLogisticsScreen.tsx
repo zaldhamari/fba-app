@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { DS } from '../components/ds';
 import { InputField, PrimaryButton, AppCard } from '../components/ds';
-import { api, Supplier } from '../services/api';
+import { api, Supplier, prewarmServer } from '../services/api';
 import { AppHeader } from '../components/AppHeader';
 import { useCurrency } from '../context/CurrencyContext';
 import { useSellerProfile } from '../hooks/useSellerProfile';
@@ -867,6 +867,7 @@ export default function SourcingLogisticsScreen() {
 
   useEffect(() => {
     isMountedRef.current = true;
+    prewarmServer(); // Wake Railway before user taps Search
     return () => { isMountedRef.current = false; };
   }, []);
 
