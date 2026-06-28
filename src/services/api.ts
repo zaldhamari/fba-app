@@ -154,6 +154,31 @@ async function warmServer(): Promise<void> {
   }
 }
 
+// ── Search pre-warmer ─────────────────────────────────────────────────────────
+// Called by search screens on mount (fire-and-forget, no await needed).
+// Sends a lightweight /health ping so Railway wakes up BEFORE the user
+// presses Search — by the time they type and tap, the cold-start penalty
+// is already absorbed. Only fires once per app session.
+let _searchWarmPromise: Promise<void> | null = null;
+
+export function prewarmServer(): void {
+  if (_searchWarmPromise) return; // Already warming / warmed — skip
+  _searchWarmPromise = (async () => {
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 10_000); // 10s cap
+      await fetch(`${BASE_URL}/health`, {
+        method:  'GET',
+        headers: { 'X-API-Key': API_KEY },
+        signal:  controller.signal,
+      });
+      clearTimeout(timer);
+    } catch {
+      // Ignore — cold start will be absorbed by the first real request instead
+    }
+  })();
+}
+
 // Brand generation: wake server first, then generate with generous timeout + 1 retry.
 async function postBrand<T>(endpoint: string, body: object): Promise<T> {
   await warmServer();
