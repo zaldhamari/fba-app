@@ -129,8 +129,6 @@ export default function ResearchWorkspaceScreen() {
   const intelProfile             = useProductIntelligence();
   const route                    = useRoute<any>();
   const prefilled                = useRef(false);
-  const autoSearchConsumed       = useRef(false);
-  const autoReconConsumed        = useRef(false);
   const isMountedRef             = useRef(true);
 
   useEffect(() => {
@@ -205,15 +203,13 @@ export default function ResearchWorkspaceScreen() {
 
   useFocusEffect(useCallback(() => {
     const params = route.params as { autoSearch?: string; autoRecon?: string } | undefined;
-    if (params?.autoRecon && !autoReconConsumed.current) {
-      autoReconConsumed.current = true;
+    if (params?.autoRecon) {
       const q = params.autoRecon as string;
       (navigation as any).setParams({ autoRecon: undefined });
       setSearchQuery(q);
       setMode('lookup');
       setPendingAutoRecon(q);
-    } else if (params?.autoSearch && !autoSearchConsumed.current) {
-      autoSearchConsumed.current = true;
+    } else if (params?.autoSearch) {
       const q = params.autoSearch as string;
       (navigation as any).setParams({ autoSearch: undefined });
       setSearchQuery(q);
